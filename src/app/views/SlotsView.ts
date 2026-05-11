@@ -2,7 +2,7 @@ import { slotFrameAsset, slotSymbolAsset } from '../../assets/manifest';
 import type { CasinoGameId } from '../../game/catalog';
 import { symbolLabel, type SlotSnapshot } from '../../game/slots';
 import type { RoomSnapshot } from '../../multiplayer/protocol';
-
+import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements';
 import { money } from '../format/appMoney';
 
