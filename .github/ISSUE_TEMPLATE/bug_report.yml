@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem in Casino Warehouse.
+title: '[Bug]: '
+labels:
+  - "type:bug"
+  - "status:needs-triage"
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting a problem. Please include enough detail for someone else to reproduce it.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps, including the game, room type, browser, and device if relevant.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: 'Chrome on macOS desktop, Safari on iPad, etc.'
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      render: text
