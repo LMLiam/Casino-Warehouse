@@ -41,7 +41,11 @@ export const gameCatalog: readonly GameCatalogEntry[] = [
     kind: 'blackjack',
     description: 'Standalone Blackjack table with dealer rules.',
     accent: '#75ff92',
-    rules: ['Beat the dealer without going over 21.', 'The dealer reveals the hole card after the player stands or busts.', 'Dealer hits soft 17 and stands on hard 17 or higher.'],
+    rules: [
+      'Beat the dealer without going over 21.',
+      'The dealer reveals the hole card after the player stands or busts.',
+      'Dealer hits soft 17 and stands on hard 17 or higher.',
+    ],
     paytable: ['Blackjack pays 3:2.', 'Regular wins pay 1:1.', 'Pushes return the wager.'],
   },
   ...slotThemes.map(

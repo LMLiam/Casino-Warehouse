@@ -44,7 +44,15 @@ export class CardRenderer {
     this.animateIfNeeded(container, animationKey, animationOrder, x, y);
   }
 
-  public drawRevealedCard(card: Card, x: number, y: number, isWinner: boolean, renderKey: string, animationKey: string | undefined, animationOrder: number | undefined): void {
+  public drawRevealedCard(
+    card: Card,
+    x: number,
+    y: number,
+    isWinner: boolean,
+    renderKey: string,
+    animationKey: string | undefined,
+    animationOrder: number | undefined,
+  ): void {
     const hadRenderedCard = this.cards.has(renderKey);
     const container = this.drawCardFace(renderKey, card, isWinner);
     if (hadRenderedCard) {
@@ -103,7 +111,13 @@ export class CardRenderer {
     return container;
   }
 
-  private animateIfNeeded(displayObject: Container, animationKey: string | undefined, animationOrder: number | undefined, targetX: number, targetY: number): void {
+  private animateIfNeeded(
+    displayObject: Container,
+    animationKey: string | undefined,
+    animationOrder: number | undefined,
+    targetX: number,
+    targetY: number,
+  ): void {
     if (!animationKey || animationOrder === undefined || this.animatedCards.has(animationKey)) {
       if (!animationKey || !this.activeAnimations.has(animationKey)) {
         displayObject.position.set(targetX, targetY);
@@ -154,7 +168,13 @@ export class CardRenderer {
     });
   }
 
-  private animateFlipIfNeeded(displayObject: Container, animationKey: string | undefined, animationOrder: number | undefined, targetX: number, targetY: number): void {
+  private animateFlipIfNeeded(
+    displayObject: Container,
+    animationKey: string | undefined,
+    animationOrder: number | undefined,
+    targetX: number,
+    targetY: number,
+  ): void {
     if (!animationKey || animationOrder === undefined || this.animatedCards.has(animationKey)) {
       if (!animationKey || !this.activeAnimations.has(animationKey)) {
         displayObject.position.set(targetX, targetY);

@@ -368,7 +368,9 @@ export class RoomAuthority {
       return this.error('It is not your turn.');
     }
     this.syncBeatBankroll(room);
-    return this.ownerAction(room, () => (room.model.kind === 'beat-the-house' ? (action === 'hit' ? room.model.game.hit() : room.model.game.stick()) : snapshot));
+    return this.ownerAction(room, () =>
+      room.model.kind === 'beat-the-house' ? (action === 'hit' ? room.model.game.hit() : room.model.game.stick()) : snapshot,
+    );
   }
 
   private nextBeatRound(room: RoomState, profileId: string, role: RoomRole): AuthorityResult {
@@ -415,7 +417,12 @@ export class RoomAuthority {
     return this.broadcast(room, this.applyBlackjackSettlements(room, result));
   }
 
-  private blackjackAction(room: RoomState, profileId: string, role: RoomRole, action: Extract<ClientMessage, { type: 'blackjack-action' }>['action']): AuthorityResult {
+  private blackjackAction(
+    room: RoomState,
+    profileId: string,
+    role: RoomRole,
+    action: Extract<ClientMessage, { type: 'blackjack-action' }>['action'],
+  ): AuthorityResult {
     if (room.model.kind !== 'blackjack') {
       return this.error('Wrong room game.');
     }
@@ -435,7 +442,8 @@ export class RoomAuthority {
       room.model.settledSessionIds.clear();
     }
     const seatBefore = room.model.table.snapshot(this.blackjackOccupants(room)).seats.find((seat) => seat.seatId === seatId);
-    const requiredDebit = action === 'double' || action === 'split' ? (seatBefore?.wager ?? 0) : action === 'insurance' ? Math.floor((seatBefore?.wager ?? 0) / 2) : 0;
+    const requiredDebit =
+      action === 'double' || action === 'split' ? (seatBefore?.wager ?? 0) : action === 'insurance' ? Math.floor((seatBefore?.wager ?? 0) / 2) : 0;
     if (requiredDebit > 0 && player.bankroll < requiredDebit) {
       return this.error('Insufficient profile bankroll for that Blackjack action.');
     }
@@ -499,7 +507,12 @@ export class RoomAuthority {
     if (room.model.game.snapshot().phase === 'bonus') {
       return this.error('Finish the Slots bonus before spinning again.');
     }
-    const sharedPhase = deriveSharedSlotsPhase(room.players.size, room.model.wagersByProfileId.size, room.model.readyProfileIds.size, room.model.game.snapshot().phase);
+    const sharedPhase = deriveSharedSlotsPhase(
+      room.players.size,
+      room.model.wagersByProfileId.size,
+      room.model.readyProfileIds.size,
+      room.model.game.snapshot().phase,
+    );
     if (!canSharedSlotsTransition(sharedPhase, { type: 'SPIN' })) {
       return this.error('Every room player must be ready before the shared spin.');
     }
@@ -707,7 +720,15 @@ export class RoomAuthority {
     };
   }
 
-  private addMember(room: RoomState, connectionId: string, role: RoomRole, profileId: string, profileName: string, bankroll: number, sessionStartBankroll?: number): void {
+  private addMember(
+    room: RoomState,
+    connectionId: string,
+    role: RoomRole,
+    profileId: string,
+    profileName: string,
+    bankroll: number,
+    sessionStartBankroll?: number,
+  ): void {
     const centralBankroll = this.centralBankroll(profileId, profileName, bankroll);
     const player: RoomPlayer = {
       connectionId,

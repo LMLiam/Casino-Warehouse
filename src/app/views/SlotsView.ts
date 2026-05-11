@@ -72,7 +72,10 @@ export class SlotsView {
       })
       .join('');
     this.setActionButton(this.elements.slotsWagerButton, snapshot.phase !== 'bonus' && canPlay);
-    this.setActionButton(this.elements.slotsReadyButton, snapshot.phase !== 'bonus' && canPlay && myWager > 0 && !activeRoom.slots?.readyProfileIds.includes(profileId));
+    this.setActionButton(
+      this.elements.slotsReadyButton,
+      snapshot.phase !== 'bonus' && canPlay && myWager > 0 && !activeRoom.slots?.readyProfileIds.includes(profileId),
+    );
     this.setActionButton(this.elements.slotsSpinButton, snapshot.phase !== 'bonus' && canPlay && readyCount >= activeRoom.players.length);
   }
 

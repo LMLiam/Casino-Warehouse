@@ -63,12 +63,17 @@ export class BlackjackView {
       )
       .join('');
     const canAct = Boolean(mySeat?.isTurn);
-    const canDeal = Boolean(mySeat && (mySeat.phase === 'empty' || mySeat.phase === 'betting') && mySeat.playerCards.length === 0 && snapshot.phase !== 'settled');
+    const canDeal = Boolean(
+      mySeat && (mySeat.phase === 'empty' || mySeat.phase === 'betting') && mySeat.playerCards.length === 0 && snapshot.phase !== 'settled',
+    );
     this.setActionButton(this.elements.blackjackDealButton, canDeal);
     this.setActionButton(this.elements.blackjackHitButton, canAct);
     this.setActionButton(this.elements.blackjackStandButton, canAct);
     this.setActionButton(this.elements.blackjackDoubleButton, canAct && (mySeat?.playerCards.length ?? 0) === 2);
-    this.setActionButton(this.elements.blackjackSplitButton, canAct && (mySeat?.playerCards.length ?? 0) === 2 && mySeat?.playerCards[0]?.rank === mySeat?.playerCards[1]?.rank);
+    this.setActionButton(
+      this.elements.blackjackSplitButton,
+      canAct && (mySeat?.playerCards.length ?? 0) === 2 && mySeat?.playerCards[0]?.rank === mySeat?.playerCards[1]?.rank,
+    );
     this.setActionButton(this.elements.blackjackInsuranceButton, canAct && snapshot.dealerCards[0]?.rank === 'A' && (mySeat?.insuranceWager ?? 0) <= 0);
     this.setActionButton(this.elements.blackjackNewButton, snapshot.phase === 'settled');
   }

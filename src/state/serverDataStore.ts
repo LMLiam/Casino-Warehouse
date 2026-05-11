@@ -34,7 +34,10 @@ export interface ServerDataStore {
   clear(): ServerDataSnapshot;
   ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile;
   setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined;
-  recordTransaction(profileId: string, transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>): CasinoProfile | undefined;
+  recordTransaction(
+    profileId: string,
+    transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
+  ): CasinoProfile | undefined;
 }
 
 class MemoryServerDataStore implements ServerDataStore {
@@ -114,7 +117,10 @@ class MemoryServerDataStore implements ServerDataStore {
     return updated;
   }
 
-  public recordTransaction(profileId: string, transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>): CasinoProfile | undefined {
+  public recordTransaction(
+    profileId: string,
+    transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
+  ): CasinoProfile | undefined {
     const profile = this.findProfile(profileId);
     if (!profile) {
       return undefined;
@@ -204,7 +210,9 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   private writeValue(key: string, value: unknown): void {
-    this.db.prepare('INSERT INTO server_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(value));
+    this.db
+      .prepare('INSERT INTO server_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(key, JSON.stringify(value));
   }
 }
 

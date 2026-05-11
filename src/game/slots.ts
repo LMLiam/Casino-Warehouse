@@ -292,7 +292,9 @@ const jackpotPayout = (theme: SlotTheme, reels: readonly SlotSymbol[], wager: nu
     if (first !== second || second !== third) {
       return [];
     }
-    const win = (Object.entries(theme.jackpots) as [JackpotTier, NonNullable<SlotTheme['jackpots'][JackpotTier]>][]).find(([, jackpot]) => jackpot.symbol === first);
+    const win = (Object.entries(theme.jackpots) as [JackpotTier, NonNullable<SlotTheme['jackpots'][JackpotTier]>][]).find(
+      ([, jackpot]) => jackpot.symbol === first,
+    );
     if (!win) {
       return [];
     }

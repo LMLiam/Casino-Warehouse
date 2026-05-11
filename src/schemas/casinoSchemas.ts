@@ -39,9 +39,12 @@ export const roomRoleSchema = z.enum(['player', 'spectator']);
 export const handIdSchema = z.enum(handIds);
 export const betTypeSchema = z.enum(betTypes);
 export type ParsedRoomSeatId = HandId | `seat-${number}`;
-export const roomSeatIdSchema = z.custom<ParsedRoomSeatId>((value) => handIds.includes(value as HandId) || (typeof value === 'string' && /^seat-[1-9]\d*$/.test(value)), {
-  message: 'Seat id is invalid.',
-});
+export const roomSeatIdSchema = z.custom<ParsedRoomSeatId>(
+  (value) => handIds.includes(value as HandId) || (typeof value === 'string' && /^seat-[1-9]\d*$/.test(value)),
+  {
+    message: 'Seat id is invalid.',
+  },
+);
 
 const baseClientMessageSchema = z.object({
   version: protocolVersionSchema,
@@ -128,7 +131,11 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   baseClientMessageSchema.extend({ type: z.literal('start-round') }),
   baseClientMessageSchema.extend({ type: z.literal('player-action'), action: z.enum(['hit', 'stick']) }),
   baseClientMessageSchema.extend({ type: z.literal('next-round') }),
-  baseClientMessageSchema.extend({ type: z.literal('admin-debug'), action: z.enum(['reset-room', 'force-settle']), reason: z.string().trim().max(160).optional() }),
+  baseClientMessageSchema.extend({
+    type: z.literal('admin-debug'),
+    action: z.enum(['reset-room', 'force-settle']),
+    reason: z.string().trim().max(160).optional(),
+  }),
   baseClientMessageSchema.extend({ type: z.literal('resync') }),
 ]);
 

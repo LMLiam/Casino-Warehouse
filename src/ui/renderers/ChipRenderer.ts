@@ -33,11 +33,22 @@ export class ChipRenderer {
     this.layer.addChild(stack);
 
     visibleChips.forEach((chip, index) => {
-      this.drawChip(chip, index * radius * CHIP_RENDERING.stackXStep - radius * CHIP_RENDERING.stackXStep, -index * radius * CHIP_RENDERING.stackYStep, radius, stack);
+      this.drawChip(
+        chip,
+        index * radius * CHIP_RENDERING.stackXStep - radius * CHIP_RENDERING.stackXStep,
+        -index * radius * CHIP_RENDERING.stackYStep,
+        radius,
+        stack,
+      );
     });
 
     if (chips.length > visibleChips.length) {
-      this.drawAmountTag(`£${roundedAmount.toLocaleString('en-GB')}`, radius * CHIP_RENDERING.amountTagXOffset, radius * CHIP_RENDERING.amountTagYOffset, stack);
+      this.drawAmountTag(
+        `£${roundedAmount.toLocaleString('en-GB')}`,
+        radius * CHIP_RENDERING.amountTagXOffset,
+        radius * CHIP_RENDERING.amountTagYOffset,
+        stack,
+      );
     }
 
     if (!animationKey || this.animatedStacks.has(animationKey) || prefersReducedMotion()) {

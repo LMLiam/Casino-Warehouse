@@ -55,7 +55,18 @@ describe('BlackjackGame', () => {
     expect(doubled.wager).toBe(20);
 
     game = new BlackjackGame();
-    game.deal(10, rigDeck([card('8', 'clubs'), card('8', 'diamonds'), card('9', 'hearts'), card('7', 'spades'), card('10', 'clubs'), card('9', 'diamonds'), card('K', 'spades')]));
+    game.deal(
+      10,
+      rigDeck([
+        card('8', 'clubs'),
+        card('8', 'diamonds'),
+        card('9', 'hearts'),
+        card('7', 'spades'),
+        card('10', 'clubs'),
+        card('9', 'diamonds'),
+        card('K', 'spades'),
+      ]),
+    );
     const split = game.split();
     expect(split.splitHands).toHaveLength(2);
     expect(split.phase).toBe('settled');
@@ -231,7 +242,23 @@ describe('SlotsGame', () => {
   it('registers only the Thai Princess slot theme', () => {
     const game = new SlotsGame({ theme: slotThemes[0] });
 
-    const snapshot = game.spin(2, ['temple', 'temple', 'temple', 'lotus', 'elephant', 'fan', 'orchid', 'fan', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan']);
+    const snapshot = game.spin(2, [
+      'temple',
+      'temple',
+      'temple',
+      'lotus',
+      'elephant',
+      'fan',
+      'orchid',
+      'fan',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+    ]);
 
     expect(slotThemes.map((theme) => theme.id)).toEqual(['thai-princess']);
     expect(snapshot.themeTitle).toBe('Thai Princess');
@@ -264,18 +291,66 @@ describe('SlotsGame', () => {
     expect(wildLine.reels).toHaveLength(15);
     expect(wildLine.lineWin).toBe(80);
 
-    const freeSpins = game.spin(2, ['lotus', 'lotus', 'fan', 'temple', 'orchid', 'fan', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']);
+    const freeSpins = game.spin(2, [
+      'lotus',
+      'lotus',
+      'fan',
+      'temple',
+      'orchid',
+      'fan',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
     expect(freeSpins.freeSpinsRemaining).toBe(8);
     expect(freeSpins.status).toContain('8 free spins awarded');
 
-    const bonus = game.spin(2, ['lotus', 'lotus', 'lotus', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']);
+    const bonus = game.spin(2, [
+      'lotus',
+      'lotus',
+      'lotus',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
     expect(bonus.phase).toBe('bonus');
     expect(bonus.bonusPicksRemaining).toBe(4);
   });
 
   it('runs a four-pick Thai Princess bonus game after at least three lotus symbols', () => {
     const game = new SlotsGame();
-    game.spin(10, ['lotus', 'lotus', 'lotus', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']);
+    game.spin(10, [
+      'lotus',
+      'lotus',
+      'lotus',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
     game.pickBonus(5);
     game.pickBonus(8);
     game.pickBonus(10);
@@ -288,12 +363,44 @@ describe('SlotsGame', () => {
 
   it('awards and consumes free spins for two lotus scatter symbols', () => {
     const game = new SlotsGame();
-    const awarded = game.spin(10, ['lotus', 'lotus', 'fan', 'temple', 'orchid', 'fan', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']);
+    const awarded = game.spin(10, [
+      'lotus',
+      'lotus',
+      'fan',
+      'temple',
+      'orchid',
+      'fan',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
 
     expect(awarded.freeSpinsRemaining).toBe(8);
     expect(awarded.status).toContain('free spins awarded');
 
-    const used = game.spin(10, ['fan', 'fan', 'fan', 'temple', 'orchid', 'fan', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']);
+    const used = game.spin(10, [
+      'fan',
+      'fan',
+      'fan',
+      'temple',
+      'orchid',
+      'fan',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
 
     expect(used.freeSpinsRemaining).toBe(7);
     expect(used.returned).toBe(240);
@@ -326,9 +433,41 @@ describe('SlotsGame', () => {
 
   it('ignores spins during bonus', () => {
     const game = new SlotsGame();
-    const bonus = game.spin(10, ['lotus', 'lotus', 'lotus', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']);
+    const bonus = game.spin(10, [
+      'lotus',
+      'lotus',
+      'lotus',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
     expect(
-      game.spin(10, ['princess', 'princess', 'princess', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant', 'temple', 'fan', 'orchid', 'elephant']),
+      game.spin(10, [
+        'princess',
+        'princess',
+        'princess',
+        'temple',
+        'fan',
+        'orchid',
+        'elephant',
+        'temple',
+        'fan',
+        'orchid',
+        'elephant',
+        'temple',
+        'fan',
+        'orchid',
+        'elephant',
+      ]),
     ).toEqual(bonus);
   });
 });

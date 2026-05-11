@@ -161,7 +161,15 @@ describe('Beat the House popup and animation behaviour', () => {
     expect(host.dataset.settlementVisible).toBe('true');
     expect(host.dataset.settlementHandCount).toBe('1');
     expect(JSON.parse(host.dataset.sideBetLabels ?? '[]')).toEqual(['Dealer Bust LOSE -£2', 'Dealer Sevens (1) WIN +£6']);
-    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith('Main WIN +£10', 'Side bets WIN +£4', ['Total WIN +£14'], expect.any(Number), expect.any(Number), 'win', true);
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main WIN +£10',
+      'Side bets WIN +£4',
+      ['Total WIN +£14'],
+      expect.any(Number),
+      expect.any(Number),
+      'win',
+      true,
+    );
     const popupText = tagRenderer.drawResultPopup.mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
     expect(popupText).not.toContain('Dealer Bust');
     expect(popupText).not.toContain('Dealer Sevens');
@@ -212,7 +220,15 @@ describe('Beat the House popup and animation behaviour', () => {
       ['dealer-hole-reveal', 0],
       ['dealer-1', 1],
     ]);
-    expect(cardRenderer.drawRevealedCard).toHaveBeenCalledWith(card('7'), expect.any(Number), expect.any(Number), false, 'dealer-hole', 'dealer-hole-reveal', 0);
+    expect(cardRenderer.drawRevealedCard).toHaveBeenCalledWith(
+      card('7'),
+      expect.any(Number),
+      expect.any(Number),
+      false,
+      'dealer-hole',
+      'dealer-hole-reveal',
+      0,
+    );
     expect(cardRenderer.drawCard).toHaveBeenCalledWith(card('K'), expect.any(Number), expect.any(Number), false, 'dealer-1', 1);
     expect(cardRenderer.drawCard).not.toHaveBeenCalledWith(card('7'), expect.any(Number), expect.any(Number), false, 'dealer-0', expect.any(Number));
   });
@@ -258,7 +274,15 @@ describe('Beat the House popup and animation behaviour', () => {
       expect.any(Number),
       expect.objectContaining({ key: 'loss-left-dealerBust-2', to: toPixels(dealerChipBank) }),
     );
-    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith('Main LOSE -£10', 'Side bets LOSE -£5', ['Total LOSE -£15'], expect.any(Number), expect.any(Number), 'lose', false);
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main LOSE -£10',
+      'Side bets LOSE -£5',
+      ['Total LOSE -£15'],
+      expect.any(Number),
+      expect.any(Number),
+      'lose',
+      false,
+    );
     const popupText = tagRenderer.drawResultPopup.mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
     expect(popupText).not.toContain('Ace Flash');
     expect(popupText).not.toContain('Dealer Bust');

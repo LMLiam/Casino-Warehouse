@@ -50,7 +50,9 @@ describe('validatePullRequest', () => {
   it('requires a conventional pull request title', () => {
     const failures = validatePullRequest(pullRequest({ title: 'Add a validator' }));
 
-    expect(failures).toContain('PR title must match "type(scope): summary" using one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security, deps.');
+    expect(failures).toContain(
+      'PR title must match "type(scope): summary" using one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security, deps.',
+    );
   });
 
   it('requires type and area labels', () => {
@@ -76,7 +78,10 @@ describe('validatePullRequest', () => {
   it('rejects body placeholders from the PR template', () => {
     const failures = validatePullRequest(
       pullRequest({
-        body: validBody.replace('Adds a reusable PR metadata gate so maintainers can enforce review standards before merge.', 'Describe the change and why it is needed.'),
+        body: validBody.replace(
+          'Adds a reusable PR metadata gate so maintainers can enforce review standards before merge.',
+          'Describe the change and why it is needed.',
+        ),
       }),
     );
 

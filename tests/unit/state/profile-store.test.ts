@@ -81,8 +81,16 @@ describe('profile store', () => {
     const state = createProfile({ version: 1, profiles: [] }, 'Clean stats', 100, new Date('2026-05-04T12:00:00Z'));
     let profile = state.profiles[0];
 
-    profile = recordTransaction(profile, { gameId: 'blackjack', type: 'push_refund', amount: 10, description: 'Push return', metadata: {} }, new Date('2026-05-04T12:01:00Z'));
-    profile = recordTransaction(profile, { gameId: 'admin', type: 'admin_adjustment', amount: 500, description: 'Admin add', metadata: {} }, new Date('2026-05-04T12:02:00Z'));
+    profile = recordTransaction(
+      profile,
+      { gameId: 'blackjack', type: 'push_refund', amount: 10, description: 'Push return', metadata: {} },
+      new Date('2026-05-04T12:01:00Z'),
+    );
+    profile = recordTransaction(
+      profile,
+      { gameId: 'admin', type: 'admin_adjustment', amount: 500, description: 'Admin add', metadata: {} },
+      new Date('2026-05-04T12:02:00Z'),
+    );
 
     expect(profile.bankroll).toBe(610);
     expect(profile.stats.totalWon).toBe(0);

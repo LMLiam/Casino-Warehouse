@@ -8,7 +8,8 @@ import type { SlotSymbol } from '../../../src/game/slots';
 
 const workspaceRoot = process.cwd();
 const allowedStatuses = new Set(['generated-final', 'approved-user-provided', 'intentional-final-vector']);
-const forbiddenAssetLanguage = /generated-placeholder|manual placeholder|legacy placeholder|temporary fallback|optional-deferred|deferred required|missing required asset/i;
+const forbiddenAssetLanguage =
+  /generated-placeholder|manual placeholder|legacy placeholder|temporary fallback|optional-deferred|deferred required|missing required asset/i;
 const forbiddenLegacyPath =
   /(?:\.\.\/\.\.\/(?:table|chips-sheet)\.png|['"`]\/(?:table|chips-sheet)\.png['"`]|\/assets\/blackjack\/table\.svg|\/assets\/lobby\/game-tiles\/[^'"`)]+\.svg|\/assets\/slots\/[^'"`)]+\/frame\.svg)/;
 
@@ -26,7 +27,9 @@ const pngDimensions = (assetPath: string): string => {
   return `${buffer.readUInt32BE(16)}x${buffer.readUInt32BE(20)}`;
 };
 
-const pngAlphaSummary = (assetPath: string): { readonly alphaMin: number; readonly alphaMax: number; readonly opaqueChromaPixels: number; readonly transparentCorners: number } => {
+const pngAlphaSummary = (
+  assetPath: string,
+): { readonly alphaMin: number; readonly alphaMax: number; readonly opaqueChromaPixels: number; readonly transparentCorners: number } => {
   const buffer = readFileSync(assetFilePath(assetPath));
   expect(buffer.subarray(1, 4).toString('ascii')).toBe('PNG');
   const width = buffer.readUInt32BE(16);
@@ -148,7 +151,9 @@ describe('casino asset manifest', () => {
     expect(assets.every((asset) => asset.id && asset.owner && asset.path && asset.category && asset.status && asset.source && asset.dimensions)).toBe(true);
     expect(assets.every((asset) => allowedStatuses.has(asset.status))).toBe(true);
     expect(assets.every((asset) => asset.path.startsWith('/assets/'))).toBe(true);
-    expect(assets.map((asset) => [asset.id, assetPathExists(asset.path), pngDimensions(asset.path)])).toEqual(assets.map((asset) => [asset.id, true, asset.dimensions]));
+    expect(assets.map((asset) => [asset.id, assetPathExists(asset.path), pngDimensions(asset.path)])).toEqual(
+      assets.map((asset) => [asset.id, true, asset.dimensions]),
+    );
     expect(assets.filter((asset) => asset.status === 'generated-final').every((asset) => asset.source === 'imagegen')).toBe(true);
     expect(
       assets

@@ -51,7 +51,8 @@ const emptyHands = (): Record<HandId, PlayerHand> => ({
   right: createHand('right'),
 });
 
-const totalBet = (bets: Bets): number => handIds.reduce((total, handId) => total + betTypes.reduce((handTotal, betType) => handTotal + bets[handId][betType], 0), 0);
+const totalBet = (bets: Bets): number =>
+  handIds.reduce((total, handId) => total + betTypes.reduce((handTotal, betType) => handTotal + bets[handId][betType], 0), 0);
 
 const handStake = (bets: Bets, handId: HandId): number => betTypes.reduce((total, betType) => total + bets[handId][betType], 0);
 
