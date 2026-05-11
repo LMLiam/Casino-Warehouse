@@ -43,6 +43,13 @@ For visual or browser workflow changes, also run:
 npm run visual
 ```
 
+Playwright defaults to two workers so browser tests catch shared-state
+collisions quickly. For debugging a flaky browser test serially, use:
+
+```bash
+npm run visual:serial
+```
+
 ## Reporting Issues
 
 Use the bug report or feature request templates. Include reproduction steps, expected behaviour, actual behaviour, browser/device details, and screenshots when they help.

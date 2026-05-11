@@ -1,8 +1,8 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, currentRealtimeUrl, resetBrowserStorage, type Locator, type Page } from './fixtures';
 
 const consoleFailures = new WeakMap<Page, string[]>();
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, realtimeUrl }) => {
   const failures: string[] = [];
   consoleFailures.set(page, failures);
   page.on('console', (message) => {
@@ -15,9 +15,7 @@ test.beforeEach(async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.clear();
-  });
+  await resetBrowserStorage(page, realtimeUrl);
   await page.reload();
   await page.waitForFunction(() => document.body.dataset.appReady === 'true');
   await waitForRealtime(page);
@@ -328,12 +326,9 @@ const waitForRealtime = async (page: Page): Promise<void> => {
   await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
 };
 
-const currentRealtimeUrl = async (page: Page): Promise<string> =>
-  page.evaluate(() => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
-
 const clearServerData = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {
-    const url = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    const url = localStorage.getItem('casino_realtime_url') ?? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
     await new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(url);
       const timer = window.setTimeout(() => {
@@ -361,7 +356,7 @@ const clearServerData = async (page: Page): Promise<void> => {
 
 const requestServerData = async (page: Page): Promise<E2EServerData> =>
   page.evaluate(async () => {
-    const url = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    const url = localStorage.getItem('casino_realtime_url') ?? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
     return await new Promise<E2EServerData>((resolve, reject) => {
       const socket = new WebSocket(url);
       const timer = window.setTimeout(() => {
