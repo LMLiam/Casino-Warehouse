@@ -1,8 +1,7 @@
 import { blackjackTableAsset } from '../../assets/manifest';
 import type { BlackjackSnapshot } from '../../game/blackjack';
-import { isBlackjackTableSnapshot, type BlackjackTableSnapshot } from '../../game/blackjackTable';
+import { isBlackjackTableSnapshot, type BlackjackTableSeatSnapshot, type BlackjackTableSnapshot } from '../../game/blackjackTable';
 import type { Card } from '../../game/cards';
-import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements';
 import { money } from '../format/appMoney';
 import { capitalize } from '../format/appText';
@@ -21,10 +20,8 @@ export class BlackjackView {
 
   private renderSolo(snapshot: BlackjackSnapshot): void {
     this.elements.blackjackStatus.textContent = snapshot.status;
-    this.elements.blackjackPlayerCards.innerHTML = this.renderCards(snapshot.playerCards);
-    this.elements.blackjackDealerCards.innerHTML = snapshot.dealerHoleHidden
-      ? `${this.renderCards(snapshot.dealerCards.slice(0, 1))}<span class="playing-card back">?</span>`
-      : this.renderCards(snapshot.dealerCards);
+    this.renderCards(this.elements.blackjackPlayerCards, snapshot.playerCards);
+    this.renderDealerCards(snapshot.dealerCards, snapshot.dealerHoleHidden);
     this.elements.blackjackResult.textContent = snapshot.result ? `${snapshot.result.toUpperCase()} • Returned ${money(snapshot.returned)}` : '';
     this.setActionButton(this.elements.blackjackDealButton, snapshot.phase !== 'player' && snapshot.phase !== 'dealer');
     this.setActionButton(this.elements.blackjackHitButton, snapshot.phase === 'player');
@@ -36,32 +33,18 @@ export class BlackjackView {
     );
     this.setActionButton(this.elements.blackjackInsuranceButton, snapshot.phase === 'player' && snapshot.dealerCards[0]?.rank === 'A');
     this.setActionButton(this.elements.blackjackNewButton, snapshot.phase === 'settled');
-    this.elements.blackjackSeats.innerHTML = '';
+    this.elements.blackjackSeats.replaceChildren();
   }
 
   private renderTable(snapshot: BlackjackTableSnapshot, profileId?: string): void {
     const mySeat = snapshot.seats.find((seat) => seat.profileId === profileId);
     this.elements.blackjackStatus.textContent = snapshot.status;
-    this.elements.blackjackDealerCards.innerHTML = snapshot.dealerHoleHidden
-      ? `${this.renderCards(snapshot.dealerCards.slice(0, 1))}<span class="playing-card back">?</span>`
-      : this.renderCards(snapshot.dealerCards);
-    this.elements.blackjackPlayerCards.innerHTML = this.renderCards(mySeat?.playerCards ?? []);
+    this.renderDealerCards(snapshot.dealerCards, snapshot.dealerHoleHidden);
+    this.renderCards(this.elements.blackjackPlayerCards, mySeat?.playerCards ?? []);
     this.elements.blackjackResult.textContent = mySeat
       ? `${capitalize(mySeat.seatId)} • ${mySeat.result ? `${mySeat.result.toUpperCase()} • Returned ${money(mySeat.returned)}` : mySeat.status}`
       : 'Spectating this Blackjack table.';
-    this.elements.blackjackSeats.innerHTML = snapshot.seats
-      .map(
-        (seat) => `
-          <article class="blackjack-table-seat ${seat.isTurn ? 'active' : ''} ${seat.profileId === profileId ? 'mine' : ''}" data-blackjack-seat="${escapeHtml(seat.seatId)}">
-            <span>${escapeHtml(capitalize(seat.seatId))}</span>
-            <b>${escapeHtml(seat.profileName ?? 'Open')}</b>
-            <div class="seat-cards">${this.renderSeatHands(seat.playerCards, seat.splitHands)}</div>
-            <small>${seat.wager > 0 ? `Wager ${money(seat.wager)}` : seat.profileName ? 'No wager yet' : 'Available'}</small>
-            <strong>${seat.isTurn ? 'TURN • ' : ''}${seat.result ? `${seat.result.toUpperCase()} ${money(seat.returned)}` : escapeHtml(seat.status)}</strong>
-          </article>
-        `,
-      )
-      .join('');
+    this.elements.blackjackSeats.replaceChildren(...snapshot.seats.map((seat) => this.renderTableSeat(seat, profileId)));
     const canAct = Boolean(mySeat?.isTurn);
     const canDeal = Boolean(
       mySeat && (mySeat.phase === 'empty' || mySeat.phase === 'betting') && mySeat.playerCards.length === 0 && snapshot.phase !== 'settled',
@@ -78,20 +61,90 @@ export class BlackjackView {
     this.setActionButton(this.elements.blackjackNewButton, snapshot.phase === 'settled');
   }
 
-  private renderCards(cards: readonly Card[]): string {
-    return cards.length > 0
-      ? cards
-          .map((card) => {
-            const red = card.suit === 'hearts' || card.suit === 'diamonds';
-            return `<span class="playing-card ${red ? 'red' : 'black'}"><b>${escapeHtml(card.rank)}</b><em>${this.suitSymbol(card.suit)}</em></span>`;
-          })
-          .join('')
-      : '<span class="playing-card empty">-</span>';
+  private renderTableSeat(seat: BlackjackTableSeatSnapshot, profileId?: string): HTMLElement {
+    const seatElement = document.createElement('article');
+    seatElement.classList.add('blackjack-table-seat');
+    seatElement.classList.toggle('active', seat.isTurn);
+    seatElement.classList.toggle('mine', seat.profileId === profileId);
+    seatElement.dataset.blackjackSeat = seat.seatId;
+
+    const label = document.createElement('span');
+    label.textContent = capitalize(seat.seatId);
+
+    const profile = document.createElement('b');
+    profile.textContent = seat.profileName ?? 'Open';
+
+    const cards = document.createElement('div');
+    cards.className = 'seat-cards';
+    this.renderSeatHands(cards, seat.playerCards, seat.splitHands);
+
+    const wager = document.createElement('small');
+    wager.textContent = seat.wager > 0 ? `Wager ${money(seat.wager)}` : seat.profileName ? 'No wager yet' : 'Available';
+
+    const status = document.createElement('strong');
+    status.textContent = `${seat.isTurn ? 'TURN • ' : ''}${seat.result ? `${seat.result.toUpperCase()} ${money(seat.returned)}` : seat.status}`;
+
+    seatElement.append(label, profile, cards, wager, status);
+    return seatElement;
   }
 
-  private renderSeatHands(playerCards: readonly Card[], splitHands: readonly (readonly Card[])[]): string {
+  private renderDealerCards(cards: readonly Card[], dealerHoleHidden: boolean): void {
+    if (!dealerHoleHidden) {
+      this.renderCards(this.elements.blackjackDealerCards, cards);
+      return;
+    }
+
+    this.elements.blackjackDealerCards.replaceChildren(...this.cardElements(cards.slice(0, 1)), this.backCardElement());
+  }
+
+  private renderCards(container: HTMLElement, cards: readonly Card[]): void {
+    container.replaceChildren(...this.cardElements(cards));
+  }
+
+  private renderSeatHands(container: HTMLElement, playerCards: readonly Card[], splitHands: readonly (readonly Card[])[]): void {
     const hands = splitHands.length > 0 ? splitHands : [playerCards];
-    return hands.map((hand) => `<div class="seat-hand">${this.renderCards(hand)}</div>`).join('');
+    container.replaceChildren(
+      ...hands.map((hand) => {
+        const handElement = document.createElement('div');
+        handElement.className = 'seat-hand';
+        handElement.replaceChildren(...this.cardElements(hand));
+        return handElement;
+      }),
+    );
+  }
+
+  private cardElements(cards: readonly Card[]): HTMLElement[] {
+    if (cards.length === 0) {
+      return [this.emptyCardElement()];
+    }
+    return cards.map((card) => {
+      const red = card.suit === 'hearts' || card.suit === 'diamonds';
+      const cardElement = document.createElement('span');
+      cardElement.classList.add('playing-card', red ? 'red' : 'black');
+
+      const rank = document.createElement('b');
+      rank.textContent = card.rank;
+
+      const suit = document.createElement('em');
+      suit.textContent = this.suitSymbol(card.suit);
+
+      cardElement.append(rank, suit);
+      return cardElement;
+    });
+  }
+
+  private emptyCardElement(): HTMLElement {
+    const card = document.createElement('span');
+    card.className = 'playing-card empty';
+    card.textContent = '-';
+    return card;
+  }
+
+  private backCardElement(): HTMLElement {
+    const card = document.createElement('span');
+    card.className = 'playing-card back';
+    card.textContent = '?';
+    return card;
   }
 
   private suitSymbol(suit: string): string {
