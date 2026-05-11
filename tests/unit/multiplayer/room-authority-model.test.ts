@@ -9,6 +9,7 @@ import { RoomAuthorityBase } from '../../../src/multiplayer/roomAuthorityBase';
 import {
   compareRoomListOrder,
   createGameModel,
+  createId,
   createRoomId,
   createServerManagedBeatRoom,
   roomPhase,
@@ -36,7 +37,8 @@ const room = (overrides: Partial<RoomState> = {}): RoomState => ({
   ...overrides,
 });
 
-const generatedId = (value: number): string => value.toString(36).slice(2, 8).toUpperCase();
+const randomIdPartSpace = 36 ** 6;
+const generatedId = (value: number): string => value.toString(36).padStart(6, '0').toUpperCase();
 
 class AuthorityHarness extends RoomAuthorityBase {
   public addPlayer(room: RoomState): void {
@@ -82,18 +84,29 @@ describe('room authority model helpers', () => {
   });
 
   it('retries generated room ids until an unused id is available', () => {
-    const first = generatedId(0.5);
-    const second = generatedId(0.6);
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.6);
+    const firstValue = 18_000;
+    const secondValue = 24_000;
+    const first = generatedId(firstValue);
+    const second = generatedId(secondValue);
+    const randomInt = vi.fn().mockReturnValueOnce(firstValue).mockReturnValueOnce(secondValue);
 
-    expect(createRoomId(new Map([[first, room({ roomId: first })]]))).toBe(second);
+    expect(createRoomId(new Map([[first, room({ roomId: first })]]), randomInt)).toBe(second);
+    expect(randomInt).toHaveBeenNthCalledWith(1, randomIdPartSpace);
+    expect(randomInt).toHaveBeenNthCalledWith(2, randomIdPartSpace);
   });
 
   it('uses the first generated room id when it is unused', () => {
-    const first = generatedId(0.7);
-    vi.spyOn(Math, 'random').mockReturnValueOnce(0.7);
+    const firstValue = 30_000;
+    const first = generatedId(firstValue);
+    const randomInt = vi.fn().mockReturnValueOnce(firstValue);
 
-    expect(createRoomId(new Map())).toBe(first);
+    expect(createRoomId(new Map(), randomInt)).toBe(first);
+  });
+
+  it('creates timestamped ids with secure injected integer source', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000);
+
+    expect(createId('session', () => 35)).toBe('session-rs-00000z');
   });
 
   it('normalizes bankrolls to non-negative whole credits', () => {

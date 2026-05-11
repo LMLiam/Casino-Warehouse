@@ -2,12 +2,16 @@ import type { BlackjackSnapshot } from '../game/blackjack';
 import { BlackjackTable } from '../game/blackjackTable';
 import { findGame, findSlotTheme } from '../game/catalog';
 import { BeatTheHouseGame } from '../game/engine';
+import { secureRandomInt } from '../game/rng';
 import { SlotsGame, type SlotSnapshot } from '../game/slots';
 import { betTypes, handIds, type GameSnapshot, type HandId } from '../game/types';
 import type { RoomGameId, RoomPlayer, RoomRole, RoomSeatId, RoomSettlement, RoomSnapshot, RoomSummary } from './protocol';
 import { normalizeRoomMaxPlayers } from './roomLimits';
 
 export const mainBeatRoomId = 'BEATMAIN';
+const randomIdPartLength = 6;
+const randomIdPartSpace = 36 ** randomIdPartLength;
+type RandomInt = (maxExclusive: number) => number;
 
 export interface AuthorityResult {
   readonly broadcasts: readonly RoomSnapshot[];
@@ -136,9 +140,9 @@ export const roomStatus = (room: RoomState): RoomSnapshot['status'] => {
   return room.model.kind === 'slots' ? 'open' : 'betting';
 };
 
-export const createRoomId = (rooms: ReadonlyMap<string, RoomState>): string => {
+export const createRoomId = (rooms: ReadonlyMap<string, RoomState>, randomInt: RandomInt = secureRandomInt): string => {
   while (true) {
-    const id = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const id = createRandomIdPart(randomInt).toUpperCase();
     if (!rooms.has(id)) {
       return id;
     }
@@ -147,7 +151,10 @@ export const createRoomId = (rooms: ReadonlyMap<string, RoomState>): string => {
 
 export const safeBankroll = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0);
 
-export const createId = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+export const createId = (prefix: string, randomInt: RandomInt = secureRandomInt): string =>
+  `${prefix}-${Date.now().toString(36)}-${createRandomIdPart(randomInt)}`;
+
+const createRandomIdPart = (randomInt: RandomInt = secureRandomInt): string => randomInt(randomIdPartSpace).toString(36).padStart(randomIdPartLength, '0');
 
 export const cleanName = (name?: string): string => (name ?? '').trim().replace(/\s+/g, ' ').slice(0, 48);
 
