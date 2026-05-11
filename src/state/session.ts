@@ -145,12 +145,21 @@ const parseGameSnapshots = (value: unknown): Readonly<Record<string, PlayerGameS
         [
           profileId,
           {
-            beatTheHouse: isRecord(snapshots.beatTheHouse) ? (snapshots.beatTheHouse as unknown as BeatTheHouseSaveState) : undefined,
-            blackjack: isRecord(snapshots.blackjack) ? (snapshots.blackjack as unknown as BlackjackSnapshot) : undefined,
-            slots: isRecord(snapshots.slots) ? (snapshots.slots as unknown as Readonly<Record<string, SlotSnapshot>>) : undefined,
+            beatTheHouse: parseSnapshotRecord<BeatTheHouseSaveState>(snapshots.beatTheHouse),
+            blackjack: parseSnapshotRecord<BlackjackSnapshot>(snapshots.blackjack),
+            slots: parseSlotSnapshots(snapshots.slots),
           },
         ],
       ];
     }),
   );
+};
+
+const parseSnapshotRecord = <Snapshot>(value: unknown): Snapshot | undefined => (isRecord(value) ? (value as Snapshot) : undefined);
+
+const parseSlotSnapshots = (value: unknown): Readonly<Record<string, SlotSnapshot>> | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return Object.fromEntries(Object.entries(value).filter(([, snapshot]) => isRecord(snapshot))) as Readonly<Record<string, SlotSnapshot>>;
 };

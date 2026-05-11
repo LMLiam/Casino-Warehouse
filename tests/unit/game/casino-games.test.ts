@@ -205,7 +205,7 @@ describe('BlackjackTable', () => {
     expect(isBlackjackTableSnapshot({ kind: 'blackjack' })).toBe(false);
     expect(isBlackjackTableSnapshot(null)).toBe(false);
     expect(isCard(card('A', 'spades'))).toBe(true);
-    expect(isCard({ rank: '1', suit: 'stars' } as unknown as Card)).toBe(false);
+    expect(isCard({ rank: '1', suit: 'stars' })).toBe(false);
   });
 });
 

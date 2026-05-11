@@ -60,20 +60,26 @@ describe('casino audio settings', () => {
         return new FakeNode();
       }
     }
-    globalThis.AudioContext = FakeAudioContext as unknown as typeof AudioContext;
+    Object.defineProperty(globalThis, 'AudioContext', { configurable: true, writable: true, value: FakeAudioContext });
 
-    const audio = new CasinoAudio();
-    audio.play('deal');
-    audio.play('chip');
-    audio.play('spin');
-    audio.play('win');
-    audio.play('bonus');
-    audio.play('ui');
-    audio.play('ambience');
-    audio.toggleMusic(true);
-    audio.updateSettings({ ...defaultAudioSettings(), muted: true });
-    audio.play('deal');
-
-    globalThis.AudioContext = originalAudioContext;
+    try {
+      const audio = new CasinoAudio();
+      audio.play('deal');
+      audio.play('chip');
+      audio.play('spin');
+      audio.play('win');
+      audio.play('bonus');
+      audio.play('ui');
+      audio.play('ambience');
+      audio.toggleMusic(true);
+      audio.updateSettings({ ...defaultAudioSettings(), muted: true });
+      audio.play('deal');
+    } finally {
+      if (originalAudioContext) {
+        Object.defineProperty(globalThis, 'AudioContext', { configurable: true, writable: true, value: originalAudioContext });
+      } else {
+        Reflect.deleteProperty(globalThis, 'AudioContext');
+      }
+    }
   });
 });

@@ -108,8 +108,10 @@ describe('per-game multiplayer protocol', () => {
 
   it('round-trips protocol messages without accepting wrong versions', () => {
     const message = join('slots:thai-princess', 'ROOM01', 'alice', 300, 'spectator');
+    const room = new RoomAuthority().handle('a', create('beat-the-house', 'alice')).direct;
     expect(parseClientMessage(JSON.parse(encodeMessage(message))).message).toEqual(message);
-    expect(decodeServerMessage('{"version":1,"type":"room-state"}')?.type).toBe('room-state');
+    expect(decodeServerMessage(JSON.stringify({ version: 1, type: 'room-state', room }))?.type).toBe('room-state');
+    expect(decodeServerMessage('{"version":1,"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();
   });
 });
