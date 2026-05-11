@@ -7,7 +7,7 @@ This is a demo game. Credits have no cash value, and the app has no deposits, wi
 ## Requirements
 
 - Git
-- Node.js `20.19.0` or newer, or `22.12.0` or newer
+- Node.js 22.x (`22.12.0` or newer). Use `nvm use` or your version manager's equivalent to read the pinned version from `.nvmrc` or `.node-version`.
 - npm
 - A desktop or tablet browser
 
