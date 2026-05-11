@@ -1,9 +1,7 @@
 import { Container, Texture } from 'pixi.js';
 import { CasinoAudio } from '../../audio/casinoAudio';
-import { isBlackjackTableSnapshot } from '../../game/blackjackTable';
-import { findGame, findSlotTheme, type CasinoGameId } from '../../game/catalog';
-import { SlotsGame } from '../../game/slots';
-import type { BetType, GameSnapshot, HandId } from '../../game/types';
+import { findGame, type CasinoGameId } from '../../game/catalog';
+import type { BetType, HandId } from '../../game/types';
 import type { ChipValue } from '../../ui/chips';
 import { PixiTable } from '../../ui/PixiTable';
 import { mountRadixChrome } from '../../ui/radixChrome';
@@ -12,15 +10,8 @@ import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
 import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
 import type { CasinoProfile, CasinoSaveState } from '../../state/profiles';
-import {
-  createSessionState,
-  loadSessionState,
-  saveSessionState,
-  sessionStorageKey,
-  type CasinoSessionRoomState,
-  type CasinoSessionState,
-} from '../../state/session';
-import { defaultRealtimeUrl, MultiplayerClient, type RealtimeConnectionState, type ServerDataState } from '../../multiplayer/client';
+import { type CasinoSessionRoomState } from '../../state/session';
+import { defaultRealtimeUrl, MultiplayerClient, type RealtimeConnectionState } from '../../multiplayer/client';
 import {
   protocolVersion,
   type RoomGameId,
@@ -34,11 +25,10 @@ import { normalizeRoomMaxPlayers } from '../../multiplayer/roomLimits';
 import { AppEventBinder, type BeatAction } from './AppEventBinder';
 import { collectElements, type AppElements } from '../dom/appElements';
 import { renderTemplate } from '../dom/appTemplate';
-import { money } from '../format/appMoney';
-import { readCreditInput, readPositiveCreditInput, inviteServerUrl, parseGameId } from '../input/appInputs';
+import { readCreditInput, readPositiveCreditInput } from '../input/appInputs';
 import { hitTestBetZone } from '../input/betZoneHitTest';
 import { defaultRoomMaxPlayers } from '../rooms/roomDefaults';
-import { isBeatSnapshot, isSlotSnapshot } from '../state/appSnapshots';
+import { isBeatSnapshot } from '../state/appSnapshots';
 import { createPlayerFromProfile, type CasinoPlayer } from '../state/casinoPlayer';
 import { AudioControls } from '../views/AudioControls';
 import { BeatControlsView } from '../views/BeatControlsView';
@@ -52,43 +42,46 @@ import { RoomSeatsView } from '../views/RoomSeatsView';
 import { RulesMenuView } from '../views/RulesMenuView';
 import { SlotsView } from '../views/SlotsView';
 import { WalletView } from '../views/WalletView';
-export class GameApp {
-  private readonly table: PixiTable;
-  private readonly elements: AppElements;
+import { GameAppSession } from './GameAppSession';
+
+export class GameApp extends GameAppSession {
+  protected readonly table: PixiTable;
+  protected readonly elements: AppElements;
   private selectedChip = 0;
-  private selectedPlayerIndex = 0;
-  private activeGame: CasinoGameId = 'beat-the-house';
-  private showingGameLobby = true;
-  private sessionWagerLimit = 0;
-  private sessionWagered = 0;
+  protected selectedPlayerIndex = 0;
+  protected activeGame: CasinoGameId = 'beat-the-house';
+  protected showingGameLobby = true;
+  protected sessionWagerLimit = 0;
+  protected sessionWagered = 0;
   private readonly audio = new CasinoAudio();
-  private readonly audioControls: AudioControls;
-  private readonly beatControlsView: BeatControlsView;
-  private readonly beatSeatStatusView: BeatSeatStatusView;
-  private readonly blackjackView: BlackjackView;
-  private readonly gameLobbyView: GameLobbyView;
-  private readonly playerStripView: PlayerStripView;
-  private readonly profileSetupView: ProfileSetupView;
-  private readonly roomBrowserView: RoomBrowserView;
-  private readonly roomSeatsView: RoomSeatsView;
-  private readonly rulesMenuView: RulesMenuView;
-  private readonly slotsView: SlotsView;
-  private readonly walletView: WalletView;
-  private readonly multiplayer: MultiplayerClient;
-  private players: CasinoPlayer[] = [];
-  private profileState: CasinoSaveState = { version: 1, profiles: [] };
-  private lastSaveError = '';
-  private pendingInviteRoomCode = '';
-  private pendingInviteServerUrl = '';
-  private pendingInviteAttempted = false;
-  private multiplayerRooms: readonly RoomSummary[] = [];
-  private realtimeUrl = '';
-  private connectionState: RealtimeConnectionState = 'disconnected';
-  private returnHomeOnServerResync = false;
-  private restoringRoomAfterReconnect = false;
-  private pendingRoomRestore: CasinoSessionRoomState | undefined;
+  protected readonly audioControls: AudioControls;
+  protected readonly beatControlsView: BeatControlsView;
+  protected readonly beatSeatStatusView: BeatSeatStatusView;
+  protected readonly blackjackView: BlackjackView;
+  protected readonly gameLobbyView: GameLobbyView;
+  protected readonly playerStripView: PlayerStripView;
+  protected readonly profileSetupView: ProfileSetupView;
+  protected readonly roomBrowserView: RoomBrowserView;
+  protected readonly roomSeatsView: RoomSeatsView;
+  protected readonly rulesMenuView: RulesMenuView;
+  protected readonly slotsView: SlotsView;
+  protected readonly walletView: WalletView;
+  protected readonly multiplayer: MultiplayerClient;
+  protected players: CasinoPlayer[] = [];
+  protected profileState: CasinoSaveState = { version: 1, profiles: [] };
+  protected lastSaveError = '';
+  protected pendingInviteRoomCode = '';
+  protected pendingInviteServerUrl = '';
+  protected pendingInviteAttempted = false;
+  protected multiplayerRooms: readonly RoomSummary[] = [];
+  protected realtimeUrl = '';
+  protected connectionState: RealtimeConnectionState = 'disconnected';
+  protected returnHomeOnServerResync = false;
+  protected restoringRoomAfterReconnect = false;
+  protected pendingRoomRestore: CasinoSessionRoomState | undefined;
 
   public constructor(root: HTMLElement) {
+    super();
     root.innerHTML = renderTemplate();
     mountRadixChrome();
     this.elements = collectElements();
@@ -193,10 +186,6 @@ export class GameApp {
       .catch((error) => {
         console.warn('Beat the House table renderer failed to initialize.', error);
       });
-  }
-
-  private get currentPlayer(): CasinoPlayer | undefined {
-    return this.players[this.selectedPlayerIndex];
   }
 
   private bindEvents(): void {
@@ -310,7 +299,7 @@ export class GameApp {
     this.multiplayer.createRoom(gameId, roomName, maxPlayers, profile.id, profile.name, profile.bankroll);
   }
 
-  private joinMultiplayerRoom(roomId: string, role: RoomRole = 'player'): void {
+  protected joinMultiplayerRoom(roomId: string, role: RoomRole = 'player'): void {
     const profile = this.currentProfile();
     if (!profile || !roomId) {
       this.elements.roomStatus.textContent = 'Select a profile and choose a room first.';
@@ -324,7 +313,7 @@ export class GameApp {
     this.multiplayer.joinRoom(gameId, roomId.toUpperCase(), role, profile.id, profile.name, profile.bankroll);
   }
 
-  private claimRoomSeat(seatId: RoomSeatId): void {
+  protected claimRoomSeat(seatId: RoomSeatId): void {
     if (!this.canUseServer()) {
       return;
     }
@@ -387,7 +376,7 @@ export class GameApp {
     this.renderProfileSetup();
   }
 
-  private refreshMultiplayerRooms(): void {
+  protected refreshMultiplayerRooms(): void {
     if (!this.canUseServer()) {
       return;
     }
@@ -402,23 +391,7 @@ export class GameApp {
     this.multiplayer.connect(this.realtimeUrl || defaultRealtimeUrl());
   }
 
-  private renderMultiplayerRoom(): void {
-    const room = this.multiplayer.room;
-    if (!room) {
-      this.roomSeatsView.clear();
-      this.beatControlsView.clearPending();
-      this.beatSeatStatusView.clear();
-      return;
-    }
-    this.roomSeatsView.render(room, this.currentPlayer?.profileId, (seatId) => this.claimRoomSeat(seatId));
-    if (room.gameId === 'beat-the-house' && isBeatSnapshot(room.game)) {
-      this.table.render(room.game);
-      this.renderBeatControls(room.game);
-    }
-    this.renderRoomBrowser();
-  }
-
-  private openRoomLobby(gameId: CasinoGameId): void {
+  protected openRoomLobby(gameId: CasinoGameId): void {
     this.activeGame = gameId;
     this.showingGameLobby = false;
     this.multiplayerRooms = [];
@@ -426,10 +399,6 @@ export class GameApp {
     this.saveSession();
     this.renderCasino();
     this.refreshMultiplayerRooms();
-  }
-
-  private renderRoomBrowser(): void {
-    this.roomBrowserView.render(this.activeGame, this.multiplayerRooms, (roomId, role) => this.joinMultiplayerRoom(roomId, role));
   }
 
   private applyRoomSettlements(settlements: readonly RoomSettlement[], _roomId: string, _sessionId: string): void {
@@ -486,279 +455,6 @@ export class GameApp {
     this.saveSession();
     this.renderCasino();
     this.maybeAutoJoinInvite();
-  }
-
-  private renderProfileSetup(): void {
-    this.profileSetupView.render(
-      this.profileState,
-      this.lastSaveError,
-      (profileId, nextName) => {
-        if (this.canUseServer()) {
-          this.multiplayer.renameProfile(profileId, nextName);
-        }
-      },
-      (profileId) => {
-        if (this.canUseServer()) {
-          this.multiplayer.deleteProfile(profileId);
-        }
-      },
-    );
-  }
-
-  private applyServerData(state: ServerDataState): void {
-    this.profileState = state.profileState;
-    this.lastSaveError = '';
-    this.players = this.players
-      .map((player) => {
-        const profile = this.profileState.profiles.find((candidate) => candidate.id === player.profileId);
-        if (profile) {
-          player.beatTheHouse.syncBankroll(profile.bankroll);
-        }
-        return profile ? player : undefined;
-      })
-      .filter((player): player is CasinoPlayer => Boolean(player));
-    if (this.players.length === 0) {
-      const clientSession = this.loadClientSession();
-      if (clientSession?.profileIds.length) {
-        this.restoreSavedSession(clientSession);
-      }
-    }
-    this.selectedPlayerIndex = Math.min(this.selectedPlayerIndex, Math.max(0, this.players.length - 1));
-    if (this.returnHomeOnServerResync && !this.multiplayer.room) {
-      this.returnHomeOnServerResync = false;
-      this.showingGameLobby = true;
-      this.multiplayerRooms = [];
-      this.elements.roomStatus.textContent = 'The room could not be restored. Choose a game to start or join a new room.';
-    }
-    this.renderProfileSetup();
-    if (this.players.length === 0 && this.pendingInviteRoomCode && !this.pendingInviteAttempted) {
-      this.elements.roomStatus.textContent = `Invite loaded for room ${this.pendingInviteRoomCode}. Select a profile to join.`;
-    }
-    if (this.players.length === 0) {
-      this.showingGameLobby = true;
-      this.multiplayerRooms = [];
-      this.elements.shell.classList.add('hidden');
-      this.elements.setup.classList.remove('hidden');
-      this.roomSeatsView.clear();
-      this.beatControlsView.clearPending();
-      this.beatSeatStatusView.clear();
-      this.multiplayer.clearRoomState();
-      return;
-    }
-    if (this.players.length > 0) {
-      this.elements.setup.classList.add('hidden');
-      this.elements.shell.classList.remove('hidden');
-      this.renderPlayerButtons();
-      this.renderGameLobby();
-      this.renderCasino();
-      if (this.returnHomeOnServerResync) {
-        this.restoreRoomAfterReconnect();
-        return;
-      }
-      if (this.maybeRestoreSavedRoom()) {
-        return;
-      }
-      if (!this.showingGameLobby && this.multiplayer.connected) {
-        this.refreshMultiplayerRooms();
-      }
-      this.maybeAutoJoinInvite();
-    }
-  }
-
-  private restoreSavedSession(session: CasinoSessionState): void {
-    const restoredPlayers = session.profileIds
-      .map((profileId) => this.profileState.profiles.find((profile) => profile.id === profileId))
-      .filter((profile): profile is CasinoProfile => Boolean(profile))
-      .map((profile) => createPlayerFromProfile(profile, session.gameSnapshots[profile.id]));
-    if (restoredPlayers.length === 0) {
-      this.clearClientSession();
-      return;
-    }
-
-    this.players = restoredPlayers;
-    this.selectedPlayerIndex = Math.min(session.selectedPlayerIndex, restoredPlayers.length - 1);
-    this.activeGame = session.activeGame;
-    this.sessionWagerLimit = session.wagerLimit;
-    this.sessionWagered = session.wagered;
-    this.showingGameLobby = true;
-    this.pendingRoomRestore = session.room;
-    this.elements.sessionLimitInput.value = this.sessionWagerLimit > 0 ? String(this.sessionWagerLimit) : '';
-  }
-
-  private returnHomeAfterRoomStateLoss(): void {
-    this.returnHomeOnServerResync = false;
-    this.restoringRoomAfterReconnect = false;
-    this.showingGameLobby = true;
-    this.multiplayerRooms = [];
-    this.elements.roomStatus.textContent = 'The room could not be restored. Choose a game to start or join a new room.';
-    this.roomSeatsView.clear();
-    this.beatControlsView.clearPending();
-    this.beatSeatStatusView.clear();
-    this.renderGameLobby();
-    this.renderCasino();
-    this.saveSession();
-  }
-
-  private restoreRoomAfterReconnect(): void {
-    const room = this.multiplayer.room;
-    const profile = this.currentProfile();
-    const role = profile
-      ? room?.players.some((candidate) => candidate.profileId === profile.id)
-        ? 'player'
-        : room?.spectators.some((candidate) => candidate.profileId === profile.id)
-          ? 'spectator'
-          : undefined
-      : undefined;
-    this.returnHomeOnServerResync = false;
-    if (!room || !profile || !role) {
-      this.multiplayer.clearRoomState();
-      return;
-    }
-
-    this.attemptRoomRestore(
-      { roomId: room.roomId, gameId: room.gameId, role, seatId: room.seats.find((seat) => seat.profileId === profile.id)?.seatId },
-      profile,
-      room.gameTitle,
-    );
-  }
-
-  private maybeRestoreSavedRoom(): boolean {
-    const room = this.pendingRoomRestore;
-    const profile = this.currentProfile();
-    if (!room || !profile || this.pendingInviteRoomCode || !this.multiplayer.connected) {
-      return false;
-    }
-    this.pendingRoomRestore = undefined;
-    this.attemptRoomRestore(room, profile, findGame(room.gameId).title);
-    return true;
-  }
-
-  private attemptRoomRestore(room: CasinoSessionRoomState, profile: CasinoProfile, gameTitle: string): void {
-    this.restoringRoomAfterReconnect = true;
-    this.showingGameLobby = true;
-    this.activeGame = room.gameId;
-    this.multiplayerRooms = [];
-    this.elements.roomStatus.textContent = `Checking ${gameTitle} room ${room.roomId} against the server.`;
-    this.renderGameLobby();
-    this.renderCasino();
-    this.multiplayer.joinRoom(room.gameId, room.roomId, room.role, profile.id, profile.name, profile.bankroll, room.seatId);
-  }
-
-  private applyInviteFromUrl(): void {
-    this.realtimeUrl = inviteServerUrl() ?? defaultRealtimeUrl();
-    this.pendingInviteServerUrl = this.realtimeUrl;
-    const params = new URLSearchParams(window.location.search);
-    const roomId = params.get('room')?.trim().toUpperCase() ?? '';
-    const gameId = parseGameId(params.get('game')?.trim());
-    if (!roomId) {
-      return;
-    }
-    this.pendingInviteRoomCode = roomId;
-    if (gameId) {
-      this.activeGame = gameId;
-    }
-    this.elements.roomStatus.textContent = `Invite loaded for room ${roomId}. Select a profile to join.`;
-  }
-
-  private maybeAutoJoinInvite(): void {
-    if (!this.pendingInviteRoomCode || this.pendingInviteAttempted || !this.currentProfile()) {
-      return;
-    }
-    this.pendingInviteAttempted = true;
-    this.showingGameLobby = false;
-    this.renderCasino();
-    this.realtimeUrl = this.pendingInviteServerUrl || this.realtimeUrl || defaultRealtimeUrl();
-    this.joinMultiplayerRoom(this.pendingInviteRoomCode, 'player');
-  }
-
-  private renderPlayerButtons(): void {
-    this.playerStripView.render(this.players, (playerIndex) => {
-      this.selectedPlayerIndex = playerIndex;
-      this.walletView.resetPreviousBankroll();
-      this.saveSession();
-      this.renderCasino();
-    });
-  }
-
-  private renderCasino(): void {
-    const player = this.currentPlayer;
-    if (!player) {
-      return;
-    }
-
-    this.elements.gameTabs.forEach((button) => button.classList.toggle('selected', button.dataset.game === this.activeGame));
-    this.elements.playerStrip.querySelectorAll<HTMLButtonElement>('[data-player]').forEach((button) => {
-      button.classList.toggle('selected', Number(button.dataset.player) === this.selectedPlayerIndex);
-    });
-
-    const activeCatalogGame = findGame(this.activeGame);
-    const isBeatTheHouse = activeCatalogGame.kind === 'beat-the-house';
-    const isBlackjack = activeCatalogGame.kind === 'blackjack';
-    const isSlots = activeCatalogGame.kind === 'slots';
-    const activeRoom = this.activeRoomForGame();
-    const roomPlayer = activeRoom?.players.find((candidate) => candidate.profileId === player.profileId);
-    const roomMember = roomPlayer ?? activeRoom?.spectators.find((candidate) => candidate.profileId === player.profileId);
-    const hasActiveRoomSeat = Boolean(activeRoom?.seats.some((seat) => seat.profileId === player.profileId));
-    const canUseGameControls = !activeRoom || hasActiveRoomSeat;
-    const beatSnapshot = isBeatTheHouse && activeRoom && isBeatSnapshot(activeRoom.game) ? activeRoom.game : player.beatTheHouse.snapshot();
-    const blackjackSnapshot = isBlackjack && activeRoom && isBlackjackTableSnapshot(activeRoom.game) ? activeRoom.game : player.blackjack.snapshot();
-    const slotsSnapshot = isSlots && activeRoom && isSlotSnapshot(activeRoom.game) ? activeRoom.game : this.currentSlots().snapshot();
-    const showingRoomLobby = !this.showingGameLobby && !activeRoom;
-    this.elements.gameLobby.classList.toggle('hidden', !this.showingGameLobby);
-    this.elements.roomLobby.classList.toggle('hidden', !showingRoomLobby);
-    this.elements.tableHost.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse);
-    this.elements.blackjackView.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBlackjack);
-    this.elements.slotsView.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isSlots);
-    this.elements.status.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse);
-    this.elements.beatControls.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse || !canUseGameControls);
-    this.elements.blackjackControls.classList.toggle(
-      'hidden',
-      this.showingGameLobby || showingRoomLobby || this.activeGame !== 'blackjack' || !canUseGameControls,
-    );
-    this.elements.slotsControls.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isSlots || !canUseGameControls);
-    this.elements.gameHud.classList.remove('hidden');
-    this.elements.moneyPill.classList.toggle('hidden', showingRoomLobby);
-    this.elements.actionDock.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !canUseGameControls);
-    this.elements.backToLobbyButton.disabled = this.showingGameLobby;
-    this.elements.leaveRoomButton.classList.toggle('hidden', !activeRoom);
-    this.elements.roomMenu.classList.toggle('hidden', !activeRoom);
-    if (!activeRoom) {
-      this.elements.roomMenu.open = false;
-    }
-    this.elements.chipRail.classList.toggle(
-      'hidden',
-      this.showingGameLobby || showingRoomLobby || !isBeatTheHouse || beatSnapshot.phase !== 'betting' || !canUseGameControls,
-    );
-
-    if (isBeatTheHouse) {
-      this.table.resize();
-    }
-    this.table.render(beatSnapshot);
-    this.beatSeatStatusView.render(beatSnapshot, isBeatTheHouse ? activeRoom : undefined, player.profileId, (seatId) => this.claimRoomSeat(seatId));
-    this.renderWallet(beatSnapshot, roomMember?.bankroll);
-    this.renderBeatControls(beatSnapshot, canUseGameControls);
-    this.blackjackView.render(blackjackSnapshot, player.profileId);
-    this.slotsView.render(slotsSnapshot, this.activeGame, activeRoom, player.profileId);
-    this.renderRoomBrowser();
-    this.rulesMenuView.render(activeCatalogGame);
-    this.renderSessionLimit();
-  }
-
-  private renderGameLobby(): void {
-    this.gameLobbyView.render((gameId) => this.openRoomLobby(gameId));
-  }
-
-  private renderBeatControls(snapshot: GameSnapshot, controlsAvailable = true): void {
-    this.beatControlsView.render(
-      snapshot,
-      findGame(this.activeGame).kind === 'beat-the-house',
-      () => this.multiplayer.send({ version: protocolVersion, type: 'start-round' }),
-      controlsAvailable,
-    );
-  }
-
-  private renderWallet(snapshot: GameSnapshot, bankrollOverride?: number): void {
-    this.walletView.render(snapshot, this.currentProfile(), bankrollOverride);
   }
 
   private dealBlackjack(): void {
@@ -839,46 +535,11 @@ export class GameApp {
     this.showRoomRequiredMessage();
   }
 
-  private currentSlots(): SlotsGame {
-    const theme = findSlotTheme(this.activeGame);
-    return this.currentPlayer?.slots[theme.id] ?? new SlotsGame({ theme });
-  }
-
-  private activeRoomForGame(): RoomSnapshot | undefined {
+  protected activeRoomForGame(): RoomSnapshot | undefined {
     return this.multiplayer.room?.gameId === this.activeGame ? this.multiplayer.room : undefined;
   }
 
-  private syncCurrentRoomBankroll(room: RoomSnapshot): void {
-    const player = this.currentPlayer;
-    if (!player) {
-      return;
-    }
-    const roomMember =
-      room.players.find((candidate) => candidate.profileId === player.profileId) ??
-      room.spectators.find((candidate) => candidate.profileId === player.profileId);
-    if (roomMember) {
-      this.syncProfileBankroll(player.profileId, roomMember.bankroll);
-    }
-  }
-
-  private syncProfileBankroll(profileId: string, bankroll: number): void {
-    const profile = this.profileState.profiles.find((candidate) => candidate.id === profileId);
-    const nextBankroll = Math.max(0, Math.floor(bankroll));
-    this.players.find((player) => player.profileId === profileId)?.beatTheHouse.syncBankroll(nextBankroll);
-    const currentBankroll = profile?.bankroll;
-    if (!profile || currentBankroll === nextBankroll) {
-      return;
-    }
-    this.profileState = {
-      ...this.profileState,
-      profiles: this.profileState.profiles.map((candidate) =>
-        candidate.id === profile.id ? { ...profile, bankroll: nextBankroll, updatedAt: new Date().toISOString() } : candidate,
-      ),
-    };
-    this.saveSession();
-  }
-
-  private canUseServer(): boolean {
+  protected canUseServer(): boolean {
     if (this.multiplayer.connected) {
       return true;
     }
@@ -886,11 +547,6 @@ export class GameApp {
     this.renderConnectionState();
     this.elements.roomStatus.textContent = 'Reconnecting to the server. Actions are paused.';
     return false;
-  }
-
-  private renderConnectionState(): void {
-    const blocking = this.connectionState === 'connecting' || this.connectionState === 'reconnecting' || this.connectionState === 'disconnected';
-    this.elements.connectionOverlay.classList.toggle('hidden', !blocking);
   }
 
   private adjustCurrentBankroll(action: 'add' | 'subtract' | 'reset'): void {
@@ -934,81 +590,5 @@ export class GameApp {
     this.sessionWagered += Math.max(0, Math.floor(amount));
     this.saveSession();
     this.renderSessionLimit();
-  }
-
-  private renderSessionLimit(): void {
-    const limitText = this.sessionWagerLimit > 0 ? ` / ${money(this.sessionWagerLimit)}` : ' / no limit';
-    this.elements.sessionNotice.textContent = `Session wagered ${money(this.sessionWagered)}${limitText}. Fictional currency only.`;
-  }
-
-  private saveSession(): void {
-    if (this.players.length === 0) {
-      return;
-    }
-    try {
-      saveSessionState(
-        localStorage,
-        createSessionState(
-          this.players.map((player) => player.profileId),
-          {
-            selectedPlayerIndex: this.selectedPlayerIndex,
-            activeGame: this.activeGame,
-            showingGameLobby: this.showingGameLobby,
-            wagerLimit: this.sessionWagerLimit,
-            wagered: this.sessionWagered,
-            room: this.currentSessionRoom(),
-            gameSnapshots: Object.fromEntries(
-              this.players.map((player) => [
-                player.profileId,
-                {
-                  blackjack: player.blackjack.snapshot(),
-                  beatTheHouse: player.beatTheHouse.saveState(),
-                  slots: Object.fromEntries(Object.entries(player.slots).map(([themeId, slots]) => [themeId, slots.snapshot()])),
-                },
-              ]),
-            ),
-          },
-        ),
-      );
-    } catch (error) {
-      console.warn('Session could not be saved in this browser.', error);
-    }
-  }
-
-  private loadClientSession(): CasinoSessionState | undefined {
-    try {
-      return loadSessionState(localStorage).session;
-    } catch (error) {
-      console.warn('Session could not be loaded in this browser.', error);
-      return undefined;
-    }
-  }
-
-  private clearClientSession(): void {
-    try {
-      localStorage.removeItem(sessionStorageKey);
-    } catch (error) {
-      console.warn('Session could not be cleared in this browser.', error);
-    }
-  }
-
-  private currentSessionRoom(): CasinoSessionRoomState | undefined {
-    const room = this.multiplayer.room;
-    const profile = this.currentProfile();
-    if (!room || !profile) {
-      return undefined;
-    }
-    const role = room.players.some((candidate) => candidate.profileId === profile.id)
-      ? 'player'
-      : room.spectators.some((candidate) => candidate.profileId === profile.id)
-        ? 'spectator'
-        : undefined;
-    const seatId = room.seats.find((seat) => seat.profileId === profile.id)?.seatId;
-    return role ? { roomId: room.roomId, gameId: room.gameId, role, seatId } : undefined;
-  }
-
-  private currentProfile(): CasinoProfile | undefined {
-    const player = this.currentPlayer;
-    return player ? this.profileState.profiles.find((profile) => profile.id === player.profileId) : undefined;
   }
 }
