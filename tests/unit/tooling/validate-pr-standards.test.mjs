@@ -75,6 +75,37 @@ describe('validatePullRequest', () => {
     expect(failures).toContain('Testing must include a non-empty "Commands run" fenced block.');
   });
 
+  it('reports missing template sections and empty metadata', () => {
+    const failures = validatePullRequest({
+      body: '## Summary\n\nToo short.',
+      labels: undefined,
+      title: undefined,
+    });
+
+    expect(failures).toContain(
+      'PR title must match "type(scope): summary" using one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security, deps.',
+    );
+    expect(failures).toContain('Add one type label, for example "type:feature" or "type:maintenance".');
+    expect(failures).toContain('Add one area label, for example "area:ui", "area:gameplay", or "area:tooling".');
+    expect(failures).toContain('PR body must keep the "## Type" template section.');
+    expect(failures).toContain('PR body must keep the "## Checks" template section.');
+    expect(failures).toContain('PR body must keep the "## Testing" template section.');
+    expect(failures).toContain('PR body must keep the "## Notes" template section.');
+  });
+
+  it('requires a useful summary and one selected type checkbox', () => {
+    const failures = validatePullRequest(
+      pullRequest({
+        body: validBody
+          .replace('Adds a reusable PR metadata gate so maintainers can enforce review standards before merge.', 'Too short.')
+          .replace('- [x] Test or tooling', '- [ ] Test or tooling'),
+      }),
+    );
+
+    expect(failures).toContain('The Summary section must describe the change and why it is needed.');
+    expect(failures).toContain('Select at least one checkbox in the Type section.');
+  });
+
   it('rejects body placeholders from the PR template', () => {
     const failures = validatePullRequest(
       pullRequest({
