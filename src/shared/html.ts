@@ -1,5 +1,3 @@
 export const escapeHtml = (value: string): string => {
-  const div = document.createElement('div');
-  div.textContent = value;
-  return div.innerHTML;
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 };
