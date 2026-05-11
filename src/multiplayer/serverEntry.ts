@@ -4,8 +4,8 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { Socket } from 'node:net';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RoomAuthority } from './roomAuthority';
-import { parseClientMessage, protocolVersion, type ClientMessage, type RoomGameId, type ServerMessage } from './protocol';
+import { RoomAuthority, type AuthorityResult } from './roomAuthority';
+import { parseClientMessage, protocolVersion, type ClientMessage, type RoomGameId, type RoomSummary, type ServerMessage } from './protocol';
 import { createSessionState } from '../state/session';
 import { createDefaultServerDataStore, type ServerDataStore } from '../state/serverDataStore';
 
@@ -18,11 +18,17 @@ interface Peer {
 
 export interface CasinoServerOptions {
   readonly distRoot?: string;
-  readonly authority?: RoomAuthority;
+  readonly authority?: CasinoRoomAuthority;
   readonly dataStore?: ServerDataStore;
   readonly heartbeatIntervalMs?: number;
   readonly heartbeatTimeoutMs?: number;
   readonly serverInstanceId?: string;
+}
+
+export interface CasinoRoomAuthority {
+  handle(connectionId: string, message: ClientMessage): AuthorityResult;
+  disconnect(connectionId: string): AuthorityResult;
+  listRoomSummaries(gameId?: RoomGameId): readonly RoomSummary[];
 }
 
 export interface CasinoServer extends Server {

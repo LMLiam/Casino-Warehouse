@@ -1,9 +1,11 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
 const sourceRoot = join(workspaceRoot, 'src');
 const testRoot = join(workspaceRoot, 'tests');
+const trackedTypeScriptFiles = gitTrackedTypeScriptFiles();
 const sourceFiles = listFiles(sourceRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const relativeSourceFiles = new Set(sourceFiles.map(toWorkspacePath));
@@ -26,6 +28,7 @@ for (const file of sourceFiles) {
   checkAppFolderLayout(relativePath);
 }
 
+checkDirectUnknownCasts();
 checkTestFolderLayout();
 checkCycles();
 
@@ -43,11 +46,17 @@ function checkImportBoundaries(relativePath, source) {
       continue;
     }
 
-    if (relativePath.startsWith('src/game/') && (importedPath.startsWith('src/ui/') || importedPath.startsWith('src/app/') || importedPath.startsWith('src/multiplayer/'))) {
+    if (
+      relativePath.startsWith('src/game/') &&
+      (importedPath.startsWith('src/ui/') || importedPath.startsWith('src/app/') || importedPath.startsWith('src/multiplayer/'))
+    ) {
       errors.push(`${relativePath} imports forbidden upper-layer module ${importedPath}. Game engines must stay UI/server independent.`);
     }
 
-    if ((relativePath.startsWith('src/multiplayer/') || relativePath.startsWith('src/state/')) && (importedPath.startsWith('src/ui/') || importedPath.startsWith('src/app/'))) {
+    if (
+      (relativePath.startsWith('src/multiplayer/') || relativePath.startsWith('src/state/')) &&
+      (importedPath.startsWith('src/ui/') || importedPath.startsWith('src/app/'))
+    ) {
       errors.push(`${relativePath} imports forbidden UI/app module ${importedPath}. Multiplayer and state modules must stay UI independent.`);
     }
 
@@ -121,6 +130,24 @@ function checkAppFolderLayout(relativePath) {
   if (parts.length < 4 || !appModuleFolders.has(folder)) {
     errors.push(`${relativePath} is not in an approved app folder. Use one of: ${[...appModuleFolders].sort().join(', ')}.`);
   }
+}
+
+function checkDirectUnknownCasts() {
+  for (const file of trackedTypeScriptFiles) {
+    const relativePath = toWorkspacePath(file);
+    const source = readFileSync(file, 'utf8');
+    for (const match of source.matchAll(/\bas\s+unknown\b/g)) {
+      const line = source.slice(0, match.index).split('\n').length;
+      errors.push(`${relativePath}:${line} uses a direct cast through unknown. Use validation, typed fakes, or a named escape-hatch helper instead.`);
+    }
+  }
+}
+
+function gitTrackedTypeScriptFiles() {
+  return execFileSync('git', ['ls-files', '*.ts', '*.tsx'], { cwd: workspaceRoot, encoding: 'utf8' })
+    .split('\n')
+    .filter((path) => path && !path.endsWith('.d.ts'))
+    .map((path) => resolve(workspaceRoot, path));
 }
 
 function checkTestFolderLayout() {
@@ -205,10 +232,13 @@ function resolveImport(fromRelativePath, specifier) {
   return match ? toWorkspacePath(match) : undefined;
 }
 
-function listFiles(dir) {
+function listFiles(dir, ignoredNames = new Set()) {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
-    return statSync(path).isDirectory() ? listFiles(path) : [path];
+    if (ignoredNames.has(name)) {
+      return [];
+    }
+    return statSync(path).isDirectory() ? listFiles(path, ignoredNames) : [path];
   });
 }
 

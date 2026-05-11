@@ -104,30 +104,31 @@ describe('Beat the House popup and animation behaviour', () => {
       matchMedia: vi.fn(() => ({ matches: false })),
       setTimeout: vi.fn(() => 0),
     });
-    const cardRenderer = {
+    const cardRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createCardRenderer']>>({
       beginFrame: vi.fn(),
       clearAnimations: vi.fn(),
       drawCard: vi.fn(),
       drawBack: vi.fn(),
       drawRevealedCard: vi.fn(),
       endFrame: vi.fn(),
-    };
-    const chipRenderer = { clearAnimations: vi.fn(), drawStack: vi.fn() };
-    const dependencies = {
+    });
+    const chipRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createChipRenderer']>>({ clearAnimations: vi.fn(), drawStack: vi.fn() });
+    const dependencies: PixiTableDependencies = {
       createCardRenderer: () => cardRenderer,
       createChipRenderer: () => chipRenderer,
-      createEffectRenderer: () => ({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() }),
-      createTagRenderer: () => ({
-        drawMarker: vi.fn(),
-        drawPayoutTag: vi.fn(),
-        drawResultPopup: vi.fn(),
-        drawSideBetWin: vi.fn(),
-        drawSideState: vi.fn(),
-      }),
-    } as unknown as PixiTableDependencies;
-    const host = { dataset: {}, clientWidth: 1000, clientHeight: 1000, classList: { toggle: vi.fn() } } as unknown as HTMLElement;
+      createEffectRenderer: () => rendererTestDouble({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() }),
+      createTagRenderer: () =>
+        rendererTestDouble({
+          drawMarker: vi.fn(),
+          drawPayoutTag: vi.fn(),
+          drawResultPopup: vi.fn(),
+          drawSideBetWin: vi.fn(),
+          drawSideState: vi.fn(),
+        }),
+    };
+    const host = hostElementTestDouble({ dataset: {}, clientWidth: 1000, clientHeight: 1000, classList: { toggle: vi.fn() } });
     const table = new PixiTable(host, { onBet: vi.fn() }, dependencies);
-    const mutableTable = table as unknown as { initialized: boolean; chipRenderer: typeof chipRenderer };
+    const mutableTable = pixiTableInternals(table);
     mutableTable.initialized = true;
     mutableTable.chipRenderer = chipRenderer;
     const game = new BeatTheHouseGame({ initialBankroll: 500 });
@@ -170,7 +171,7 @@ describe('Beat the House popup and animation behaviour', () => {
       'win',
       true,
     );
-    const popupText = tagRenderer.drawResultPopup.mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
+    const popupText = vi.mocked(tagRenderer.drawResultPopup).mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
     expect(popupText).not.toContain('Dealer Bust');
     expect(popupText).not.toContain('Dealer Sevens');
     expect(tagRenderer.drawSideState).toHaveBeenCalledWith('lose', expect.any(Number), expect.any(Number));
@@ -283,7 +284,7 @@ describe('Beat the House popup and animation behaviour', () => {
       'lose',
       false,
     );
-    const popupText = tagRenderer.drawResultPopup.mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
+    const popupText = vi.mocked(tagRenderer.drawResultPopup).mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
     expect(popupText).not.toContain('Ace Flash');
     expect(popupText).not.toContain('Dealer Bust');
   });
@@ -308,39 +309,46 @@ describe('Beat the House popup and animation behaviour', () => {
 });
 
 const createInitializedTable = () => {
-  const chipRenderer = { clearAnimations: vi.fn(), drawStack: vi.fn() };
-  const effectRenderer = { drawConfetti: vi.fn(), drawSideBetWin: vi.fn() };
-  const tagRenderer = {
+  const chipRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createChipRenderer']>>({ clearAnimations: vi.fn(), drawStack: vi.fn() });
+  const effectRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createEffectRenderer']>>({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() });
+  const tagRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createTagRenderer']>>({
     drawMarker: vi.fn(),
     drawPayoutTag: vi.fn(),
     drawResultPopup: vi.fn(),
     drawSideBetWin: vi.fn(),
     drawSideState: vi.fn(),
-  };
-  const cardRenderer = {
+  });
+  const cardRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createCardRenderer']>>({
     beginFrame: vi.fn(),
     clearAnimations: vi.fn(),
     drawCard: vi.fn(),
     drawBack: vi.fn(),
     drawRevealedCard: vi.fn(),
     endFrame: vi.fn(),
-  };
-  const dependencies = {
+  });
+  const dependencies: PixiTableDependencies = {
     createCardRenderer: () => cardRenderer,
     createChipRenderer: () => chipRenderer,
     createEffectRenderer: () => effectRenderer,
     createTagRenderer: () => tagRenderer,
-  } as unknown as PixiTableDependencies;
-  const host = {
+  };
+  const host = hostElementTestDouble({
     dataset: {},
     clientWidth: 1000,
     clientHeight: 1000,
     classList: { toggle: vi.fn() },
-  } as unknown as HTMLElement;
+  });
   const table = new PixiTable(host, { onBet: vi.fn() }, dependencies);
-  const mutableTable = table as unknown as { initialized: boolean; chipRenderer: typeof chipRenderer };
+  const mutableTable = pixiTableInternals(table);
   mutableTable.initialized = true;
   mutableTable.chipRenderer = chipRenderer;
 
   return { table, host, cardRenderer, chipRenderer, effectRenderer, tagRenderer };
 };
+
+const rendererTestDouble = <Renderer>(implementation: object): Renderer => implementation as Renderer;
+
+const hostElementTestDouble = (implementation: object): HTMLElement => implementation as HTMLElement;
+
+const pixiTableInternals = (table: PixiTable): { initialized: boolean; chipRenderer: ReturnType<PixiTableDependencies['createChipRenderer']> } =>
+  rendererTestDouble(table);

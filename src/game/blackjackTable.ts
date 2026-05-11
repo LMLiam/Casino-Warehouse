@@ -410,4 +410,10 @@ const handText = (cards: readonly Card[]): string => `${cards.map(cardLabel).joi
 export const isBlackjackTableSnapshot = (snapshot: unknown): snapshot is BlackjackTableSnapshot =>
   typeof snapshot === 'object' && snapshot !== null && 'kind' in snapshot && (snapshot as { kind?: unknown }).kind === 'blackjack-table';
 
-export const isCard = (card: Card): card is Card => suits.includes(card.suit) && ranks.includes(card.rank);
+export const isCard = (card: unknown): card is Card =>
+  typeof card === 'object' &&
+  card !== null &&
+  'suit' in card &&
+  'rank' in card &&
+  suits.includes(card.suit as Card['suit']) &&
+  ranks.includes(card.rank as Card['rank']);

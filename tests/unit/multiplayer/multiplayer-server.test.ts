@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine';
-import type { RoomAuthority } from '../../../src/multiplayer/roomAuthority';
-import { createCasinoServer, type CasinoServer, type CasinoServerOptions } from '../../../src/multiplayer/serverEntry';
+import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer, type CasinoServerOptions } from '../../../src/multiplayer/serverEntry';
 import { decodeServerMessage, encodeMessage, type ClientMessage, type RoomSnapshot, type ServerMessage } from '../../../src/multiplayer/protocol';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore';
 
@@ -318,7 +317,7 @@ describe('multiplayer WebSocket server', () => {
   });
 
   it('broadcasts authoritative settlement events returned by the room layer', async () => {
-    const authority = {
+    const authority: CasinoRoomAuthority = {
       handle: (connectionId: string) => {
         const room = createRoomSnapshot(connectionId);
         return {
@@ -327,7 +326,8 @@ describe('multiplayer WebSocket server', () => {
         };
       },
       disconnect: () => ({ broadcasts: [], settlements: [] }),
-    } as unknown as RoomAuthority;
+      listRoomSummaries: () => [],
+    };
     const baseUrl = await startServer('.', authority);
     const alice = await connect(baseUrl.ws);
 
@@ -348,7 +348,7 @@ const createStaticFixture = async (): Promise<string> => {
 
 const startServer = async (
   distRoot = '.',
-  authority?: RoomAuthority,
+  authority?: CasinoRoomAuthority,
   options: CasinoServerOptions = {},
 ): Promise<{ readonly http: string; readonly ws: string; readonly port: number }> => {
   server = createCasinoServer({ distRoot, authority, ...options });
