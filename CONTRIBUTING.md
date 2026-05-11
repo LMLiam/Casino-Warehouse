@@ -22,6 +22,12 @@ Casino Warehouse accepts changes through pull requests only. The `main` branch i
 - Wait for CI and maintainer review.
 - Do not commit directly to `main`; maintainers merge pull requests with squash commits.
 
+## Security And Quality Gates
+
+The `main` branch ruleset requires the CodeQL code scanning tool to report results before protected refs can update. The native code scanning gate blocks pull requests when CodeQL analysis is missing, still running, or reports a security alert at `high` severity or higher. The existing `Analyze (javascript-typescript)` status check remains required so the workflow result stays visible in the pull request checks list.
+
+GitHub Code Quality is not enabled for this repository yet, so the ruleset does not currently enforce a Code Quality gate. When the `CodeQL - Code Quality / Analyze` check is available and passing on pull requests, maintainers should enable the native Code Quality ruleset requirement with an `Errors` threshold first. Contributors blocked by either gate should inspect the pull request checks and code scanning or Code Quality annotations, fix the reported finding, and push an updated commit.
+
 ## Local Checks
 
 Configure your editor to respect the repository `.editorconfig` before making changes.
