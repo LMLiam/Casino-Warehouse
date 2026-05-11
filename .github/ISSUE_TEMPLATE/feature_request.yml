@@ -2,8 +2,8 @@ name: Feature request
 description: Suggest an improvement or new capability.
 title: '[Feature]: '
 labels:
-  - "type:feature"
-  - "status:needs-triage"
+  - 'type:feature'
+  - 'status:needs-triage'
 body:
   - type: textarea
     id: problem
