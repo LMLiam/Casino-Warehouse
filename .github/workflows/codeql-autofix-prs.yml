@@ -1,0 +1,102 @@
+name: CodeQL Autofix PRs
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Dry run or create draft pull requests
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - create-draft-prs
+      min-severity:
+        description: Lowest alert severity eligible for automation
+        required: true
+        default: high
+        type: choice
+        options:
+          - critical
+          - high
+          - medium
+          - low
+      max-alerts:
+        description: Maximum candidate alerts to process in one run
+        required: true
+        default: '3'
+        type: string
+      allow-rules:
+        description: Optional comma-separated CodeQL rule allowlist
+        required: false
+        default: ''
+        type: string
+  schedule:
+    - cron: '41 4 * * 2'
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    if: github.event_name == 'schedule' || github.event.inputs.mode == 'dry-run'
+    name: Plan draft Autofix PRs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      security-events: read
+
+    steps:
+      - name: Checkout trusted automation
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Dry-run CodeQL Autofix PR plan
+        env:
+          AUTOFIX_ALLOW_RULES: ${{ github.event.inputs.allow-rules || '' }}
+          AUTOFIX_MAX_ALERTS: ${{ github.event.inputs.max-alerts || '3' }}
+          AUTOFIX_MIN_SEVERITY: ${{ github.event.inputs.min-severity || 'high' }}
+          AUTOFIX_MODE: dry-run
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/codeql-autofix-prs.mjs
+
+  create-draft-prs:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'create-draft-prs'
+    name: Create draft Autofix PRs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      security-events: write
+
+    steps:
+      - name: Checkout trusted automation
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Create draft CodeQL Autofix PRs
+        env:
+          AUTOFIX_ALLOW_RULES: ${{ github.event.inputs.allow-rules || '' }}
+          AUTOFIX_MAX_ALERTS: ${{ github.event.inputs.max-alerts || '3' }}
+          AUTOFIX_MIN_SEVERITY: ${{ github.event.inputs.min-severity || 'high' }}
+          AUTOFIX_MODE: create-draft-prs
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/codeql-autofix-prs.mjs
