@@ -1,0 +1,41 @@
+name: Issue Standards
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+      - labeled
+      - unlabeled
+      - assigned
+      - unassigned
+      - milestoned
+      - demilestoned
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  validate:
+    name: Issue Standards
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout trusted validator
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Validate issue metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_STANDARDS_EVENT_PATH: ${{ github.event_path }}
+        run: node scripts/validate-issue-standards.mjs
