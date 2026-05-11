@@ -1,0 +1,305 @@
+import { findGame, findSlotTheme } from '../../game/catalog';
+import { defaultRealtimeUrl, type ServerDataState } from '../../multiplayer/client';
+import type { RoomSnapshot } from '../../multiplayer/protocol';
+import type { CasinoProfile } from '../../state/profiles';
+import {
+  createSessionState,
+  loadSessionState,
+  saveSessionState,
+  sessionStorageKey,
+  type CasinoSessionRoomState,
+  type CasinoSessionState,
+} from '../../state/session';
+import { SlotsGame } from '../../game/slots';
+import { type CasinoPlayer, createPlayerFromProfile } from '../state/casinoPlayer';
+import { inviteServerUrl, parseGameId } from '../input/appInputs';
+import { GameAppRendering } from './GameAppRendering';
+
+export abstract class GameAppSession extends GameAppRendering {
+  protected abstract realtimeUrl: string;
+  protected abstract returnHomeOnServerResync: boolean;
+  protected abstract restoringRoomAfterReconnect: boolean;
+  protected abstract pendingRoomRestore: CasinoSessionRoomState | undefined;
+  protected abstract pendingInviteRoomCode: string;
+  protected abstract pendingInviteServerUrl: string;
+  protected abstract pendingInviteAttempted: boolean;
+
+  protected get currentPlayer(): CasinoPlayer | undefined {
+    return this.players[this.selectedPlayerIndex];
+  }
+
+  protected applyServerData(state: ServerDataState): void {
+    this.profileState = state.profileState;
+    this.lastSaveError = '';
+    this.players = this.players
+      .map((player) => {
+        const profile = this.profileState.profiles.find((candidate) => candidate.id === player.profileId);
+        if (profile) {
+          player.beatTheHouse.syncBankroll(profile.bankroll);
+        }
+        return profile ? player : undefined;
+      })
+      .filter((player): player is CasinoPlayer => Boolean(player));
+    if (this.players.length === 0) {
+      const clientSession = this.loadClientSession();
+      if (clientSession?.profileIds.length) {
+        this.restoreSavedSession(clientSession);
+      }
+    }
+    this.selectedPlayerIndex = Math.min(this.selectedPlayerIndex, Math.max(0, this.players.length - 1));
+    if (this.returnHomeOnServerResync && !this.multiplayer.room) {
+      this.returnHomeOnServerResync = false;
+      this.showingGameLobby = true;
+      this.multiplayerRooms = [];
+      this.elements.roomStatus.textContent = 'The room could not be restored. Choose a game to start or join a new room.';
+    }
+    this.renderProfileSetup();
+    if (this.players.length === 0 && this.pendingInviteRoomCode && !this.pendingInviteAttempted) {
+      this.elements.roomStatus.textContent = `Invite loaded for room ${this.pendingInviteRoomCode}. Select a profile to join.`;
+    }
+    if (this.players.length === 0) {
+      this.showingGameLobby = true;
+      this.multiplayerRooms = [];
+      this.elements.shell.classList.add('hidden');
+      this.elements.setup.classList.remove('hidden');
+      this.roomSeatsView.clear();
+      this.beatControlsView.clearPending();
+      this.beatSeatStatusView.clear();
+      this.multiplayer.clearRoomState();
+      return;
+    }
+    if (this.players.length > 0) {
+      this.elements.setup.classList.add('hidden');
+      this.elements.shell.classList.remove('hidden');
+      this.renderPlayerButtons();
+      this.renderGameLobby();
+      this.renderCasino();
+      if (this.returnHomeOnServerResync) {
+        this.restoreRoomAfterReconnect();
+        return;
+      }
+      if (this.maybeRestoreSavedRoom()) {
+        return;
+      }
+      if (!this.showingGameLobby && this.multiplayer.connected) {
+        this.refreshMultiplayerRooms();
+      }
+      this.maybeAutoJoinInvite();
+    }
+  }
+
+  protected restoreSavedSession(session: CasinoSessionState): void {
+    const restoredPlayers = session.profileIds
+      .map((profileId) => this.profileState.profiles.find((profile) => profile.id === profileId))
+      .filter((profile): profile is CasinoProfile => Boolean(profile))
+      .map((profile) => createPlayerFromProfile(profile, session.gameSnapshots[profile.id]));
+    if (restoredPlayers.length === 0) {
+      this.clearClientSession();
+      return;
+    }
+
+    this.players = restoredPlayers;
+    this.selectedPlayerIndex = Math.min(session.selectedPlayerIndex, restoredPlayers.length - 1);
+    this.activeGame = session.activeGame;
+    this.sessionWagerLimit = session.wagerLimit;
+    this.sessionWagered = session.wagered;
+    this.showingGameLobby = true;
+    this.pendingRoomRestore = session.room;
+    this.elements.sessionLimitInput.value = this.sessionWagerLimit > 0 ? String(this.sessionWagerLimit) : '';
+  }
+
+  protected returnHomeAfterRoomStateLoss(): void {
+    this.returnHomeOnServerResync = false;
+    this.restoringRoomAfterReconnect = false;
+    this.showingGameLobby = true;
+    this.multiplayerRooms = [];
+    this.elements.roomStatus.textContent = 'The room could not be restored. Choose a game to start or join a new room.';
+    this.roomSeatsView.clear();
+    this.beatControlsView.clearPending();
+    this.beatSeatStatusView.clear();
+    this.renderGameLobby();
+    this.renderCasino();
+    this.saveSession();
+  }
+
+  protected restoreRoomAfterReconnect(): void {
+    const room = this.multiplayer.room;
+    const profile = this.currentProfile();
+    const role = profile
+      ? room?.players.some((candidate) => candidate.profileId === profile.id)
+        ? 'player'
+        : room?.spectators.some((candidate) => candidate.profileId === profile.id)
+          ? 'spectator'
+          : undefined
+      : undefined;
+    this.returnHomeOnServerResync = false;
+    if (!room || !profile || !role) {
+      this.multiplayer.clearRoomState();
+      return;
+    }
+
+    this.attemptRoomRestore(
+      { roomId: room.roomId, gameId: room.gameId, role, seatId: room.seats.find((seat) => seat.profileId === profile.id)?.seatId },
+      profile,
+      room.gameTitle,
+    );
+  }
+
+  protected maybeRestoreSavedRoom(): boolean {
+    const room = this.pendingRoomRestore;
+    const profile = this.currentProfile();
+    if (!room || !profile || this.pendingInviteRoomCode || !this.multiplayer.connected) {
+      return false;
+    }
+    this.pendingRoomRestore = undefined;
+    this.attemptRoomRestore(room, profile, findGame(room.gameId).title);
+    return true;
+  }
+
+  protected attemptRoomRestore(room: CasinoSessionRoomState, profile: CasinoProfile, gameTitle: string): void {
+    this.restoringRoomAfterReconnect = true;
+    this.showingGameLobby = true;
+    this.activeGame = room.gameId;
+    this.multiplayerRooms = [];
+    this.elements.roomStatus.textContent = `Checking ${gameTitle} room ${room.roomId} against the server.`;
+    this.renderGameLobby();
+    this.renderCasino();
+    this.multiplayer.joinRoom(room.gameId, room.roomId, room.role, profile.id, profile.name, profile.bankroll, room.seatId);
+  }
+
+  protected applyInviteFromUrl(): void {
+    this.realtimeUrl = inviteServerUrl() ?? defaultRealtimeUrl();
+    this.pendingInviteServerUrl = this.realtimeUrl;
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('room')?.trim().toUpperCase() ?? '';
+    const gameId = parseGameId(params.get('game')?.trim());
+    if (!roomId) {
+      return;
+    }
+    this.pendingInviteRoomCode = roomId;
+    if (gameId) {
+      this.activeGame = gameId;
+    }
+    this.elements.roomStatus.textContent = `Invite loaded for room ${roomId}. Select a profile to join.`;
+  }
+
+  protected maybeAutoJoinInvite(): void {
+    if (!this.pendingInviteRoomCode || this.pendingInviteAttempted || !this.currentProfile()) {
+      return;
+    }
+    this.pendingInviteAttempted = true;
+    this.showingGameLobby = false;
+    this.renderCasino();
+    this.realtimeUrl = this.pendingInviteServerUrl || this.realtimeUrl || defaultRealtimeUrl();
+    this.joinMultiplayerRoom(this.pendingInviteRoomCode, 'player');
+  }
+
+  protected syncCurrentRoomBankroll(room: RoomSnapshot): void {
+    const player = this.currentPlayer;
+    if (!player) {
+      return;
+    }
+    const roomMember =
+      room.players.find((candidate) => candidate.profileId === player.profileId) ??
+      room.spectators.find((candidate) => candidate.profileId === player.profileId);
+    if (roomMember) {
+      this.syncProfileBankroll(player.profileId, roomMember.bankroll);
+    }
+  }
+
+  protected syncProfileBankroll(profileId: string, bankroll: number): void {
+    const profile = this.profileState.profiles.find((candidate) => candidate.id === profileId);
+    const nextBankroll = Math.max(0, Math.floor(bankroll));
+    this.players.find((player) => player.profileId === profileId)?.beatTheHouse.syncBankroll(nextBankroll);
+    const currentBankroll = profile?.bankroll;
+    if (!profile || currentBankroll === nextBankroll) {
+      return;
+    }
+    this.profileState = {
+      ...this.profileState,
+      profiles: this.profileState.profiles.map((candidate) =>
+        candidate.id === profile.id ? { ...profile, bankroll: nextBankroll, updatedAt: new Date().toISOString() } : candidate,
+      ),
+    };
+    this.saveSession();
+  }
+
+  protected currentSlots(): SlotsGame {
+    const theme = findSlotTheme(this.activeGame);
+    return this.currentPlayer?.slots[theme.id] ?? new SlotsGame({ theme });
+  }
+
+  protected saveSession(): void {
+    if (this.players.length === 0) {
+      return;
+    }
+    try {
+      saveSessionState(
+        localStorage,
+        createSessionState(
+          this.players.map((player) => player.profileId),
+          {
+            selectedPlayerIndex: this.selectedPlayerIndex,
+            activeGame: this.activeGame,
+            showingGameLobby: this.showingGameLobby,
+            wagerLimit: this.sessionWagerLimit,
+            wagered: this.sessionWagered,
+            room: this.currentSessionRoom(),
+            gameSnapshots: Object.fromEntries(
+              this.players.map((player) => [
+                player.profileId,
+                {
+                  blackjack: player.blackjack.snapshot(),
+                  beatTheHouse: player.beatTheHouse.saveState(),
+                  slots: Object.fromEntries(Object.entries(player.slots).map(([themeId, slots]) => [themeId, slots.snapshot()])),
+                },
+              ]),
+            ),
+          },
+        ),
+      );
+    } catch (error) {
+      console.warn('Session could not be saved in this browser.', error);
+    }
+  }
+
+  protected loadClientSession(): CasinoSessionState | undefined {
+    try {
+      return loadSessionState(localStorage).session;
+    } catch (error) {
+      console.warn('Session could not be loaded in this browser.', error);
+      return undefined;
+    }
+  }
+
+  protected clearClientSession(): void {
+    try {
+      localStorage.removeItem(sessionStorageKey);
+    } catch (error) {
+      console.warn('Session could not be cleared in this browser.', error);
+    }
+  }
+
+  protected currentSessionRoom(): CasinoSessionRoomState | undefined {
+    const room = this.multiplayer.room;
+    const profile = this.currentProfile();
+    if (!room || !profile) {
+      return undefined;
+    }
+    const role = room.players.some((candidate) => candidate.profileId === profile.id)
+      ? 'player'
+      : room.spectators.some((candidate) => candidate.profileId === profile.id)
+        ? 'spectator'
+        : undefined;
+    const seatId = room.seats.find((seat) => seat.profileId === profile.id)?.seatId;
+    return role ? { roomId: room.roomId, gameId: room.gameId, role, seatId } : undefined;
+  }
+
+  protected currentProfile(): CasinoProfile | undefined {
+    const player = this.currentPlayer;
+    return player ? this.profileState.profiles.find((profile) => profile.id === player.profileId) : undefined;
+  }
+
+  protected abstract refreshMultiplayerRooms(): void;
+  protected abstract activeRoomForGame(): RoomSnapshot | undefined;
+}
