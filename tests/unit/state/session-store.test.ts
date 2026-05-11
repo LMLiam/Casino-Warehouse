@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { BlackjackGame } from '../../../src/game/blackjack';
+import { slotThemes } from '../../../src/game/catalog';
+import { rigDeck, type Card } from '../../../src/game/cards';
 import { BeatTheHouseGame } from '../../../src/game/engine';
+import { SlotsGame } from '../../../src/game/slots';
 import { createPlayerFromProfile } from '../../../src/app/state/casinoPlayer';
 import { createSessionState, loadSessionState, parseSessionState, saveSessionState } from '../../../src/state/session';
 import { createProfile, type StorageLike } from '../../../src/state/profiles';
+
+const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -77,6 +83,37 @@ describe('session store', () => {
     const player = createPlayerFromProfile(profile, { beatTheHouse: staleSnapshot });
 
     expect(player.beatTheHouse.snapshot().bankroll).toBe(467);
+  });
+
+  it('restores saved Blackjack and slot snapshots for a profile session', () => {
+    const profile = createProfile({ version: 1, profiles: [] }, 'Saved Table', 700).profiles[0];
+    const blackjackSnapshot = new BlackjackGame().deal(25, rigDeck([card('10', 'spades'), card('9', 'hearts'), card('6', 'clubs'), card('8', 'diamonds')]));
+    const slotTheme = slotThemes[0];
+    const slotSnapshot = new SlotsGame({ theme: slotTheme }).spin(10, [
+      'lotus',
+      'lotus',
+      'lotus',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+      'temple',
+      'fan',
+      'orchid',
+      'elephant',
+    ]);
+
+    const player = createPlayerFromProfile(profile, {
+      blackjack: blackjackSnapshot,
+      slots: { [slotTheme.id]: slotSnapshot },
+    });
+
+    expect(player.blackjack.snapshot()).toEqual(blackjackSnapshot);
+    expect(player.slots[slotTheme.id].snapshot()).toEqual(slotSnapshot);
   });
 
   it('recovers gracefully from corrupt session storage', () => {

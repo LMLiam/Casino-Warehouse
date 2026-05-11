@@ -1,16 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const playwrightHost = process.env.PLAYWRIGHT_HOST ?? '127.0.0.1';
+const playwrightPort = process.env.PLAYWRIGHT_PORT ?? '4173';
+const playwrightBaseURL = `http://${playwrightHost}:${playwrightPort}`;
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
   workers: 1,
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]] : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: playwrightBaseURL,
+    screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'HOST=127.0.0.1 PORT=4173 npm run dev:server',
-    url: 'http://127.0.0.1:4173',
+    command: `HOST=${playwrightHost} PORT=${playwrightPort} npm run dev:server`,
+    url: playwrightBaseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
   },
