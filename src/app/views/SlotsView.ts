@@ -2,7 +2,7 @@ import { slotFrameAsset, slotSymbolAsset } from '../../assets/manifest';
 import type { CasinoGameId } from '../../game/catalog';
 import { symbolLabel, type SlotSnapshot } from '../../game/slots';
 import type { RoomSnapshot } from '../../multiplayer/protocol';
-import { escapeHtml } from '../../shared/html';
+
 import type { AppElements } from '../dom/appElements';
 import { money } from '../format/appMoney';
 
@@ -30,15 +30,30 @@ export class SlotsView {
     this.elements.slotReels.style.setProperty('--slot-column-count', String(snapshot.columns));
     this.elements.slotReels.style.setProperty('--slot-row-count', String(snapshot.rows));
     this.elements.slotsStatus.textContent = snapshot.status;
-    this.elements.slotReels.innerHTML = snapshot.reels
-      .map((symbol, index) => {
-        const row = Math.floor(index / snapshot.columns) + 1;
-        const column = (index % snapshot.columns) + 1;
-        const label = escapeHtml(symbolLabel(symbol));
-        const symbolAsset = slotSymbolAsset(symbol);
-        return `<span style="--reel-delay: ${index * 42}ms; --reel-shine-delay: ${120 + index * 34}ms" aria-label="Column ${column}, row ${row}: ${label}" data-slot-symbol="${symbol}" data-slot-column="${column}" data-slot-row="${row}"><img class="slot-symbol-img" src="${symbolAsset.path}" alt="" draggable="false" /></span>`;
-      })
-      .join('');
+    this.elements.slotReels.replaceChildren();
+    snapshot.reels.forEach((symbol, index) => {
+      const row = Math.floor(index / snapshot.columns) + 1;
+      const column = (index % snapshot.columns) + 1;
+      const label = symbolLabel(symbol);
+      const symbolAsset = slotSymbolAsset(symbol);
+
+      const reelCell = document.createElement('span');
+      reelCell.style.setProperty('--reel-delay', `${index * 42}ms`);
+      reelCell.style.setProperty('--reel-shine-delay', `${120 + index * 34}ms`);
+      reelCell.setAttribute('aria-label', `Column ${column}, row ${row}: ${label}`);
+      reelCell.setAttribute('data-slot-symbol', String(symbol));
+      reelCell.setAttribute('data-slot-column', String(column));
+      reelCell.setAttribute('data-slot-row', String(row));
+
+      const symbolImage = document.createElement('img');
+      symbolImage.className = 'slot-symbol-img';
+      symbolImage.src = symbolAsset.path;
+      symbolImage.alt = '';
+      symbolImage.draggable = false;
+
+      reelCell.append(symbolImage);
+      this.elements.slotReels.append(reelCell);
+    });
     this.elements.slotsResult.textContent = `${snapshot.jackpotWin ? `${snapshot.jackpotWin.label} • ` : ''}Line ${money(snapshot.lineWin)} • Bonus ${money(snapshot.bonusBank)} • Free spins ${snapshot.freeSpinsRemaining} • Returned ${money(snapshot.returned)}`;
 
     if (activeRoom?.slots && activeRoom.gameId === activeGame) {
