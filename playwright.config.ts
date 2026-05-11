@@ -3,11 +3,12 @@ import { defineConfig, devices } from '@playwright/test';
 const playwrightHost = process.env.PLAYWRIGHT_HOST ?? '127.0.0.1';
 const playwrightPort = process.env.PLAYWRIGHT_PORT ?? '4173';
 const playwrightBaseURL = `http://${playwrightHost}:${playwrightPort}`;
+const playwrightWorkers = Number(process.env.PLAYWRIGHT_WORKERS ?? 2);
 
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
-  workers: 1,
+  workers: Number.isFinite(playwrightWorkers) && playwrightWorkers > 0 ? Math.floor(playwrightWorkers) : 2,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]] : 'list',
   use: {
     baseURL: playwrightBaseURL,
