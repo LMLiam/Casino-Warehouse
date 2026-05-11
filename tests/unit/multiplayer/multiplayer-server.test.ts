@@ -154,11 +154,15 @@ describe('multiplayer WebSocket server', () => {
     const initialData = await alice.waitFor((message) => message.type === 'data-state');
     expect(initialData.type === 'data-state' ? initialData.database : '').toBe('memory');
     alice.send({ version: 1, type: 'create-profile', profileName: 'Server Alice' });
-    const profileData = await alice.waitFor((message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Server Alice'));
+    const profileData = await alice.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Server Alice'),
+    );
     const aliceProfile = profileData.type === 'data-state' ? profileData.profileState.profiles.find((profile) => profile.name === 'Server Alice') : undefined;
     expect(aliceProfile?.bankroll).toBe(1000);
     bob.send({ version: 1, type: 'create-profile', profileName: 'Server Bob' });
-    const bobProfileData = await bob.waitFor((message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Server Bob'));
+    const bobProfileData = await bob.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Server Bob'),
+    );
     const bobProfile = bobProfileData.type === 'data-state' ? bobProfileData.profileState.profiles.find((profile) => profile.name === 'Server Bob') : undefined;
     if (!aliceProfile || !bobProfile) {
       throw new Error('Expected server-created profiles.');
@@ -177,10 +181,19 @@ describe('multiplayer WebSocket server', () => {
     expect(badMessage.type === 'error' ? badMessage.message : '').toBe('Message version or type is invalid.');
 
     alice.send({ version: 1, type: 'create-room', gameId: 'beat-the-house', profileId: 'missing-profile', profileName: 'Missing', bankroll: 500 });
-    const unknownProfile = await alice.waitFor((message) => message.type === 'error' && message.code === 'rejected' && message.message === 'Profile was not found.');
+    const unknownProfile = await alice.waitFor(
+      (message) => message.type === 'error' && message.code === 'rejected' && message.message === 'Profile was not found.',
+    );
     expect(unknownProfile.type === 'error' ? unknownProfile.message : '').toBe('Profile was not found.');
 
-    alice.send({ version: 1, type: 'create-room', gameId: 'beat-the-house', profileId: aliceProfile.id, profileName: `Spoof ${'Long'.repeat(48)}`, bankroll: 1 });
+    alice.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: `Spoof ${'Long'.repeat(48)}`,
+      bankroll: 1,
+    });
     const created = await alice.waitFor((message) => message.type === 'room-created');
     if (created.type !== 'room-created') {
       throw new Error('Expected room-created message.');
@@ -193,7 +206,16 @@ describe('multiplayer WebSocket server', () => {
     alice.send({ version: 1, type: 'assign-seat', seatId: 'left' });
     await waitForRoom(alice, (room) => room.seats.some((seat) => seat.seatId === 'left' && seat.profileId === aliceProfile.id));
 
-    bob.send({ version: 1, type: 'join-room', gameId: 'beat-the-house', roomId, role: 'player', profileId: bobProfile.id, profileName: 'Spoof Bob', bankroll: 1 });
+    bob.send({
+      version: 1,
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId,
+      role: 'player',
+      profileId: bobProfile.id,
+      profileName: 'Spoof Bob',
+      bankroll: 1,
+    });
     await waitForRoom(bob, (room) => room.spectators.some((player) => player.profileId === bobProfile.id));
     bob.send({ version: 1, type: 'assign-seat', seatId: 'centre' });
     await waitForRoom(alice, (room) => room.seats.some((seat) => seat.seatId === 'centre' && seat.profileId === bobProfile.id));
@@ -207,7 +229,9 @@ describe('multiplayer WebSocket server', () => {
     expect(rejected.type === 'error' ? rejected.message : '').toBe('You can only bet on your own seat.');
 
     alice.send({ version: 1, type: 'resync' });
-    const resynced = await alice.waitFor((message) => message.type === 'room-created' && message.room.roomId === roomId && beat(message.room).bets.left.main === 25);
+    const resynced = await alice.waitFor(
+      (message) => message.type === 'room-created' && message.room.roomId === roomId && beat(message.room).bets.left.main === 25,
+    );
     expect(resynced.type === 'room-created' ? beat(resynced.room).bets.left.main : 0).toBe(25);
 
     bob.close();
@@ -229,7 +253,9 @@ describe('multiplayer WebSocket server', () => {
 
     baseUrl = await startServer('.', undefined, { dataStore: new SqliteServerDataStore(dbPath) });
     const returning = await connect(baseUrl.ws);
-    const restored = await returning.waitFor((message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Returning Alice'));
+    const restored = await returning.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Returning Alice'),
+    );
 
     expect(restored.type === 'data-state' ? restored.profileState.profiles.map((profile) => profile.name) : []).toContain('Returning Alice');
   });
@@ -266,7 +292,9 @@ describe('multiplayer WebSocket server', () => {
       const baseUrl = await startServer();
       const alice = await connect(baseUrl.ws);
       alice.send({ version: 1, type: 'create-profile', profileName: 'Alice' });
-      const profileData = await alice.waitFor((message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Alice'));
+      const profileData = await alice.waitFor(
+        (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Alice'),
+      );
       const profile = profileData.type === 'data-state' ? profileData.profileState.profiles.find((candidate) => candidate.name === 'Alice') : undefined;
       if (!profile) {
         throw new Error('Expected Alice profile.');
@@ -276,7 +304,9 @@ describe('multiplayer WebSocket server', () => {
       if (created.type !== 'room-created') {
         throw new Error('Expected room-created message.');
       }
-      expect(created.invitePath).toBe(`https://casino-public.example.test/?game=blackjack&room=${created.room.roomId}&server=wss%3A%2F%2Fcasino-public.example.test%2Fws`);
+      expect(created.invitePath).toBe(
+        `https://casino-public.example.test/?game=blackjack&room=${created.room.roomId}&server=wss%3A%2F%2Fcasino-public.example.test%2Fws`,
+      );
       await alice.closeAndWait();
     } finally {
       if (originalPublicBaseUrl === undefined) {
@@ -347,7 +377,9 @@ const sendUpgradeRequest = async (port: number, path: string, extraHeader = ''):
   new Promise((resolve, reject) => {
     const socket = connectSocket(port, '127.0.0.1');
     socket.on('connect', () => {
-      socket.write(`${[`GET ${path} HTTP/1.1`, 'Host: 127.0.0.1', 'Connection: Upgrade', 'Upgrade: websocket', extraHeader].filter(Boolean).join('\r\n')}\r\n\r\n`);
+      socket.write(
+        `${[`GET ${path} HTTP/1.1`, 'Host: 127.0.0.1', 'Connection: Upgrade', 'Upgrade: websocket', extraHeader].filter(Boolean).join('\r\n')}\r\n\r\n`,
+      );
     });
     socket.on('close', () => resolve());
     socket.on('error', reject);

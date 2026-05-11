@@ -24,6 +24,8 @@ Casino Warehouse accepts changes through pull requests only. The `main` branch i
 
 ## Local Checks
 
+Configure your editor to respect the repository `.editorconfig` before making changes.
+
 Run the relevant checks before requesting review:
 
 ```bash

@@ -328,7 +328,8 @@ const waitForRealtime = async (page: Page): Promise<void> => {
   await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
 };
 
-const currentRealtimeUrl = async (page: Page): Promise<string> => page.evaluate(() => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
+const currentRealtimeUrl = async (page: Page): Promise<string> =>
+  page.evaluate(() => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
 
 const clearServerData = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {

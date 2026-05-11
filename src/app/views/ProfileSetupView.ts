@@ -16,7 +16,12 @@ export class ProfileSetupView {
     this.pendingRenameProfileId = '';
   }
 
-  public render(profileState: CasinoSaveState, lastSaveError: string, onRename: (profileId: string, nextName: string) => void, onDelete: (profileId: string) => void): void {
+  public render(
+    profileState: CasinoSaveState,
+    lastSaveError: string,
+    onRename: (profileId: string, nextName: string) => void,
+    onDelete: (profileId: string) => void,
+  ): void {
     this.rememberCheckedProfiles();
     this.pruneDeletedSelections(profileState);
     this.elements.profileList.innerHTML =

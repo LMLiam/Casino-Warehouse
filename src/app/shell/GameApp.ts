@@ -12,9 +12,24 @@ import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
 import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
 import type { CasinoProfile, CasinoSaveState } from '../../state/profiles';
-import { createSessionState, loadSessionState, saveSessionState, sessionStorageKey, type CasinoSessionRoomState, type CasinoSessionState } from '../../state/session';
+import {
+  createSessionState,
+  loadSessionState,
+  saveSessionState,
+  sessionStorageKey,
+  type CasinoSessionRoomState,
+  type CasinoSessionState,
+} from '../../state/session';
 import { defaultRealtimeUrl, MultiplayerClient, type RealtimeConnectionState, type ServerDataState } from '../../multiplayer/client';
-import { protocolVersion, type RoomGameId, type RoomRole, type RoomSeatId, type RoomSettlement, type RoomSnapshot, type RoomSummary } from '../../multiplayer/protocol';
+import {
+  protocolVersion,
+  type RoomGameId,
+  type RoomRole,
+  type RoomSeatId,
+  type RoomSettlement,
+  type RoomSnapshot,
+  type RoomSummary,
+} from '../../multiplayer/protocol';
 import { normalizeRoomMaxPlayers } from '../../multiplayer/roomLimits';
 import { AppEventBinder, type BeatAction } from './AppEventBinder';
 import { collectElements, type AppElements } from '../dom/appElements';
@@ -236,7 +251,9 @@ export class GameApp {
         this.beatControlsView.queueStartRound();
         return;
       }
-      this.multiplayer.send(typeof action === 'string' ? { version: protocolVersion, type: action } : { version: protocolVersion, type: action.type, action: action.action });
+      this.multiplayer.send(
+        typeof action === 'string' ? { version: protocolVersion, type: action } : { version: protocolVersion, type: action.type, action: action.action },
+      );
       return;
     }
     this.showRoomRequiredMessage();
@@ -598,7 +615,11 @@ export class GameApp {
       return;
     }
 
-    this.attemptRoomRestore({ roomId: room.roomId, gameId: room.gameId, role, seatId: room.seats.find((seat) => seat.profileId === profile.id)?.seatId }, profile, room.gameTitle);
+    this.attemptRoomRestore(
+      { roomId: room.roomId, gameId: room.gameId, role, seatId: room.seats.find((seat) => seat.profileId === profile.id)?.seatId },
+      profile,
+      room.gameTitle,
+    );
   }
 
   private maybeRestoreSavedRoom(): boolean {
@@ -690,7 +711,10 @@ export class GameApp {
     this.elements.slotsView.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isSlots);
     this.elements.status.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse);
     this.elements.beatControls.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse || !canUseGameControls);
-    this.elements.blackjackControls.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || this.activeGame !== 'blackjack' || !canUseGameControls);
+    this.elements.blackjackControls.classList.toggle(
+      'hidden',
+      this.showingGameLobby || showingRoomLobby || this.activeGame !== 'blackjack' || !canUseGameControls,
+    );
     this.elements.slotsControls.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isSlots || !canUseGameControls);
     this.elements.gameHud.classList.remove('hidden');
     this.elements.moneyPill.classList.toggle('hidden', showingRoomLobby);
@@ -701,7 +725,10 @@ export class GameApp {
     if (!activeRoom) {
       this.elements.roomMenu.open = false;
     }
-    this.elements.chipRail.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse || beatSnapshot.phase !== 'betting' || !canUseGameControls);
+    this.elements.chipRail.classList.toggle(
+      'hidden',
+      this.showingGameLobby || showingRoomLobby || !isBeatTheHouse || beatSnapshot.phase !== 'betting' || !canUseGameControls,
+    );
 
     if (isBeatTheHouse) {
       this.table.resize();
@@ -826,7 +853,9 @@ export class GameApp {
     if (!player) {
       return;
     }
-    const roomMember = room.players.find((candidate) => candidate.profileId === player.profileId) ?? room.spectators.find((candidate) => candidate.profileId === player.profileId);
+    const roomMember =
+      room.players.find((candidate) => candidate.profileId === player.profileId) ??
+      room.spectators.find((candidate) => candidate.profileId === player.profileId);
     if (roomMember) {
       this.syncProfileBankroll(player.profileId, roomMember.bankroll);
     }

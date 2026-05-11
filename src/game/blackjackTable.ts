@@ -164,7 +164,11 @@ export class BlackjackTable {
     return { snapshot: this.snapshot(occupants), debit: seat.wager, settlements };
   }
 
-  public act(action: 'hit' | 'stand' | 'double' | 'split' | 'insurance' | 'new-hand', seatId: string, occupants: readonly BlackjackTableOccupant[]): BlackjackTableActionResult {
+  public act(
+    action: 'hit' | 'stand' | 'double' | 'split' | 'insurance' | 'new-hand',
+    seatId: string,
+    occupants: readonly BlackjackTableOccupant[],
+  ): BlackjackTableActionResult {
     if (action === 'new-hand') {
       if (this.phase !== 'settled') {
         return { snapshot: this.snapshot(occupants), debit: 0, settlements: [], error: 'Finish the Blackjack table before starting a new hand.' };

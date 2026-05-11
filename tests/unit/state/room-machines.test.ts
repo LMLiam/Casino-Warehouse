@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { canRoomFlowTransition, canSharedSlotsTransition, deriveSharedSlotsPhase, nextRoomFlowPhase, nextSharedSlotsPhase } from '../../../src/state/roomMachines';
+import {
+  canRoomFlowTransition,
+  canSharedSlotsTransition,
+  deriveSharedSlotsPhase,
+  nextRoomFlowPhase,
+  nextSharedSlotsPhase,
+} from '../../../src/state/roomMachines';
 
 describe('XState casino room machines', () => {
   it('allows only explicit multiplayer room phase transitions', () => {

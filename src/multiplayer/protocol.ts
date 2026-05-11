@@ -21,7 +21,13 @@ export type ClientMessage = ClientMessageFromSchema;
 export type ServerMessage =
   | { readonly version: 1; readonly type: 'server-hello'; readonly serverInstanceId: string }
   | { readonly version: 1; readonly type: 'reload-required'; readonly reason: 'server-restarted'; readonly message: string }
-  | { readonly version: 1; readonly type: 'data-state'; readonly database: ServerDatabaseChoice; readonly profileState: CasinoSaveState; readonly session?: CasinoSessionState }
+  | {
+      readonly version: 1;
+      readonly type: 'data-state';
+      readonly database: ServerDatabaseChoice;
+      readonly profileState: CasinoSaveState;
+      readonly session?: CasinoSessionState;
+    }
   | { readonly version: 1; readonly type: 'heartbeat'; readonly sentAt: number }
   | { readonly version: 1; readonly type: 'room-created'; readonly room: RoomSnapshot; readonly invitePath: string }
   | { readonly version: 1; readonly type: 'room-list'; readonly gameId: RoomGameId; readonly rooms: readonly RoomSummary[] }

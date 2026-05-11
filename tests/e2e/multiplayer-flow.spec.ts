@@ -79,7 +79,9 @@ test('multiplayer room lobby supports create, join, seat choice, spectate, leave
     await expect(host.locator('.blackjack-table-seat').filter({ hasText: 'Wager £20' })).toBeVisible();
     await expect(host.locator('.blackjack-table-seat .seat-cards .playing-card').first()).toBeVisible();
     await expect
-      .poll(async () => (await host.locator('.blackjack-table-seat.active').count()) === 1 || (await host.locator('#blackjackNewBtn').isEnabled()), { timeout: 10_000 })
+      .poll(async () => (await host.locator('.blackjack-table-seat.active').count()) === 1 || (await host.locator('#blackjackNewBtn').isEnabled()), {
+        timeout: 10_000,
+      })
       .toBe(true);
   } finally {
     await Promise.all(contexts.map((context) => context.close().catch(() => undefined)));
@@ -247,7 +249,9 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
           ['dealer-hole', 1],
         ]),
       );
-    await expect.poll(async () => Number(await page.locator('#tableHost').evaluate((element) => element.dataset.dealerCardCount ?? '0'))).toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(async () => Number(await page.locator('#tableHost').evaluate((element) => element.dataset.dealerCardCount ?? '0')))
+      .toBeGreaterThanOrEqual(1);
 
     const animationOrdersBeforePanel = await parsedDataset(page, 'cardAnimationOrders');
     await page.locator('.admin-panel > summary').click();
@@ -266,7 +270,9 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
 
     await expect(page.locator('#nextBtn')).toBeEnabled({ timeout: 10_000 });
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
-    await expect.poll(async () => Number(await page.locator('#tableHost').evaluate((element) => element.dataset.settlementHandCount ?? '0'))).toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(async () => Number(await page.locator('#tableHost').evaluate((element) => element.dataset.settlementHandCount ?? '0')))
+      .toBeGreaterThanOrEqual(1);
     await expect
       .poll(async () =>
         (await parsedDataset(page, 'settlementResults')).some(
@@ -306,7 +312,10 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
   }
 });
 
-test('multiplayer Slots exposes shared readiness, spin result, spectating, and no duplicate settlement from repeated spin attempts', async ({ browser, baseURL }) => {
+test('multiplayer Slots exposes shared readiness, spin result, spectating, and no duplicate settlement from repeated spin attempts', async ({
+  browser,
+  baseURL,
+}) => {
   test.setTimeout(60_000);
   const wsUrl = await startRealtimeServer(['Slots Alice', 'Slots Bob', 'Slots Watcher']);
   const contexts: BrowserContext[] = [];
@@ -467,31 +476,33 @@ const tableAmount = async (page: Page): Promise<number> => {
 const transactionCount = async (page: Page, text: string): Promise<number> =>
   page.evaluate(async (needle) => {
     const url = localStorage.getItem('casino_realtime_url') ?? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
-    const store = await new Promise<{ readonly profiles?: readonly { readonly transactions?: readonly { readonly description?: string }[] }[] }>((resolve, reject) => {
-      const socket = new WebSocket(url);
-      const timer = window.setTimeout(() => {
-        socket.close();
-        reject(new Error('Timed out reading server data.'));
-      }, 5_000);
-      socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ version: 1, type: 'request-data' }));
-      });
-      socket.addEventListener('message', (event) => {
-        const message = JSON.parse(String(event.data)) as {
-          type?: string;
-          profileState?: { profiles?: readonly { readonly transactions?: readonly { readonly description?: string }[] }[] };
-        };
-        if (message.type === 'data-state' && message.profileState) {
-          window.clearTimeout(timer);
+    const store = await new Promise<{ readonly profiles?: readonly { readonly transactions?: readonly { readonly description?: string }[] }[] }>(
+      (resolve, reject) => {
+        const socket = new WebSocket(url);
+        const timer = window.setTimeout(() => {
           socket.close();
-          resolve(message.profileState);
-        }
-      });
-      socket.addEventListener('error', () => {
-        window.clearTimeout(timer);
-        reject(new Error('Failed to connect while reading server data.'));
-      });
-    });
+          reject(new Error('Timed out reading server data.'));
+        }, 5_000);
+        socket.addEventListener('open', () => {
+          socket.send(JSON.stringify({ version: 1, type: 'request-data' }));
+        });
+        socket.addEventListener('message', (event) => {
+          const message = JSON.parse(String(event.data)) as {
+            type?: string;
+            profileState?: { profiles?: readonly { readonly transactions?: readonly { readonly description?: string }[] }[] };
+          };
+          if (message.type === 'data-state' && message.profileState) {
+            window.clearTimeout(timer);
+            socket.close();
+            resolve(message.profileState);
+          }
+        });
+        socket.addEventListener('error', () => {
+          window.clearTimeout(timer);
+          reject(new Error('Failed to connect while reading server data.'));
+        });
+      },
+    );
     return (store.profiles ?? []).flatMap((profile) => profile.transactions ?? []).filter((transaction) => transaction.description?.includes(needle)).length;
   }, text);
 

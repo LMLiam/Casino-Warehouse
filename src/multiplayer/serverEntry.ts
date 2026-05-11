@@ -145,7 +145,11 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const applyAdminBankroll = (profileId: string, action: 'add' | 'subtract' | 'reset', amount: number): void => {
     const profile = requireProfile(profileId);
     const delta =
-      action === 'add' ? Math.max(0, Math.floor(amount)) : action === 'subtract' ? -Math.min(profile.bankroll, Math.max(0, Math.floor(amount))) : 1000 - profile.bankroll;
+      action === 'add'
+        ? Math.max(0, Math.floor(amount))
+        : action === 'subtract'
+          ? -Math.min(profile.bankroll, Math.max(0, Math.floor(amount)))
+          : 1000 - profile.bankroll;
     if (delta !== 0) {
       dataStore.recordTransaction(profileId, {
         gameId: 'admin',
@@ -211,7 +215,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     try {
       serverOwnedMessage = useServerProfile(parsed.message);
     } catch (error) {
-      send(peer, { version: protocolVersion, type: 'error', code: 'rejected', message: error instanceof Error ? error.message : 'Server rejected the player action.' });
+      send(peer, {
+        version: protocolVersion,
+        type: 'error',
+        code: 'rejected',
+        message: error instanceof Error ? error.message : 'Server rejected the player action.',
+      });
       return;
     }
 
@@ -226,7 +235,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       send(peer, { version: protocolVersion, type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
     }
     if (result.direct) {
-      send(peer, { version: protocolVersion, type: 'room-created', room: result.direct, invitePath: createInvitePath(result.direct.gameId, result.direct.roomId) });
+      send(peer, {
+        version: protocolVersion,
+        type: 'room-created',
+        room: result.direct,
+        invitePath: createInvitePath(result.direct.gameId, result.direct.roomId),
+      });
     }
     for (const snapshot of result.broadcasts) {
       broadcast({ version: protocolVersion, type: 'room-state', room: snapshot }, connectionIds(snapshot));
@@ -235,7 +249,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     if (result.settlements.length > 0) {
       const room = result.broadcasts.at(-1);
       if (room) {
-        broadcast({ version: protocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements }, connectionIds(room));
+        broadcast(
+          { version: protocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements },
+          connectionIds(room),
+        );
       }
     }
     if (result.broadcasts.length > 0 || result.settlements.length > 0) {
@@ -273,7 +290,9 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       return;
     }
 
-    socket.write(['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', `Sec-WebSocket-Accept: ${acceptKey(key)}`, '', ''].join('\r\n'));
+    socket.write(
+      ['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', `Sec-WebSocket-Accept: ${acceptKey(key)}`, '', ''].join('\r\n'),
+    );
 
     const peer: Peer = { id: randomUUID(), socket: socket as Socket, lastPongAt: Date.now() };
     const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');

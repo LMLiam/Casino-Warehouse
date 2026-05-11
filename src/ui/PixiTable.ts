@@ -133,7 +133,9 @@ export class PixiTable {
     this.host.dataset.activeMainBets = JSON.stringify(handLayouts.filter((hand) => snapshot.bets[hand.id].main > 0).map((hand) => hand.id));
     this.host.dataset.dealerCardCount = String(snapshot.dealer.cards.length + (snapshot.dealer.holeCard && !snapshot.dealer.holeRevealed ? 1 : 0));
     this.host.dataset.cardAnimationOrders = JSON.stringify([...this.cardAnimationQueue.entries()]);
-    this.host.dataset.dealerAnimationOrders = JSON.stringify([...this.cardAnimationQueue.entries()].filter(([key]) => key.startsWith('dealer-')).map(([, order]) => order));
+    this.host.dataset.dealerAnimationOrders = JSON.stringify(
+      [...this.cardAnimationQueue.entries()].filter(([key]) => key.startsWith('dealer-')).map(([, order]) => order),
+    );
 
     this.drawBettingZones(snapshot);
     this.drawHands(snapshot);
@@ -182,7 +184,13 @@ export class PixiTable {
         if (betType === 'main' && snapshot.phase !== 'roundOver' && snapshot.hands[hand.id].automaticWin) {
           const amount = snapshot.bets[hand.id].main;
           this.chipRenderer?.drawStack(amount, centerX + BET_RENDERING.mainWagerOffsetX, centerY, BET_RENDERING.mainChipRadius);
-          this.drawDealerPayout(amount, centerX + BET_RENDERING.mainPayoutOffsetX, centerY, BET_RENDERING.mainChipRadius, `automatic-payout-${hand.id}-main-${amount}`);
+          this.drawDealerPayout(
+            amount,
+            centerX + BET_RENDERING.mainPayoutOffsetX,
+            centerY,
+            BET_RENDERING.mainChipRadius,
+            `automatic-payout-${hand.id}-main-${amount}`,
+          );
           this.tagRenderer.drawPayoutTag(`PAID +£${amount}`, centerX + BET_RENDERING.mainPayoutOffsetX, centerY + BET_RENDERING.sideLabelOffsetY, 'win');
           continue;
         }
@@ -208,7 +216,11 @@ export class PixiTable {
       color: isActive ? COLORS.white : COLORS.gold,
       width: isActive ? BET_RENDERING.activeZoneStrokeWidth : BET_RENDERING.zoneStrokeWidth,
       alpha:
-        isBettable || isActive ? BET_RENDERING.zoneBettableStrokeAlpha : snapshot.phase === 'betting' ? BET_RENDERING.zoneIdleStrokeAlpha : BET_RENDERING.zoneInvalidStrokeAlpha,
+        isBettable || isActive
+          ? BET_RENDERING.zoneBettableStrokeAlpha
+          : snapshot.phase === 'betting'
+            ? BET_RENDERING.zoneIdleStrokeAlpha
+            : BET_RENDERING.zoneInvalidStrokeAlpha,
     });
     graphics.eventMode = isBettable ? 'static' : 'none';
     graphics.cursor = isBettable ? 'pointer' : 'default';
@@ -267,7 +279,15 @@ export class PixiTable {
     snapshot.dealer.cards.forEach((card, index) => {
       const point = toPixels(dealerSlots[index]);
       if (index === 0 && snapshot.dealer.holeRevealed) {
-        this.cardRenderer.drawRevealedCard(card, point.x, point.y, false, 'dealer-hole', 'dealer-hole-reveal', this.cardAnimationQueue.get('dealer-hole-reveal'));
+        this.cardRenderer.drawRevealedCard(
+          card,
+          point.x,
+          point.y,
+          false,
+          'dealer-hole',
+          'dealer-hole-reveal',
+          this.cardAnimationQueue.get('dealer-hole-reveal'),
+        );
         return;
       }
       this.cardRenderer.drawCard(card, point.x, point.y, false, `dealer-${index}`, this.cardAnimationQueue.get(`dealer-${index}`));
@@ -334,7 +354,13 @@ export class PixiTable {
       const sideWin = summary.sideWins.find((win) => win.betType === betType);
       this.chipRenderer.drawStack(amount, x + BET_RENDERING.sideWagerOffsetX, y, BET_RENDERING.sideChipRadius);
       if (sideWin) {
-        this.drawDealerPayout(sideWin.profit, x + BET_RENDERING.sidePayoutOffsetX, y, BET_RENDERING.sideChipRadius, `payout-${handId}-${betType}-${sideWin.profit}`);
+        this.drawDealerPayout(
+          sideWin.profit,
+          x + BET_RENDERING.sidePayoutOffsetX,
+          y,
+          BET_RENDERING.sideChipRadius,
+          `payout-${handId}-${betType}-${sideWin.profit}`,
+        );
         this.tagRenderer.drawPayoutTag(`+£${sideWin.profit}`, x + BET_RENDERING.sidePayoutOffsetX, y + BET_RENDERING.sideLabelOffsetY, 'win');
       }
       this.tagRenderer.drawSideState('win', x + BET_RENDERING.sideWagerOffsetX, y + BET_RENDERING.sideLabelOffsetY);
@@ -451,13 +477,24 @@ export const roundStartAnimationKey = (snapshot: GameSnapshot): string => {
 
   return JSON.stringify({
     bets: handLayouts.map((hand) => [hand.id, snapshot.bets[hand.id].main]),
-    hands: handLayouts.map((hand) => [hand.id, snapshot.hands[hand.id].cards.map(cardSignature), snapshot.hands[hand.id].result ?? '', snapshot.hands[hand.id].done]),
+    hands: handLayouts.map((hand) => [
+      hand.id,
+      snapshot.hands[hand.id].cards.map(cardSignature),
+      snapshot.hands[hand.id].result ?? '',
+      snapshot.hands[hand.id].done,
+    ]),
     dealer: {
       holeCard: snapshot.dealer.holeCard ? cardSignature(snapshot.dealer.holeCard) : '',
       cards: snapshot.dealer.cards.map(cardSignature),
       holeRevealed: snapshot.dealer.holeRevealed,
     },
-    events: snapshot.lastEvents.map((event) => [event.type, event.handId ?? '', event.cardIndex ?? '', event.card ? cardSignature(event.card) : '', event.totalProfit ?? '']),
+    events: snapshot.lastEvents.map((event) => [
+      event.type,
+      event.handId ?? '',
+      event.cardIndex ?? '',
+      event.card ? cardSignature(event.card) : '',
+      event.totalProfit ?? '',
+    ]),
   });
 };
 
@@ -467,7 +504,10 @@ const formatProfit = (profit: number): string => `${profit >= 0 ? '+' : '-'}£${
 
 const settlementPopupForSummary = (snapshot: GameSnapshot, summary: RoundSummary) => {
   const mainStake = snapshot.bets[summary.handId].main;
-  const sideStake = (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).reduce((total, betType) => total + snapshot.bets[summary.handId][betType], 0);
+  const sideStake = (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).reduce(
+    (total, betType) => total + snapshot.bets[summary.handId][betType],
+    0,
+  );
   const mainProfit = mainProfitForSummary(summary.mainResult, mainStake);
   const sideProfit = summary.profit - mainProfit;
   return {

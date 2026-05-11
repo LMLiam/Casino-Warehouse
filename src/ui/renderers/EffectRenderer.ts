@@ -13,8 +13,12 @@ export class EffectRenderer {
     shine.position.set(x, y);
     shine.alpha = effectAlpha;
 
-    const halo = new Graphics().ellipse(0, 0, width * SIDE_WIN_EFFECT.haloScaleX, height * SIDE_WIN_EFFECT.haloScaleY).fill({ color: COLORS.gold, alpha: 0.13 });
-    const ring = new Graphics().ellipse(0, 0, width * SIDE_WIN_EFFECT.ringScaleX, height * SIDE_WIN_EFFECT.ringScaleY).stroke({ color: COLORS.goldSoft, width: 6, alpha: 0.92 });
+    const halo = new Graphics()
+      .ellipse(0, 0, width * SIDE_WIN_EFFECT.haloScaleX, height * SIDE_WIN_EFFECT.haloScaleY)
+      .fill({ color: COLORS.gold, alpha: 0.13 });
+    const ring = new Graphics()
+      .ellipse(0, 0, width * SIDE_WIN_EFFECT.ringScaleX, height * SIDE_WIN_EFFECT.ringScaleY)
+      .stroke({ color: COLORS.goldSoft, width: 6, alpha: 0.92 });
     const innerRing = new Graphics()
       .ellipse(0, 0, width * SIDE_WIN_EFFECT.innerScaleX, height * SIDE_WIN_EFFECT.innerScaleY)
       .stroke({ color: COLORS.white, width: 2, alpha: 0.55 });
@@ -35,7 +39,11 @@ export class EffectRenderer {
       const sparkle = new Graphics().star(0, 0, 4, 6, 2).fill({ color: index % 2 === 0 ? COLORS.white : COLORS.gold, alpha: 0.9 });
       sparkle.position.set(Math.cos(angle) * width * SIDE_WIN_EFFECT.innerScaleX, Math.sin(angle) * height * SIDE_WIN_EFFECT.innerScaleY);
       shine.addChild(sparkle);
-      gsap.fromTo(sparkle, { alpha: 0.15, scale: 0.4 }, { alpha: 1, scale: 1.15, repeat: 3, yoyo: true, duration: 0.34, delay: index * 0.035, ease: 'sine.inOut' });
+      gsap.fromTo(
+        sparkle,
+        { alpha: 0.15, scale: 0.4 },
+        { alpha: 1, scale: 1.15, repeat: 3, yoyo: true, duration: 0.34, delay: index * 0.035, ease: 'sine.inOut' },
+      );
     }
   }
 

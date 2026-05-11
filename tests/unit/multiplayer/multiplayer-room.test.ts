@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { mainBeatRoomId, RoomAuthority } from '../../../src/multiplayer/roomAuthority';
-import { decodeServerMessage, encodeMessage, parseClientMessage, type ClientMessage, type RoomGameId, type RoomSeatId, type RoomSnapshot } from '../../../src/multiplayer/protocol';
+import {
+  decodeServerMessage,
+  encodeMessage,
+  parseClientMessage,
+  type ClientMessage,
+  type RoomGameId,
+  type RoomSeatId,
+  type RoomSnapshot,
+} from '../../../src/multiplayer/protocol';
 import type { GameSnapshot } from '../../../src/game/types';
 import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable';
 import type { SlotSnapshot } from '../../../src/game/slots';
@@ -41,7 +49,9 @@ describe('per-game multiplayer protocol', () => {
     expect(parseClientMessage({ version: 1, type: 'admin-bankroll', profileId: 'a', action: 'add', amount: 50 })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'list-rooms', gameId: 'blackjack' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'create-room', profileId: 'a', profileName: 'A', bankroll: 50 })).toMatchObject({ ok: false });
-    expect(parseClientMessage({ version: 1, type: 'join-room', gameId: 'blackjack', profileId: 'b', profileName: 'B', bankroll: 50 })).toMatchObject({ ok: false });
+    expect(parseClientMessage({ version: 1, type: 'join-room', gameId: 'blackjack', profileId: 'b', profileName: 'B', bankroll: 50 })).toMatchObject({
+      ok: false,
+    });
     expect(parseClientMessage({ version: 1, type: 'select-game', gameId: 'beat-the-house' })).toMatchObject({ ok: false });
     expect(parseClientMessage(join('blackjack', 'abc123', 'b')).message).toMatchObject({ roomId: 'ABC123', gameId: 'blackjack', role: 'player' });
     expect(parseClientMessage({ version: 1, type: 'blackjack-action', action: 'stand' }).ok).toBe(true);
@@ -52,7 +62,9 @@ describe('per-game multiplayer protocol', () => {
     expect(parseClientMessage(null)).toMatchObject({ ok: false });
     expect(parseClientMessage({ version: 1, type: 'list-rooms', gameId: 'missing' })).toMatchObject({ ok: false, error: 'Game id is invalid.' });
     expect(parseClientMessage({ version: 1, type: 'list-rooms', gameId: 'slots:house-of-sevens' })).toMatchObject({ ok: false, error: 'Game id is invalid.' });
-    expect(parseClientMessage({ version: 1, type: 'create-room', gameId: 'blackjack', profileId: 'a', profileName: 'A', bankroll: '50' })).toMatchObject({ ok: false });
+    expect(parseClientMessage({ version: 1, type: 'create-room', gameId: 'blackjack', profileId: 'a', profileName: 'A', bankroll: '50' })).toMatchObject({
+      ok: false,
+    });
     expect(parseClientMessage({ version: 1, type: 'create-room', gameId: 'blackjack', profileId: 'a', profileName: 'A', bankroll: 50 })).toMatchObject({
       ok: true,
       message: { roomName: undefined, maxPlayers: undefined, allowSpectators: undefined },
@@ -117,7 +129,9 @@ describe('per-game room authority', () => {
       beatRoom.roomId,
       mainBeatRoomId,
     ]);
-    expect(authority.handle('viewer', { version: 1, type: 'list-rooms', gameId: 'blackjack' }).roomList?.rooms.map((room) => room.roomId)).toEqual([blackjackRoom.roomId]);
+    expect(authority.handle('viewer', { version: 1, type: 'list-rooms', gameId: 'blackjack' }).roomList?.rooms.map((room) => room.roomId)).toEqual([
+      blackjackRoom.roomId,
+    ]);
     expect(authority.handle('c', join('blackjack', beatRoom.roomId, 'charlie')).error).toBe('Room belongs to a different game.');
   });
 
@@ -132,7 +146,9 @@ describe('per-game room authority', () => {
       players: [],
       status: 'waiting',
     });
-    expect(authority.handle('viewer', { version: 1, type: 'list-rooms', gameId: 'beat-the-house' }).roomList?.rooms.map((room) => room.roomId)).toEqual([mainBeatRoomId]);
+    expect(authority.handle('viewer', { version: 1, type: 'list-rooms', gameId: 'beat-the-house' }).roomList?.rooms.map((room) => room.roomId)).toEqual([
+      mainBeatRoomId,
+    ]);
 
     const joined = authority.handle('a', join('beat-the-house', mainBeatRoomId, 'alice', 500)).broadcasts[0];
     expect(joined.players).toEqual([]);
@@ -169,7 +185,9 @@ describe('per-game room authority', () => {
 
     expect(authority.handle('s', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 }).error).toBe('Spectators cannot wager.');
     expect(authority.handle('b', claimSeat('left')).error).toBe('Release your current seat before claiming another one.');
-    expect(authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'aceFlash', amount: 5 }).error).toBe('Side bets need a main bet on the same hand.');
+    expect(authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'aceFlash', amount: 5 }).error).toBe(
+      'Side bets need a main bet on the same hand.',
+    );
 
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'aceFlash', amount: 5 });
@@ -231,7 +249,9 @@ describe('per-game room authority', () => {
     ['seat-2', 'seat-3', 'seat-4', 'seat-5'].forEach((seatId, index) => authority.handle(`p${index}`, claimSeat(seatId as RoomSeatId)));
     authority.handle('extra', join('blackjack', roomId, 'frank', 500));
     expect(authority.handle('extra', claimSeat('seat-1')).error).toBe('Seat is already occupied.');
-    expect(authority.handle('watch', join('blackjack', roomId, 'frank', 500, 'spectator')).broadcasts[0].spectators.map((player) => player.profileId)).toContain('frank');
+    expect(
+      authority.handle('watch', join('blackjack', roomId, 'frank', 500, 'spectator')).broadcasts[0].spectators.map((player) => player.profileId),
+    ).toContain('frank');
     expect(authority.handle('watch', { version: 1, type: 'blackjack-deal', wager: 25 }).error).toBe('Spectators cannot deal Blackjack.');
 
     const dealt = authority.handle('a', { version: 1, type: 'blackjack-deal', wager: 25 }).broadcasts[0];
@@ -375,7 +395,9 @@ describe('per-game room authority', () => {
       bankroll: 500,
       allowSpectators: false,
     }).direct!;
-    expect(authority.handle('watch', join('blackjack', privateRoom.roomId, 'watcher', 500, 'spectator')).error).toBe('Spectators are not allowed in this room.');
+    expect(authority.handle('watch', join('blackjack', privateRoom.roomId, 'watcher', 500, 'spectator')).error).toBe(
+      'Spectators are not allowed in this room.',
+    );
     expect(authority.handle('missing', join('blackjack', 'MISSING', 'ghost')).error).toBe('Room was not found.');
 
     const explicitSeatRoom = authority.handle('b', create('blackjack', 'bob', 500)).direct!;
@@ -429,7 +451,9 @@ describe('per-game room authority', () => {
 
     const blackjackRoom = authority.handle('b', create('blackjack', 'bob', 500)).direct!;
     expect(authority.handle('b', { version: 1, type: 'clear-bets' }).error).toBe('This action only applies to Beat the House rooms.');
-    expect(authority.handle('b', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 10 }).error).toBe('Beat the House wagers are not valid in this room.');
+    expect(authority.handle('b', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 10 }).error).toBe(
+      'Beat the House wagers are not valid in this room.',
+    );
     expect(blackjackRoom.gameId).toBe('blackjack');
   });
 
@@ -450,10 +474,14 @@ describe('per-game room authority', () => {
     expect(Boolean(duplicateDeal.error) || duplicateDeal.broadcasts.length > 0).toBe(true);
 
     const activeAfterDeal = blackjack(authority.handle('a', { version: 1, type: 'resync' }).direct!).activeSeatId;
-    const hit = activeAfterDeal ? authority.handle(activeAfterDeal === 'seat-2' ? 'b' : 'a', { version: 1, type: 'blackjack-action', action: 'hit' }) : undefined;
+    const hit = activeAfterDeal
+      ? authority.handle(activeAfterDeal === 'seat-2' ? 'b' : 'a', { version: 1, type: 'blackjack-action', action: 'hit' })
+      : undefined;
     expect(hit ? hit.broadcasts.length + hit.settlements.length : 1).toBeGreaterThan(0);
     const activeBeforeStand = blackjack(authority.handle('a', { version: 1, type: 'resync' }).direct!).activeSeatId;
-    const stand = activeBeforeStand ? authority.handle(activeBeforeStand === 'seat-2' ? 'b' : 'a', { version: 1, type: 'blackjack-action', action: 'stand' }) : undefined;
+    const stand = activeBeforeStand
+      ? authority.handle(activeBeforeStand === 'seat-2' ? 'b' : 'a', { version: 1, type: 'blackjack-action', action: 'stand' })
+      : undefined;
     expect(stand ? stand.broadcasts.length : 1).toBeGreaterThan(0);
     for (let attempts = 0; attempts < 6 && blackjack(authority.handle('a', { version: 1, type: 'resync' }).direct!).phase !== 'settled'; attempts += 1) {
       const activeSeat = blackjack(authority.handle('a', { version: 1, type: 'resync' }).direct!).activeSeatId;
