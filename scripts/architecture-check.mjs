@@ -12,11 +12,6 @@ const appModuleFolders = new Set(['actions', 'dom', 'format', 'input', 'rooms', 
 const testSuiteFolders = new Set(['e2e', 'unit']);
 const unitTestDomainFolders = new Set(['app', 'assets', 'audio', 'game', 'multiplayer', 'schemas', 'state']);
 
-const fileSizeExceptions = new Map([
-  ['src/app/shell/GameApp.ts', 'Application coordinator wiring persistence, realtime rooms, and view modules; feature-specific rendering is kept in app/views.'],
-  ['src/multiplayer/roomAuthority.ts', 'Authoritative room coordinator; keep checks in place while extracting game-specific room services.'],
-]);
-
 for (const file of sourceFiles) {
   const relativePath = toWorkspacePath(file);
   const source = readFileSync(file, 'utf8');
@@ -107,9 +102,7 @@ function checkFileSize(relativePath, source) {
   if (lines <= 700) {
     return;
   }
-  if (!fileSizeExceptions.has(relativePath)) {
-    errors.push(`${relativePath} has ${lines} lines. Split files above 700 lines or document a justified exception.`);
-  }
+  errors.push(`${relativePath} has ${lines} lines. Split files above 700 lines.`);
 }
 
 function checkVagueFilename(relativePath) {
