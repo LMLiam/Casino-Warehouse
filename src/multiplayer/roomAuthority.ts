@@ -516,5 +516,4 @@ export class RoomAuthority extends RoomAuthorityBase {
     room.model.lastSpinByProfileId = profileId;
     return this.broadcast(room, this.settleSlots(room, before, after));
   }
-
 }

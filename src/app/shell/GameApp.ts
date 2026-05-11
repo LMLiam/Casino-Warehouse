@@ -591,5 +591,4 @@ export class GameApp extends GameAppSession {
     this.saveSession();
     this.renderSessionLimit();
   }
-
 }
