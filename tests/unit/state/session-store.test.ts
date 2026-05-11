@@ -1,0 +1,173 @@
+import { describe, expect, it } from 'vitest';
+import { BeatTheHouseGame } from '../../../src/game/engine';
+import { createPlayerFromProfile } from '../../../src/app/state/casinoPlayer';
+import { createSessionState, loadSessionState, parseSessionState, saveSessionState } from '../../../src/state/session';
+import { createProfile, type StorageLike } from '../../../src/state/profiles';
+
+class MemoryStorage implements StorageLike {
+  private readonly values = new Map<string, string>();
+
+  public getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+
+  public setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
+}
+
+describe('session store', () => {
+  it('persists current multiplayer session separately from profile records', () => {
+    const storage = new MemoryStorage();
+    const session = createSessionState(
+      ['profile-a', 'profile-b'],
+      {
+        activeGame: 'blackjack',
+        selectedPlayerIndex: 1,
+        showingGameLobby: false,
+        wagerLimit: 500,
+        wagered: 125,
+        room: {
+          roomId: 'abc123',
+          gameId: 'blackjack',
+          role: 'player',
+        },
+        gameSnapshots: {
+          'profile-a': {
+            blackjack: {
+              phase: 'player',
+              wager: 25,
+              playerCards: [{ rank: 'K', suit: 'spades' }],
+              dealerCards: [{ rank: '7', suit: 'hearts' }],
+              dealerHoleHidden: true,
+              insuranceWager: 0,
+              splitHands: [],
+              returned: 0,
+              status: 'Player K.',
+            },
+            slots: {},
+          },
+        },
+      },
+      new Date('2026-05-04T12:00:00Z'),
+    );
+
+    saveSessionState(storage, session);
+    const loaded = loadSessionState(storage);
+
+    expect(loaded.session).toEqual(session);
+    expect(loaded.recovered).toBe(false);
+  });
+
+  it('deduplicates selected profiles and clamps invalid wager values', () => {
+    const session = createSessionState(['a', 'a', '', 'b'], {
+      wagerLimit: -1,
+      wagered: Number.NaN,
+    });
+
+    expect(session.profileIds).toEqual(['a', 'b']);
+    expect(session.wagerLimit).toBe(0);
+    expect(session.wagered).toBe(0);
+  });
+
+  it('uses the profile bankroll instead of stale Beat the House session bankrolls', () => {
+    const profile = createProfile({ version: 1, profiles: [] }, 'Central Wallet', 467).profiles[0];
+    const staleSnapshot = new BeatTheHouseGame({ initialBankroll: 2169 }).saveState();
+
+    const player = createPlayerFromProfile(profile, { beatTheHouse: staleSnapshot });
+
+    expect(player.beatTheHouse.snapshot().bankroll).toBe(467);
+  });
+
+  it('recovers gracefully from corrupt session storage', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('casino_warehouse_session_v1', '{ broken');
+
+    const loaded = loadSessionState(storage);
+
+    expect(loaded.session).toBeUndefined();
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.error).toBeTruthy();
+  });
+
+  it('rejects unknown game ids', () => {
+    const session = parseSessionState({
+      version: 1,
+      profileIds: ['a'],
+      activeGame: 'not-real',
+      selectedPlayerIndex: 0,
+      showingGameLobby: false,
+      wagerLimit: 0,
+      wagered: 0,
+      updatedAt: '2026-05-04T12:00:00Z',
+    });
+
+    expect(session.activeGame).toBe('beat-the-house');
+  });
+
+  it('handles missing and invalid session fields without destroying valid saves', () => {
+    const storage = new MemoryStorage();
+    expect(loadSessionState(storage)).toEqual({ recovered: false });
+    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data is not valid.');
+    const session = parseSessionState({
+      version: 1,
+      profileIds: ['a', 7, 'b'],
+      selectedPlayerIndex: 4.7,
+      activeGame: 'slots:thai-princess',
+      showingGameLobby: '',
+      wagerLimit: '200',
+      wagered: '50',
+      gameSnapshots: {
+        a: { beatTheHouse: {}, blackjack: {}, slots: { 'thai-princess': { themeId: 'thai-princess' } } },
+        bad: null,
+      },
+    });
+
+    expect(session.profileIds).toEqual(['a', 'b']);
+    expect(session.activeGame).toBe('slots:thai-princess');
+    expect(session.selectedPlayerIndex).toBe(4);
+    expect(
+      parseSessionState({
+        version: 1,
+        profileIds: ['a'],
+        room: { roomId: 'mixed42', gameId: 'blackjack', role: 'spectator', seatId: 'seat-2' },
+      }).room,
+    ).toEqual({ roomId: 'MIXED42', gameId: 'blackjack', role: 'spectator', seatId: 'seat-2' });
+    expect(
+      parseSessionState({
+        version: 1,
+        profileIds: ['a'],
+        room: { roomId: 'mixed42', gameId: 'beat-the-house', role: 'player', seatId: 'centre' },
+      }).room,
+    ).toEqual({ roomId: 'MIXED42', gameId: 'beat-the-house', role: 'player', seatId: 'centre' });
+    expect(
+      parseSessionState({
+        version: 1,
+        profileIds: ['a'],
+        room: { roomId: 'mixed42', gameId: 'blackjack', role: 'player', seatId: 'not-a-seat' },
+      }).room,
+    ).toEqual({ roomId: 'MIXED42', gameId: 'blackjack', role: 'player', seatId: undefined });
+    expect(
+      parseSessionState({
+        version: 1,
+        profileIds: ['a'],
+        room: { roomId: '', gameId: 'blackjack', role: 'player' },
+      }).room,
+    ).toBeUndefined();
+    expect(
+      parseSessionState({
+        version: 1,
+        profileIds: ['a'],
+        room: { roomId: 'room42', gameId: 'not-real', role: 'player' },
+      }).room,
+    ).toBeUndefined();
+    expect(
+      parseSessionState({
+        version: 1,
+        profileIds: ['a'],
+        room: { roomId: 'room42', gameId: 'blackjack', role: 'dealer' },
+      }).room,
+    ).toBeUndefined();
+    expect(session.gameSnapshots.a.slots?.['thai-princess']).toEqual({ themeId: 'thai-princess' });
+  });
+});

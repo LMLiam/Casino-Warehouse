@@ -1,0 +1,115 @@
+import type { CasinoGameId } from '../../game/catalog';
+import type { AppElements } from '../dom/appElements';
+
+type BeatAction = 'clear-bets' | 'rebet' | 'start-round' | 'next-round' | { readonly type: 'player-action'; readonly action: 'hit' | 'stick' };
+
+interface AppEventCallbacks {
+  readonly createProfile: () => void;
+  readonly startSelectedProfiles: () => void;
+  readonly refreshMultiplayerRooms: () => void;
+  readonly hostMultiplayerRoom: () => void;
+  readonly leaveMultiplayerRoom: () => void;
+  readonly backToLobby: () => void;
+  readonly switchProfiles: () => void;
+  readonly updateSessionLimit: () => void;
+  readonly openRoomLobby: (gameId: CasinoGameId) => void;
+  readonly selectChip: (button: HTMLButtonElement) => void;
+  readonly dropChipOnTable: (event: DragEvent) => void;
+  readonly runBeatAction: (action: BeatAction) => void;
+  readonly addMoney: () => void;
+  readonly subtractMoney: () => void;
+  readonly resetMoney: () => void;
+  readonly resetAllProfiles: () => void;
+  readonly clearSaves: () => void;
+  readonly toggleLayoutOverlay: () => void;
+  readonly dealBlackjack: () => void;
+  readonly hitBlackjack: () => void;
+  readonly standBlackjack: () => void;
+  readonly doubleBlackjack: () => void;
+  readonly splitBlackjack: () => void;
+  readonly insureBlackjack: () => void;
+  readonly newBlackjackHand: () => void;
+  readonly setSlotsWager: () => void;
+  readonly readySlots: () => void;
+  readonly spinSlots: () => void;
+  readonly pickSlotsBonus: () => void;
+}
+
+export class AppEventBinder {
+  public constructor(
+    private readonly elements: AppElements,
+    private readonly callbacks: AppEventCallbacks,
+  ) {}
+
+  public bind(): void {
+    this.elements.createProfileButton.addEventListener('click', () => this.callbacks.createProfile());
+    this.elements.startSessionButton.addEventListener('click', () => this.callbacks.startSelectedProfiles());
+    this.elements.roomRefreshButton.addEventListener('click', () => this.callbacks.refreshMultiplayerRooms());
+    this.elements.hostRoomButton.addEventListener('click', () => this.callbacks.hostMultiplayerRoom());
+    this.elements.leaveRoomButton.addEventListener('click', () => this.callbacks.leaveMultiplayerRoom());
+    this.elements.backToLobbyButton.addEventListener('click', () => this.callbacks.backToLobby());
+    this.elements.switchProfileButton.addEventListener('click', () => this.callbacks.switchProfiles());
+    this.elements.sessionLimitInput.addEventListener('change', () => this.callbacks.updateSessionLimit());
+    this.bindGameTabs();
+    this.bindChips();
+    this.bindBeatControls();
+    this.bindBlackjackControls();
+    this.bindSlotsControls();
+  }
+
+  private bindGameTabs(): void {
+    this.elements.gameTabs.forEach((button) => {
+      button.addEventListener('click', () => {
+        this.callbacks.openRoomLobby(button.dataset.game as CasinoGameId);
+      });
+    });
+  }
+
+  private bindChips(): void {
+    this.elements.chipButtons.forEach((button) => {
+      button.draggable = true;
+      button.addEventListener('dragstart', (event) => {
+        event.dataTransfer?.setData('text/plain', String(button.dataset.chip ?? '0'));
+      });
+      button.addEventListener('click', () => this.callbacks.selectChip(button));
+    });
+    this.elements.tableHost.addEventListener('dragover', (event) => event.preventDefault());
+    this.elements.tableHost.addEventListener('drop', (event) => this.callbacks.dropChipOnTable(event));
+  }
+
+  private bindBeatControls(): void {
+    this.elements.dealButton.addEventListener('click', () => this.callbacks.runBeatAction('start-round'));
+    this.elements.nextButton.addEventListener('click', () => this.callbacks.runBeatAction('next-round'));
+    this.elements.hitButton.addEventListener('click', () => this.callbacks.runBeatAction({ type: 'player-action', action: 'hit' }));
+    this.elements.stickButton.addEventListener('click', () => this.callbacks.runBeatAction({ type: 'player-action', action: 'stick' }));
+    this.elements.rebetButton.addEventListener('click', () => this.callbacks.runBeatAction('rebet'));
+    this.elements.clearButton.addEventListener('click', () => this.callbacks.runBeatAction('clear-bets'));
+    this.elements.addMoneyButton.addEventListener('click', () => this.callbacks.addMoney());
+    this.elements.subtractMoneyButton.addEventListener('click', () => this.callbacks.subtractMoney());
+    this.elements.resetMoneyButton.addEventListener('click', () => this.callbacks.resetMoney());
+    this.elements.resetAllButton.addEventListener('click', () => this.callbacks.resetAllProfiles());
+    this.elements.clearSavesButton.addEventListener('click', () => this.callbacks.clearSaves());
+    this.elements.layoutOverlayButton.addEventListener('click', () => this.callbacks.toggleLayoutOverlay());
+  }
+
+  private bindBlackjackControls(): void {
+    this.elements.blackjackDealButton.addEventListener('click', () => this.callbacks.dealBlackjack());
+    this.elements.blackjackHitButton.addEventListener('click', () => this.callbacks.hitBlackjack());
+    this.elements.blackjackStandButton.addEventListener('click', () => this.callbacks.standBlackjack());
+    this.elements.blackjackDoubleButton.addEventListener('click', () => this.callbacks.doubleBlackjack());
+    this.elements.blackjackSplitButton.addEventListener('click', () => this.callbacks.splitBlackjack());
+    this.elements.blackjackInsuranceButton.addEventListener('click', () => this.callbacks.insureBlackjack());
+    this.elements.blackjackNewButton.addEventListener('click', () => this.callbacks.newBlackjackHand());
+  }
+
+  private bindSlotsControls(): void {
+    this.elements.slotsWagerButton.addEventListener('click', () => this.callbacks.setSlotsWager());
+    this.elements.slotsReadyButton.addEventListener('click', () => this.callbacks.readySlots());
+    this.elements.slotsSpinButton.addEventListener('click', () => this.callbacks.spinSlots());
+    this.elements.bonusPickButtons.forEach((button) => {
+      button.addEventListener('click', () => this.callbacks.pickSlotsBonus());
+    });
+  }
+}
+
+export type { BeatAction };

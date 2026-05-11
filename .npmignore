@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-server/
+coverage/
+playwright-report/
+test-results/
+.casino/
+tmp/
+.env
+.env.*
+.idea/
+.DS_Store
+*.log

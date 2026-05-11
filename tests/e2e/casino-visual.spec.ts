@@ -1,0 +1,386 @@
+import { expect, test, type Locator, type Page } from '@playwright/test';
+
+const consoleFailures = new WeakMap<Page, string[]>();
+
+test.beforeEach(async ({ page }) => {
+  const failures: string[] = [];
+  consoleFailures.set(page, failures);
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      failures.push(message.text());
+    }
+  });
+  page.on('pageerror', (error) => {
+    failures.push(error.message);
+  });
+
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.clear();
+  });
+  await page.reload();
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await waitForRealtime(page);
+  await clearServerData(page);
+  await page.reload();
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await waitForRealtime(page);
+});
+
+test('profile lobby and game tiles render without overflowing key text', async ({ page }) => {
+  await createSession(page);
+
+  await expect(page.getByRole('heading', { name: 'Casino Warehouse' })).toBeVisible();
+  await expect(page.locator('[data-lobby-game="beat-the-house"]')).toBeVisible();
+  await expect(page.locator('[data-lobby-game="blackjack"]')).toBeVisible();
+  await expect(page.locator('[data-lobby-game="slots:thai-princess"]')).toBeVisible();
+  await expect(page.locator('[data-lobby-game^="slots:"]')).toHaveCount(1);
+  await expect(page.locator('#gameLobby .fictional-notice')).toContainText('Fictional currency only');
+  const primaryHud = page.locator('#gameHud > .hud-button-row').first();
+  await expect(primaryHud.locator('summary').filter({ hasText: /^Games$/ })).toHaveCount(0);
+  await expect(primaryHud.locator('summary').filter({ hasText: /^Rules$/ })).toHaveCount(0);
+  await expect(primaryHud.locator('summary').filter({ hasText: /^Paytable$/ })).toHaveCount(0);
+  await expect(primaryHud.locator('summary').filter({ hasText: /^Info$/ })).toBeVisible();
+  await primaryHud
+    .locator('summary')
+    .filter({ hasText: /^Info$/ })
+    .click();
+  await expect(page.locator('#beatRules')).toContainText('Play up to three hands');
+  await expect(page.locator('#beatPaytable')).toContainText('Dealer Sevens');
+  await expect(page.locator('#roomMenu')).toBeHidden();
+
+  await expectNoHorizontalOverflow(page.locator('.game-shell'));
+  expectConsoleClean(page);
+});
+
+test('Radix setup dialogs trap focus and close with Escape', async ({ page }) => {
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+
+  await expect(page.getByRole('button', { name: 'Backup' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Audio' }).click();
+  const audioDialog = page.getByRole('dialog', { name: 'Audio' });
+  await expect(audioDialog).toBeVisible();
+  await expect(page.getByLabel('Master')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(audioDialog).toBeHidden();
+  expectConsoleClean(page);
+});
+
+test('profile page hides storage internals while row actions preserve server-backed profiles', async ({ page }) => {
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await expect(page.locator('#saveStatus')).not.toContainText('SQLite');
+  await expect(page.locator('#saveStatus')).not.toContainText('Server-owned');
+  await expect(page.getByRole('button', { name: 'Backup' })).toHaveCount(0);
+
+  await page.getByPlaceholder('Player name').fill('Profile QA');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.locator('#profileList')).toContainText('Profile QA');
+  await page.locator('[data-profile-select]').check();
+
+  await page.locator('[data-profile-action="rename"]').click();
+  await expect(page.getByLabel('New profile name')).toBeVisible();
+  await page.getByLabel('New profile name').fill('Renamed QA');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('#profileList')).toContainText('Renamed QA');
+  await expect(page.locator('[data-profile-select]')).toBeChecked();
+
+  await page.locator('[data-profile-action="delete"]').click();
+  await expect(page.getByRole('alert')).toContainText('Delete Renamed QA?');
+  await page.getByRole('button', { name: 'Delete Profile' }).click();
+  await expect(page.locator('#profileList')).toContainText('Create a profile');
+  await expect(page.getByRole('button', { name: 'Start Selected Session' })).toBeDisabled();
+  expectConsoleClean(page);
+});
+
+test('audio mute and volume controls persist across reloads', async ({ page }) => {
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await page.getByRole('button', { name: 'Audio' }).click();
+  await page.getByLabel('Mute').check();
+  await setRangeValue(page.locator('#masterVolume'), '0.35');
+  await setRangeValue(page.locator('#musicVolume'), '0');
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = localStorage.getItem('casino_audio_settings_v1');
+        return raw ? JSON.parse(raw) : undefined;
+      }),
+    )
+    .toMatchObject({ muted: true, masterVolume: 0.35, musicVolume: 0 });
+
+  await page.reload();
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await page.getByRole('button', { name: 'Audio' }).click();
+  await expect(page.getByLabel('Mute')).toBeChecked();
+  await expect(page.locator('#masterVolume')).toHaveValue('0.35');
+  await expect(page.locator('#musicVolume')).toHaveValue('0');
+  expectConsoleClean(page);
+});
+
+test('admin bankroll adjustments update wallet and audit ledger without corrupting profile storage', async ({ page }) => {
+  await createSession(page);
+
+  await page.locator('.admin-panel > summary').click();
+  await page.locator('#moneyInput').fill('125');
+  await page.getByRole('button', { name: 'Add' }).click();
+  await expect(page.locator('#bankroll')).toContainText('£1,125');
+  await expect(page.locator('#auditLog')).toContainText('Admin bankroll add');
+
+  await page.getByRole('button', { name: 'Subtract' }).click();
+  await expect(page.locator('#bankroll')).toContainText('£1,000');
+  await expect(page.locator('#auditLog')).toContainText('Admin bankroll subtract');
+
+  const serverData = await requestServerData(page);
+  const savedProfile = serverData.profileState.profiles.find((profile) => profile.name === 'QA Player');
+  expect(savedProfile).toMatchObject({
+    bankroll: 1000,
+    transactions: [
+      { type: 'admin_adjustment', amount: -125, description: 'Admin bankroll subtract' },
+      { type: 'admin_adjustment', amount: 125, description: 'Admin bankroll add' },
+    ],
+  });
+  expectConsoleClean(page);
+});
+
+test('blackjack has its own table rendering', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="blackjack"]').click();
+
+  await expect(page.locator('#roomLobby')).toBeVisible();
+  await expect(page.locator('.blackjack-table-felt')).toBeHidden();
+  await expect(page.locator('.table-host')).toBeHidden();
+  await expect(page.locator('#roomGameTitle')).toContainText('Blackjack');
+  await expect(page.locator('#blackjackRules')).toContainText('Dealer hits soft 17');
+
+  await expectNoHorizontalOverflow(page.locator('#roomLobby'));
+  expectConsoleClean(page);
+});
+
+test('slot themes expose bonus, jackpot, and paytable surfaces', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="slots:thai-princess"]').click();
+
+  await expect(page.locator('#roomLobby')).toBeVisible();
+  await expect(page.locator('#roomGameTitle')).toContainText('Thai Princess');
+  await expect(page.locator('#slotsPaytable')).toContainText('princess substitutes');
+  await expect(page.locator('#slotsRules')).toContainText('3 column by 5 row grid');
+  await expect(page.locator('#slotsRules')).toContainText('lotus scatter-style');
+
+  await expectNoHorizontalOverflow(page.locator('#roomLobby'));
+  expectConsoleClean(page);
+});
+
+test('Beat the House selection opens the multiplayer room lobby before table play', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="beat-the-house"]').click();
+
+  await expect(page.locator('#roomLobby')).toBeVisible();
+  await expect(page.locator('#roomGameTitle')).toContainText('Beat the House');
+  await expect(page.locator('#roomMaxPlayersInput')).toHaveAttribute('max', '3');
+  await expect(page.locator('#roomMaxPlayersInput')).toHaveValue('3');
+  await expect(page.locator('#roomBrowser')).toContainText('Beat the House Main Room');
+  await expect(page.locator('#roomMenu')).toBeHidden();
+  await expect(page.locator('#tableHost')).toBeHidden();
+  await expect(page.locator('#chipRail')).toBeHidden();
+  await page.getByRole('button', { name: 'Join Room' }).first().click();
+  await expect(page.locator('#tableHost')).toBeVisible();
+  await expect(page.locator('#roomMenu')).toBeVisible();
+  await expect(page.locator('#chipRail')).toBeHidden();
+  await page.locator('#roomMenu').evaluate((element) => {
+    (element as HTMLDetailsElement).open = true;
+  });
+  await page.locator('#roomSeats').getByRole('button', { name: 'Left: open' }).click();
+  await expect(page.locator('#roomSeats')).toContainText('Left: QA Player');
+  await expect(page.locator('#chipRail')).toBeVisible();
+  expectConsoleClean(page);
+});
+
+test('tablet room lobby opens without moving the active table canvas', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await createSession(page);
+  await page.locator('[data-lobby-game="beat-the-house"]').click();
+  await expect(page.locator('#roomLobby')).toBeVisible();
+
+  const before = await boundingBox(page.locator('#roomLobby'));
+  await page.getByRole('button', { name: 'Refresh Rooms' }).click();
+  const after = await boundingBox(page.locator('#roomLobby'));
+
+  expect(after.x).toBeCloseTo(before.x, 0);
+  expect(after.y).toBeCloseTo(before.y, 0);
+  expect(after.width).toBeCloseTo(before.width, 0);
+  expect(after.height).toBeCloseTo(before.height, 0);
+  expectConsoleClean(page);
+});
+
+test('game lobby no longer exposes local-only table play before joining a room', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="beat-the-house"]').click();
+
+  await expect(page.locator('#roomLobby')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Deal' })).toBeHidden();
+  await expect(page.locator('#status')).toBeHidden();
+  expectConsoleClean(page);
+});
+
+test('multiplayer invite URLs load hidden direct-join state without manual room controls', async ({ page }) => {
+  const wsUrl = await currentRealtimeUrl(page);
+  await page.goto(`/?game=blackjack&room=abc123&server=${encodeURIComponent(wsUrl)}`);
+  await page.evaluate(() => {
+    localStorage.clear();
+  });
+  await page.reload();
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await waitForRealtime(page);
+
+  await expect(page.locator('#roomIdInput')).toHaveCount(0);
+  await expect(page.locator('#roomServerInput')).toHaveCount(0);
+  await expect(page.locator('#roomConnectBtn')).toHaveCount(0);
+  await expect(page.locator('#roomStatus')).toContainText('Invite loaded for room ABC123');
+  expectConsoleClean(page);
+});
+
+test('disconnected clients show a reconnecting screen and block profile actions', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('casino_realtime_url', 'ws://127.0.0.1:9/ws'));
+  await page.reload();
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await expect(page.locator('#connectionOverlay')).toBeVisible();
+  await expect(page.locator('#connectionOverlay')).toContainText('Connection interrupted');
+  await expect(page.locator('#connectionOverlay')).not.toContainText('Realtime');
+
+  await page.getByPlaceholder('Player name').fill('Offline QA');
+  await page.getByRole('button', { name: 'Create' }).click({ force: true });
+  await expect(page.locator('#profileList')).not.toContainText('Offline QA');
+  await expect(page.locator('#roomStatus')).toContainText('Actions are paused');
+});
+
+test('room browser UX uses per-game cards with join and spectate actions', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="blackjack"]').click();
+
+  await expect(page.locator('#roomServerInput')).toHaveCount(0);
+  await expect(page.locator('#roomIdInput')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Connect' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Create Room' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refresh Rooms' })).toBeVisible();
+  await expect(page.locator('#roomBrowser')).toContainText('No rooms for this game yet.');
+  expectConsoleClean(page);
+});
+
+test('phone-sized screens show the unsupported-device message', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'Desktop or tablet required' })).toBeVisible();
+  await expect(page.locator('#setup')).toBeHidden();
+  expectConsoleClean(page);
+});
+
+const createSession = async (page: Page): Promise<void> => {
+  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await waitForRealtime(page);
+  await page.getByPlaceholder('Player name').fill('QA Player');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.locator('#profileList')).toContainText('QA Player');
+  await page.locator('[data-profile-select]').check();
+  await page.getByRole('button', { name: 'Start Selected Session' }).click();
+};
+
+const expectNoHorizontalOverflow = async (locator: Locator): Promise<void> => {
+  await expect(locator).toBeVisible();
+  const overflow = await locator.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+};
+
+const setRangeValue = async (locator: Locator, value: string): Promise<void> => {
+  await locator.evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    input.value = nextValue;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+};
+
+const boundingBox = async (locator: Locator): Promise<{ readonly x: number; readonly y: number; readonly width: number; readonly height: number }> => {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('Expected locator to have a bounding box.');
+  }
+  return box;
+};
+
+const expectConsoleClean = (page: Page): void => {
+  expect(consoleFailures.get(page) ?? []).toEqual([]);
+};
+
+type E2EServerProfile = {
+  readonly name?: string;
+  readonly bankroll?: number;
+  readonly transactions?: readonly { readonly type?: string; readonly amount?: number; readonly description?: string }[];
+};
+
+type E2EServerData = {
+  readonly profileState: {
+    readonly profiles: readonly E2EServerProfile[];
+  };
+};
+
+const waitForRealtime = async (page: Page): Promise<void> => {
+  await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
+};
+
+const currentRealtimeUrl = async (page: Page): Promise<string> => page.evaluate(() => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
+
+const clearServerData = async (page: Page): Promise<void> => {
+  await page.evaluate(async () => {
+    const url = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    await new Promise<void>((resolve, reject) => {
+      const socket = new WebSocket(url);
+      const timer = window.setTimeout(() => {
+        socket.close();
+        reject(new Error('Timed out clearing server data.'));
+      }, 5_000);
+      socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({ version: 1, type: 'clear-server-data' }));
+      });
+      socket.addEventListener('message', (event) => {
+        const message = JSON.parse(String(event.data)) as { type?: string; profileState?: { profiles?: unknown[] }; session?: unknown };
+        if (message.type === 'data-state' && message.profileState?.profiles?.length === 0 && message.session === undefined) {
+          window.clearTimeout(timer);
+          socket.close();
+          resolve();
+        }
+      });
+      socket.addEventListener('error', () => {
+        window.clearTimeout(timer);
+        reject(new Error('Failed to connect while clearing server data.'));
+      });
+    });
+  });
+};
+
+const requestServerData = async (page: Page): Promise<E2EServerData> =>
+  page.evaluate(async () => {
+    const url = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    return await new Promise<E2EServerData>((resolve, reject) => {
+      const socket = new WebSocket(url);
+      const timer = window.setTimeout(() => {
+        socket.close();
+        reject(new Error('Timed out reading server data.'));
+      }, 5_000);
+      socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({ version: 1, type: 'request-data' }));
+      });
+      socket.addEventListener('message', (event) => {
+        const message = JSON.parse(String(event.data)) as { type?: string; profileState?: E2EServerData['profileState'] };
+        if (message.type === 'data-state' && message.profileState) {
+          window.clearTimeout(timer);
+          socket.close();
+          resolve({ profileState: message.profileState });
+        }
+      });
+      socket.addEventListener('error', () => {
+        window.clearTimeout(timer);
+        reject(new Error('Failed to connect while reading server data.'));
+      });
+    });
+  });
