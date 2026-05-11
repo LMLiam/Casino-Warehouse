@@ -52,7 +52,7 @@ export class BlackjackView {
     this.elements.blackjackSeats.innerHTML = snapshot.seats
       .map(
         (seat) => `
-          <article class="blackjack-table-seat ${seat.isTurn ? 'active' : ''} ${seat.profileId === profileId ? 'mine' : ''}" data-blackjack-seat="${seat.seatId}">
+          <article class="blackjack-table-seat ${seat.isTurn ? 'active' : ''} ${seat.profileId === profileId ? 'mine' : ''}" data-blackjack-seat="${escapeHtml(seat.seatId)}">
             <span>${escapeHtml(capitalize(seat.seatId))}</span>
             <b>${escapeHtml(seat.profileName ?? 'Open')}</b>
             <div class="seat-cards">${this.renderSeatHands(seat.playerCards, seat.splitHands)}</div>
