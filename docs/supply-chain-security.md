@@ -29,7 +29,9 @@ Run `npm run supply-chain:check` after editing workflows. `npm run lint` runs th
 
 ## Dependabot Update Policy
 
-Dependabot checks npm dependencies weekly with an open pull request limit of five. GitHub Actions updates are also checked weekly, using GitHub's [`github-actions` ecosystem](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/keeping-your-actions-up-to-date-with-dependabot), grouped into one `github-actions` update group, and capped at two open pull requests. This keeps SHA-pinned workflows maintainable without creating a separate pull request for every action pin.
+Dependabot checks npm dependencies weekly with an open pull request limit of five. npm security updates are grouped into one `npm-security` security-update group for the root manifest.
+
+GitHub Actions updates are also checked weekly using GitHub's [`github-actions` ecosystem](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/keeping-your-actions-up-to-date-with-dependabot). Version updates are grouped into one `github-actions` update group, security updates are grouped into one `github-actions-security` update group, and open pull requests are capped at two. This keeps SHA-pinned workflows maintainable without creating a separate pull request for every action pin.
 
 Dependabot labels both npm and GitHub Actions update pull requests with `dependencies`, `area:tooling`, and `type:maintenance`; GitHub Actions updates also carry the `security` label because they alter CI trust inputs.
 
