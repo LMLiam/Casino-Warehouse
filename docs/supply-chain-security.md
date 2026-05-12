@@ -14,14 +14,16 @@ This follows GitHub's [secure use guidance](https://docs.github.com/en/actions/r
 
 The current pinned workflow actions are:
 
-| Action                             | Pinned version |
-| ---------------------------------- | -------------- |
-| `actions/checkout`                 | `v5`           |
-| `actions/setup-node`               | `v5`           |
-| `actions/upload-artifact`          | `v4`           |
-| `actions/dependency-review-action` | `v4.9.0`       |
-| `github/codeql-action/init`        | `v4`           |
-| `github/codeql-action/analyze`     | `v4`           |
+| Action                              | Pinned version |
+| ----------------------------------- | -------------- |
+| `actions/checkout`                  | `v5`           |
+| `actions/setup-node`                | `v5`           |
+| `actions/upload-artifact`           | `v4`           |
+| `actions/dependency-review-action`  | `v4.9.0`       |
+| `github/codeql-action/init`         | `v4`           |
+| `github/codeql-action/analyze`      | `v4`           |
+| `github/codeql-action/upload-sarif` | `v4`           |
+| `ossf/scorecard-action`             | `v2.4.3`       |
 
 Run `npm run supply-chain:check` after editing workflows. `npm run lint` runs the same check in the normal local and CI lint gate.
 
@@ -37,9 +39,20 @@ The Dependency Review workflow is required on pull requests to `main`. It fails 
 
 This keeps the policy stricter than runtime-only scanning while avoiding low-severity noise. License blocking is intentionally not configured yet because the project uses the PolyForm Noncommercial license and does not currently have a reviewed third-party license denylist. If maintainers add license enforcement later, prefer a small denylist over a broad allowlist.
 
-## Scorecard Follow-Up
+## OpenSSF Scorecard
 
-OpenSSF Scorecard is not added in this pass. Add it after issue #25 lands so code-scanning ownership, SARIF routing, and required-check expectations are clear before another security signal is introduced.
+OpenSSF Scorecard runs from `.github/workflows/scorecard.yml` on a weekly Tuesday schedule and through manual `workflow_dispatch`. It does not run on pull requests because Scorecard is a repository-level posture signal and the official action does not support forked repositories.
+
+The workflow uses the official `ossf/scorecard-action`, pinned by full commit SHA with a same-line version comment. The job grants only the permissions needed for this configuration: `contents: read` for checkout/repository inspection, `id-token: write` to publish authenticated results to the Scorecard API, and `security-events: write` to upload SARIF into GitHub code scanning. Workflow-level permissions stay empty so those writes are scoped to the Scorecard job.
+
+Results are published with `publish_results: true` so the public Scorecard API and README badge reflect this repository's own run instead of the broader weekly ecosystem scan. The workflow also uploads `scorecard.sarif` as a short-lived Actions artifact and to GitHub code scanning so maintainers can inspect individual findings from the Security tab.
+
+Maintainers triage Scorecard findings as security-health signals, not automatic merge blockers:
+
+- Create follow-up issues for actionable repository gaps, especially findings that affect branch protection, dependency hygiene, token permissions, release provenance, or vulnerability reporting.
+- Mark findings as accepted false positives in issue or PR notes when the recommendation does not fit this source-available, noncommercial demo project.
+- Prefer small, scoped follow-up issues over broad "raise the score" work.
+- Do not weaken existing CodeQL, Dependency Review, branch protection, or action-pinning controls to improve a Scorecard score.
 
 ## SBOM Export
 
