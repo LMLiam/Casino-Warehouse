@@ -4,7 +4,7 @@ This app uses Tailwind CSS, Radix Primitives, Zod, and XState as focused archite
 
 ## Tailwind DOM Design System
 
-Tailwind is wired through `@tailwindcss/vite` and `src/styles/main.css`. The CSS file defines casino tokens for ink, felt, gold, cream, muted text, win/loss states, panel/card surfaces, radii, shadows, typography, and recurring spacing. Reusable classes cover panels, buttons, inputs, room cards, status badges, overlays, dialogs, tooltips, and scroll areas.
+Tailwind is wired through `@tailwindcss/vite` and `src/styles/main.css`. `main.css` is an import manifest for focused files in `src/styles/`: theme/root tokens, base elements, setup and lobby screens, table shell layout, game views, HUD controls, room panels, responsive rules, Tailwind component helpers, and Radix chrome. Reusable classes cover panels, buttons, inputs, room cards, status badges, overlays, dialogs, tooltips, and scroll areas.
 
 Use Tailwind-backed DOM utilities for lobby, room browser, setup, dialogs, settings/audio, side panels, admin/debug, ledger, rules, and general app chrome. Keep PixiJS responsible for Beat the House table layout, cards, chips, table hit zones, and animations that depend on `src/ui/layout.ts`.
 
