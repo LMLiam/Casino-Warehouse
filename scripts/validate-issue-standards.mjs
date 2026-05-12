@@ -155,12 +155,20 @@ export async function upsertIssueStandardsComment({ fetchImpl = fetch, repositor
   }
 
   const comments = await githubRequest({ fetchImpl, repository, token, path: `/issues/${issueNumber}/comments?per_page=100` });
-  const existing = comments.find((comment) => String(comment.body ?? '').includes(issueStandardsCommentMarker));
+  const existingComments = comments.filter((comment) => String(comment.body ?? '').includes(issueStandardsCommentMarker));
+  const [existing, ...duplicates] = existingComments;
   const body = buildIssueStandardsComment(failures);
 
   if (existing) {
     await githubRequest({ fetchImpl, method: 'PATCH', repository, token, path: `/issues/comments/${existing.id}`, body: { body } });
-    return { action: 'updated', commentId: existing.id };
+
+    for (const duplicate of duplicates) {
+      await githubRequest({ fetchImpl, method: 'DELETE', repository, token, path: `/issues/comments/${duplicate.id}` });
+    }
+
+    return duplicates.length > 0
+      ? { action: 'updated', commentId: existing.id, deletedCommentIds: duplicates.map((duplicate) => duplicate.id) }
+      : { action: 'updated', commentId: existing.id };
   }
 
   if (failures.length === 0) {

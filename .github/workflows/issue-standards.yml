@@ -17,6 +17,10 @@ permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: issue-standards-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Issue Standards
