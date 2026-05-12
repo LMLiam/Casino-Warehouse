@@ -1,0 +1,52 @@
+.radix-action-row {
+  @apply grid grid-cols-2 gap-2;
+}
+
+.casino-dialog-overlay {
+  @apply fixed inset-0 z-40 bg-black/70 backdrop-blur-sm;
+}
+
+.casino-dialog-overlay[data-state='closed'],
+.casino-dialog-content[data-state='closed'] {
+  @apply hidden;
+}
+
+.casino-dialog-content {
+  @apply fixed left-1/2 top-1/2 z-50 grid max-h-[min(680px,calc(100vh-48px))] w-[min(620px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 gap-3 rounded-casino border border-casino-line bg-casino-panel p-5 text-casino-cream shadow-casino-panel outline-none;
+}
+
+.casino-dialog-title {
+  @apply font-casino-display text-3xl leading-none text-white;
+}
+
+.casino-dialog-description {
+  @apply text-sm font-bold leading-snug text-casino-muted;
+}
+
+.casino-dialog-close {
+  @apply justify-self-end;
+}
+
+.casino-scroll-area {
+  @apply min-h-0 overflow-hidden;
+}
+
+.casino-scroll-viewport {
+  @apply max-h-[420px] pr-3;
+}
+
+.casino-scrollbar {
+  @apply flex w-2 touch-none rounded-casino-pill bg-white/10 p-px;
+}
+
+.casino-scroll-thumb {
+  @apply relative flex-1 rounded-casino-pill bg-casino-gold;
+}
+
+.casino-tooltip {
+  @apply z-50 rounded-casino border border-casino-line bg-casino-panel px-2 py-1 text-xs font-black text-casino-gold-bright shadow-casino-card;
+}
+
+.casino-tooltip-arrow {
+  fill: rgba(6, 13, 10, 0.92);
+}
