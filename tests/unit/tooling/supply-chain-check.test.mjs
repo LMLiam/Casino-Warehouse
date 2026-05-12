@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { dependabotActionsUpdateFailures, dependencyReviewPolicyFailures, workflowActionPinFailures } from '../../../scripts/supply-chain-check.mjs';
 
-const pinnedSha = '0123456789abcdef0123456789abcdef01234567';
-
 const validDependabot = `version: 2
 updates:
   - package-ecosystem: npm
@@ -67,42 +65,45 @@ describe('dependabotActionsUpdateFailures', () => {
 });
 
 describe('workflowActionPinFailures', () => {
-  it('accepts pinned external actions and local workflow actions', () => {
-    expect(
-      workflowActionPinFailures([
-        {
-          path: '.github/workflows/ci.yml',
-          source: `steps:
-  uses: actions/checkout@${pinnedSha} # v5.0.1
-  uses: ./github/actions/local-check
-`,
-        },
-      ]),
-    ).toEqual([]);
-  });
-
-  it('flags missing refs, short refs, and missing Dependabot comments', () => {
+  it('accepts full-SHA external actions with version comments', () => {
     const failures = workflowActionPinFailures([
       {
-        path: '.github/workflows/ci.yml',
-        source: `steps:
-  uses: actions/setup-node
-  uses: actions/cache@v5 # v5.0.0
-  uses: "github/codeql-action/init@${pinnedSha}"
+        path: '.github/workflows/example.yml',
+        source: `
+steps:
+  - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+  - uses: './.github/actions/local-action'
+`,
+      },
+    ]);
+
+    expect(failures).toEqual([]);
+  });
+
+  it('rejects external actions without explicit SHA pins and version comments', () => {
+    const failures = workflowActionPinFailures([
+      {
+        path: '.github/workflows/example.yml',
+        source: `
+steps:
+  - uses: actions/checkout
+  - uses: actions/setup-node@v5
+  - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
 `,
       },
     ]);
 
     expect(failures).toEqual([
-      '.github/workflows/ci.yml:2 uses actions/setup-node without an explicit ref.',
-      '.github/workflows/ci.yml:3 uses actions/cache@v5. Pin external actions to a full 40-character commit SHA.',
-      '.github/workflows/ci.yml:4 must keep a same-line version comment for Dependabot, for example "# v1.2.3".',
+      '.github/workflows/example.yml:3 uses actions/checkout without an explicit ref.',
+      '.github/workflows/example.yml:4 uses actions/setup-node@v5. Pin external actions to a full 40-character commit SHA.',
+      '.github/workflows/example.yml:4 must keep a same-line version comment for Dependabot, for example "# v1.2.3".',
+      '.github/workflows/example.yml:5 must keep a same-line version comment for Dependabot, for example "# v1.2.3".',
     ]);
   });
 });
 
 describe('dependencyReviewPolicyFailures', () => {
-  it('accepts the required Dependency Review policy fragments', () => {
+  it('accepts the configured Dependency Review severity and scope policy', () => {
     expect(
       dependencyReviewPolicyFailures(`with:
   fail-on-severity: moderate
@@ -111,8 +112,8 @@ describe('dependencyReviewPolicyFailures', () => {
     ).toEqual([]);
   });
 
-  it('reports each missing Dependency Review policy fragment', () => {
-    expect(dependencyReviewPolicyFailures('with:\n  fail-on-severity: high\n', '.github/workflows/dependency-review.yml')).toEqual([
+  it('requires both Dependency Review policy fragments', () => {
+    expect(dependencyReviewPolicyFailures('with:\n  fail-on-severity: high\n')).toEqual([
       '.github/workflows/dependency-review.yml must include "fail-on-severity: moderate".',
       '.github/workflows/dependency-review.yml must include "fail-on-scopes: runtime,development,unknown".',
     ]);
