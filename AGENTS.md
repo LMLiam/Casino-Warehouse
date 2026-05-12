@@ -48,6 +48,7 @@ Run the narrowest meaningful checks while iterating, then run the broader checks
 - Work through issues and pull requests. Do not commit directly to `main`.
 - Keep changes focused on the issue or user request.
 - Use branches or worktrees so unrelated user work is not disturbed. If the user asks for a worktree, create a separate worktree for the branch.
+- Name agent-created branches by issue or purpose, for example `issue-71-agents-md`. Do not prefix branch names with `codex/` or other tool-ownership markers.
 - Preserve generated build output out of commits.
 - Follow conventional PR titles: `type(scope): summary`.
 - PRs need at least one `type:*` label and one `area:*` label.
