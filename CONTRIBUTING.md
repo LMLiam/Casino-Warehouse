@@ -28,6 +28,12 @@ The `main` branch ruleset requires the CodeQL code scanning tool to report resul
 
 GitHub Code Quality is not enabled for this repository yet, so the ruleset does not currently enforce a Code Quality gate. When the `CodeQL - Code Quality / Analyze` check is available and passing on pull requests, maintainers should enable the native Code Quality ruleset requirement with an `Errors` threshold first. Contributors blocked by either gate should inspect the pull request checks and code scanning or Code Quality annotations, fix the reported finding, and push an updated commit.
 
+## Source File Shape
+
+Keep new `src/` modules focused on one exported top-level element. Classes, React components, exported functions, exported constants, interfaces, types, enums, schemas, and exported variable declarations all count as top-level elements. Private helpers may live next to the one exported element they support.
+
+`npm run architecture:check` enforces this convention. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each exported declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
+
 ## Local Checks
 
 Configure your editor to respect the repository `.editorconfig` before making changes.

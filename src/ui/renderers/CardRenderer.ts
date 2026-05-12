@@ -1,7 +1,11 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import { gsap } from 'gsap';
-import { cardLabel, isRed, type Card } from '../../game/cards';
-import { CARD_ANIMATION, CARD_SIZE, COLORS } from './renderingConstants';
+import type { Card } from '../../game/cards/Card';
+import { cardLabel } from '../../game/cards/cardLabel';
+import { isRed } from '../../game/cards/isRed';
+import { CARD_ANIMATION } from './renderingConstants/CARD_ANIMATION';
+import { CARD_SIZE } from './renderingConstants/CARD_SIZE';
+import { COLORS } from './renderingConstants/COLORS';
 
 export class CardRenderer {
   private readonly animatedCards = new Set<string>();

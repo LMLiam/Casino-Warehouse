@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
-import type { CasinoPlayer } from '../state/casinoPlayer';
+import type { AppElements } from '../dom/appElements/AppElements';
+import type { CasinoPlayer } from '../state/casinoPlayer/CasinoPlayer';
 
 export class PlayerStripView {
   public constructor(private readonly elements: AppElements) {}

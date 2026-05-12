@@ -1,8 +1,9 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import type { AddressInfo } from 'node:net';
 import { createCasinoServer, type CasinoServer } from '../../src/multiplayer/serverEntry';
-import { createMemoryServerDataStore, type ServerDataStore } from '../../src/state/serverDataStore';
-import { createSessionState } from '../../src/state/session';
+import { createMemoryServerDataStore } from '../../src/state/serverDataStore/createMemoryServerDataStore';
+import type { ServerDataStore } from '../../src/state/serverDataStore/ServerDataStore';
+import { createSessionState } from '../../src/state/session/createSessionState';
 
 let realtimeServer: CasinoServer | undefined;
 

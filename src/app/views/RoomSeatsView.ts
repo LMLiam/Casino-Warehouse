@@ -1,6 +1,7 @@
-import type { RoomSeatId, RoomSnapshot } from '../../multiplayer/protocol';
+import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
+import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { capitalize } from '../format/appText';
 
 export class RoomSeatsView {

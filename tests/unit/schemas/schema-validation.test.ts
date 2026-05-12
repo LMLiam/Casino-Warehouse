@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeAudioSettings } from '../../../src/audio/casinoAudio';
-import { gameCatalog } from '../../../src/game/catalog';
-import { gameCatalogSchema, slotThemeSchema } from '../../../src/schemas/casinoSchemas';
-import { loadProfileStore, parseProfileStoreJson, type StorageLike } from '../../../src/state/profiles';
-import { parseClientMessage } from '../../../src/multiplayer/protocol';
+import { sanitizeAudioSettings } from '../../../src/audio/casinoAudio/sanitizeAudioSettings';
+import { gameCatalog } from '../../../src/game/catalog/gameCatalog';
+import { gameCatalogSchema } from '../../../src/schemas/casinoSchemas/gameCatalogSchema';
+import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
+import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
+import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
+import type { StorageLike } from '../../../src/state/profiles/StorageLike';
+import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();

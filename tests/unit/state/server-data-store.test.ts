@@ -2,8 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createMemoryServerDataStore, SqliteServerDataStore } from '../../../src/state/serverDataStore';
-import { createSessionState } from '../../../src/state/session';
+import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
+import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
+import { createSessionState } from '../../../src/state/session/createSessionState';
 
 const tempDirs: string[] = [];
 

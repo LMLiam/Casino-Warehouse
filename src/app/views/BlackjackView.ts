@@ -1,8 +1,10 @@
-import { blackjackTableAsset } from '../../assets/manifest';
-import type { BlackjackSnapshot } from '../../game/blackjack';
-import { isBlackjackTableSnapshot, type BlackjackTableSeatSnapshot, type BlackjackTableSnapshot } from '../../game/blackjackTable';
-import type { Card } from '../../game/cards';
-import type { AppElements } from '../dom/appElements';
+import { blackjackTableAsset } from '../../assets/manifest/blackjackTableAsset';
+import type { BlackjackSnapshot } from '../../game/blackjack/BlackjackSnapshot';
+import type { BlackjackTableSeatSnapshot } from '../../game/blackjackTable/BlackjackTableSeatSnapshot';
+import type { BlackjackTableSnapshot } from '../../game/blackjackTable/BlackjackTableSnapshot';
+import { isBlackjackTableSnapshot } from '../../game/blackjackTable/isBlackjackTableSnapshot';
+import type { Card } from '../../game/cards/Card';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 import { capitalize } from '../format/appText';
 

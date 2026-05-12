@@ -1,7 +1,8 @@
-import { gameTileAsset } from '../../assets/manifest';
-import { gameCatalog, type CasinoGameId } from '../../game/catalog';
+import { gameTileAsset } from '../../assets/manifest/gameTileAsset';
+import { gameCatalog } from '../../game/catalog/gameCatalog';
+import type { CasinoGameId } from '../../game/ids';
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
 
 export class GameLobbyView {
   public constructor(private readonly elements: AppElements) {}

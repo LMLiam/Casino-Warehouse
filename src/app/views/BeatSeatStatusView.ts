@@ -1,8 +1,10 @@
-import type { GameSnapshot, HandId } from '../../game/types';
-import type { RoomSnapshot } from '../../multiplayer/protocol';
+import type { GameSnapshot } from '../../game/types/GameSnapshot';
+import type { HandId } from '../../game/types/HandId';
+import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { escapeHtml } from '../../shared/html';
-import { handLayouts, tableSize } from '../../ui/layout';
-import type { AppElements } from '../dom/appElements';
+import { handLayouts } from '../../ui/layout/handLayouts';
+import { tableSize } from '../../ui/layout/tableSize';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 import { capitalize } from '../format/appText';
 

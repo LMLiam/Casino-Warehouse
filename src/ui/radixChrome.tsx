@@ -5,8 +5,9 @@ import type { ReactElement } from 'react';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { beatTheHouseChipsUrl } from '../assets/tableAssets';
-import { chipCrops, chipSheetSize } from './chips';
+import { beatTheHouseChipsUrl } from '../assets/tableAssets/beatTheHouseChipsUrl';
+import { chipCrops } from './chips/chipCrops';
+import { chipSheetSize } from './chips/chipSheetSize';
 
 const chipFaceSize = 72;
 const chipScale = chipFaceSize / chipCrops[0].size;

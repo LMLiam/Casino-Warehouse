@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { topLevelElementErrors } from './top-level-elements-check.mjs';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
 const sourceRoot = join(workspaceRoot, 'src');
@@ -14,30 +16,36 @@ const appModuleFolders = new Set(['actions', 'dom', 'format', 'input', 'rooms', 
 const testSuiteFolders = new Set(['e2e', 'unit']);
 const unitTestDomainFolders = new Set(['app', 'assets', 'audio', 'game', 'multiplayer', 'schemas', 'state']);
 
-for (const file of sourceFiles) {
-  const relativePath = toWorkspacePath(file);
-  const source = readFileSync(file, 'utf8');
+function main() {
+  for (const file of sourceFiles) {
+    const relativePath = toWorkspacePath(file);
+    const source = readFileSync(file, 'utf8');
 
-  checkImportBoundaries(relativePath, source);
-  checkMathRandom(relativePath, source);
-  checkBankrollMutation(relativePath, source);
-  checkUiPayoutDuplication(relativePath, source);
-  checkPrimaryExportCount(relativePath, source);
-  checkFileSize(relativePath, source);
-  checkVagueFilename(relativePath);
-  checkAppFolderLayout(relativePath);
+    checkImportBoundaries(relativePath, source);
+    checkMathRandom(relativePath, source);
+    checkBankrollMutation(relativePath, source);
+    checkUiPayoutDuplication(relativePath, source);
+    checkTopLevelElementCount(relativePath, source);
+    checkFileSize(relativePath, source);
+    checkVagueFilename(relativePath);
+    checkAppFolderLayout(relativePath);
+  }
+
+  checkDirectUnknownCasts();
+  checkTestFolderLayout();
+  checkCycles();
+
+  if (errors.length > 0) {
+    console.error(['Architecture check failed:', ...errors.map((error) => `- ${error}`)].join('\n'));
+    process.exit(1);
+  }
+
+  console.log(`Architecture check passed for ${sourceFiles.length} source files.`);
 }
 
-checkDirectUnknownCasts();
-checkTestFolderLayout();
-checkCycles();
-
-if (errors.length > 0) {
-  console.error(['Architecture check failed:', ...errors.map((error) => `- ${error}`)].join('\n'));
-  process.exit(1);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
 }
-
-console.log(`Architecture check passed for ${sourceFiles.length} source files.`);
 
 function checkImportBoundaries(relativePath, source) {
   for (const specifier of importSpecifiers(source)) {
@@ -73,7 +81,7 @@ function checkMathRandom(relativePath, source) {
 }
 
 function checkBankrollMutation(relativePath, source) {
-  const allowed = new Set(['src/game/engine.ts', 'src/multiplayer/roomAuthority.ts', 'src/state/profiles.ts']);
+  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/multiplayer/roomAuthority.ts', 'src/state/profiles.ts']);
   const mutatesBankroll = /\bthis\.bankroll\s*(?:[+\-*/]?=|\+\+|--)|\.bankroll\s*(?:[+\-*/]?=|\+\+|--)/.test(source);
   if (mutatesBankroll && !allowed.has(relativePath)) {
     errors.push(`${relativePath} mutates bankroll directly. Route changes through the authorised game/room/profile ledger modules.`);
@@ -99,11 +107,8 @@ function checkUiPayoutDuplication(relativePath, source) {
   }
 }
 
-function checkPrimaryExportCount(relativePath, source) {
-  const exportedClasses = source.match(/^export\s+class\s+/gm) ?? [];
-  if (exportedClasses.length > 1) {
-    errors.push(`${relativePath} exports ${exportedClasses.length} classes. Keep one primary class/component per file.`);
-  }
+function checkTopLevelElementCount(relativePath, source) {
+  errors.push(...topLevelElementErrors(relativePath, source));
 }
 
 function checkFileSize(relativePath, source) {

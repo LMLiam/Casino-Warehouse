@@ -1,7 +1,7 @@
-import type { GameSnapshot } from '../../game/types';
-import type { CasinoProfile } from '../../state/profiles';
+import type { GameSnapshot } from '../../game/types/GameSnapshot';
+import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 
 export class WalletView {

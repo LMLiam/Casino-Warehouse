@@ -1,0 +1,15 @@
+export const COLORS = {
+  gold: 0xffd56b,
+  goldSoft: 0xfff1a8,
+  white: 0xffffff,
+  black: 0x000000,
+  cardFace: 0xfffdf1,
+  cardBorder: 0xd8d8d8,
+  cardText: 0x101010,
+  cardRed: 0xbf1d1d,
+  win: 0x75ff92,
+  lose: 0xff7d7d,
+  push: 0xb9d6ff,
+  jackpot: 0xfff1a8,
+  cardBack: 0x0d4a30,
+};

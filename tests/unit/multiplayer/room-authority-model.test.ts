@@ -1,21 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BlackjackTable, type BlackjackTableActionResult } from '../../../src/game/blackjackTable';
-import { findSlotTheme } from '../../../src/game/catalog';
-import { BeatTheHouseGame } from '../../../src/game/engine';
-import { SlotsGame, type SlotSnapshot } from '../../../src/game/slots';
-import type { GameSnapshot } from '../../../src/game/types';
-import type { RoomPlayer } from '../../../src/multiplayer/protocol';
+import { BlackjackTable } from '../../../src/game/blackjackTable/BlackjackTable';
+import type { BlackjackTableActionResult } from '../../../src/game/blackjackTable/BlackjackTableActionResult';
+import { findSlotTheme } from '../../../src/game/catalog/findSlotTheme';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { SlotsGame } from '../../../src/game/slots/SlotsGame';
+import type { SlotSnapshot } from '../../../src/game/slots/SlotSnapshot';
+import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
+import type { RoomPlayer } from '../../../src/multiplayer/protocol/RoomPlayer';
 import { RoomAuthorityBase } from '../../../src/multiplayer/roomAuthorityBase';
-import {
-  compareRoomListOrder,
-  createGameModel,
-  createId,
-  createRoomId,
-  createServerManagedBeatRoom,
-  roomPhase,
-  safeBankroll,
-  type RoomState,
-} from '../../../src/multiplayer/roomAuthorityModel';
+import { compareRoomListOrder } from '../../../src/multiplayer/roomAuthorityModel/compareRoomListOrder';
+import { createGameModel } from '../../../src/multiplayer/roomAuthorityModel/createGameModel';
+import { createId } from '../../../src/multiplayer/roomAuthorityModel/createId';
+import { createRoomId } from '../../../src/multiplayer/roomAuthorityModel/createRoomId';
+import { createServerManagedBeatRoom } from '../../../src/multiplayer/roomAuthorityModel/createServerManagedBeatRoom';
+import { roomPhase } from '../../../src/multiplayer/roomAuthorityModel/roomPhase';
+import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
+import { safeBankroll } from '../../../src/multiplayer/roomAuthorityModel/safeBankroll';
 
 const player = (profileId: string): RoomPlayer => ({
   connectionId: `conn-${profileId}`,

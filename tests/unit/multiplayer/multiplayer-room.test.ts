@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { mainBeatRoomId, RoomAuthority } from '../../../src/multiplayer/roomAuthority';
-import {
-  decodeServerMessage,
-  encodeMessage,
-  parseClientMessage,
-  type ClientMessage,
-  type RoomGameId,
-  type RoomSeatId,
-  type RoomSnapshot,
-} from '../../../src/multiplayer/protocol';
-import type { GameSnapshot } from '../../../src/game/types';
-import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable';
-import type { SlotSnapshot } from '../../../src/game/slots';
+import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
+import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
+import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
+import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
+import type { RoomGameId } from '../../../src/multiplayer/protocol/RoomGameId';
+import type { RoomSeatId } from '../../../src/multiplayer/protocol/RoomSeatId';
+import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
+import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable/BlackjackTableSnapshot';
+import type { SlotSnapshot } from '../../../src/game/slots/SlotSnapshot';
 
 const create = (gameId: RoomGameId, profileId: string, bankroll = 500, maxPlayers?: number): ClientMessage => ({
   version: 1,

@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createProfile,
-  deleteProfile,
-  loadProfileStore,
-  parseProfileStoreJson,
-  recordTransaction,
-  renameProfile,
-  replaceProfile,
-  saveProfileStore,
-  type StorageLike,
-} from '../../../src/state/profiles';
+import { createProfile } from '../../../src/state/profiles/createProfile';
+import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
+import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
+import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
+import { recordTransaction } from '../../../src/state/profiles/recordTransaction';
+import { renameProfile } from '../../../src/state/profiles/renameProfile';
+import { replaceProfile } from '../../../src/state/profiles/replaceProfile';
+import { saveProfileStore } from '../../../src/state/profiles/saveProfileStore';
+import type { StorageLike } from '../../../src/state/profiles/StorageLike';
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();

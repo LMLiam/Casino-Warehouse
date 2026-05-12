@@ -1,0 +1,1 @@
+export const mainBeatRoomId = 'BEATMAIN';

@@ -1,5 +1,7 @@
-import type { BetType, HandId } from '../../game/types';
-import { handLayouts, tableSize } from '../../ui/layout';
+import type { BetType } from '../../game/types/BetType';
+import type { HandId } from '../../game/types/HandId';
+import { handLayouts } from '../../ui/layout/handLayouts';
+import { tableSize } from '../../ui/layout/tableSize';
 
 export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: number): { readonly handId: HandId; readonly betType: BetType } | undefined => {
   const rect = host.getBoundingClientRect();

@@ -1,8 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { rigDeck, type Card } from '../../../src/game/cards';
-import { BeatTheHouseGame } from '../../../src/game/engine';
-import { PixiTable, roundStartAnimationKey, type PixiTableDependencies } from '../../../src/ui/PixiTable';
-import { dealerChipBank, toPixels } from '../../../src/ui/layout';
+import type { Card } from '../../../src/game/cards/Card';
+import { rigDeck } from '../../../src/game/cards/rigDeck';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { PixiTable } from '../../../src/ui/PixiTable/PixiTable';
+import type { PixiTableDependencies } from '../../../src/ui/PixiTable/PixiTableDependencies';
+import { roundStartAnimationKey } from '../../../src/ui/PixiTable/roundStartAnimationKey';
+import { dealerChipBank } from '../../../src/ui/layout/dealerChipBank';
+import { toPixels } from '../../../src/ui/layout/toPixels';
 
 const card = (rank: Card['rank'], suit: Card['suit'] = 'spades'): Card => ({ rank, suit });
 
