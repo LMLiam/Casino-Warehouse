@@ -121,6 +121,10 @@ describe('per-game multiplayer protocol', () => {
       ownedProfileIds: ['alice'],
     });
     expect(decodeServerMessage('{"version":1,"type":"admin-access","authorized":true}')).toMatchObject({ type: 'admin-access', authorized: true });
+    expect(
+      decodeServerMessage(JSON.stringify({ version: 1, type: 'room-closed', roomId: 'ROOM42', gameId: 'beat-the-house', reason: 'profile-deleted' })),
+    ).toMatchObject({ type: 'room-closed', roomId: 'ROOM42', gameId: 'beat-the-house', reason: 'profile-deleted' });
+    expect(decodeServerMessage('{"version":1,"type":"room-closed","roomId":"ROOM42","gameId":"missing","reason":"profile-deleted"}')).toBeUndefined();
     expect(decodeServerMessage(JSON.stringify({ version: 1, type: 'room-state', room }))?.type).toBe('room-state');
     expect(decodeServerMessage('{"version":1,"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();

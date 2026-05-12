@@ -8,6 +8,7 @@ import { SlotsGame } from '../game/slots/SlotsGame';
 import type { SlotSnapshot } from '../game/slots/SlotSnapshot';
 import type { GameSnapshot } from '../game/types/GameSnapshot';
 import { handIds } from '../game/types/handIds';
+import type { CasinoProfile } from '../state/profiles/CasinoProfile';
 import { createMemoryServerDataStore } from '../state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../state/serverDataStore/ServerDataStore';
 import type { RoomPlayer } from './protocol/RoomPlayer';
@@ -145,6 +146,77 @@ export abstract class RoomAuthorityBase {
     room.revision += 1;
     room.updatedAt = Date.now();
     return { broadcasts: [this.snapshot(room)], settlements };
+  }
+
+  protected reconcileRooms(reason: string, profileId?: string): AuthorityResult {
+    const profiles = new Map(this.dataStore.snapshot().profileState.profiles.map((profile) => [profile.id, profile]));
+    const broadcasts: RoomSnapshot[] = [];
+    const roomClosures: Array<NonNullable<AuthorityResult['roomClosures']>[number]> = [];
+
+    for (const room of [...this.rooms.values()]) {
+      if (profileId && !this.roomHasProfile(room, profileId)) {
+        continue;
+      }
+      const beforeConnectionIds = this.roomConnectionIds(room);
+      const removedConnectionIds: string[] = [];
+      let changed = false;
+
+      for (const memberProfileId of this.roomProfileIds(room)) {
+        const profile = profiles.get(memberProfileId);
+        if (!profile) {
+          removedConnectionIds.push(...this.profileConnectionIds(room, memberProfileId));
+          this.removeExistingMember(room, memberProfileId);
+          changed = true;
+          continue;
+        }
+        changed = this.updateRoomProfile(room, profile) || changed;
+      }
+
+      if (!changed) {
+        continue;
+      }
+
+      if (!room.serverManaged && (!this.roomHasProfile(room, room.hostProfileId) || this.roomMemberCount(room) === 0)) {
+        this.rooms.delete(room.roomId);
+        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: unique(beforeConnectionIds), reason });
+        continue;
+      }
+
+      if (room.serverManaged && this.roomMemberCount(room) === 0) {
+        this.resetServerManagedRoom(room);
+      }
+      this.syncBeatBankroll(room);
+      if (removedConnectionIds.length > 0) {
+        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: unique(removedConnectionIds), reason });
+      }
+      broadcasts.push(this.broadcast(room).broadcasts[0]);
+    }
+
+    return { broadcasts, settlements: [], roomClosures };
+  }
+
+  protected clearAllRooms(reason: string): AuthorityResult {
+    const broadcasts: RoomSnapshot[] = [];
+    const roomClosures: Array<NonNullable<AuthorityResult['roomClosures']>[number]> = [];
+
+    for (const room of [...this.rooms.values()]) {
+      const connectionIds = this.roomConnectionIds(room);
+      if (!room.serverManaged) {
+        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds, reason });
+        this.rooms.delete(room.roomId);
+        continue;
+      }
+      if (connectionIds.length > 0) {
+        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds, reason });
+      }
+      room.players.clear();
+      room.spectators.clear();
+      room.connectionToMember.clear();
+      this.resetServerManagedRoom(room);
+      broadcasts.push(this.broadcast(room).broadcasts[0]);
+    }
+
+    return { broadcasts, settlements: [], roomClosures };
   }
 
   protected snapshot(room: RoomState): RoomSnapshot {
@@ -289,6 +361,54 @@ export abstract class RoomAuthorityBase {
     return [...room.seats.entries()].find(([, owner]) => owner === profileId)?.[0];
   }
 
+  private roomProfileIds(room: RoomState): readonly string[] {
+    return unique([
+      ...room.players.keys(),
+      ...room.spectators.keys(),
+      ...[...room.seats.values()].filter((profileId): profileId is string => Boolean(profileId)),
+    ]);
+  }
+
+  private roomConnectionIds(room: RoomState): readonly string[] {
+    return unique([...room.connectionToMember.keys(), ...[...room.players.values(), ...room.spectators.values()].map((player) => player.connectionId)]);
+  }
+
+  private profileConnectionIds(room: RoomState, profileId: string): readonly string[] {
+    return unique(
+      [room.players.get(profileId)?.connectionId, room.spectators.get(profileId)?.connectionId].filter((connectionId): connectionId is string =>
+        Boolean(connectionId),
+      ),
+    );
+  }
+
+  private roomHasProfile(room: RoomState, profileId: string): boolean {
+    return this.roomProfileIds(room).includes(profileId);
+  }
+
+  private roomMemberCount(room: RoomState): number {
+    return room.players.size + room.spectators.size;
+  }
+
+  private updateRoomProfile(room: RoomState, profile: CasinoProfile): boolean {
+    let changed = false;
+    const update = (player: RoomPlayer): RoomPlayer => {
+      if (player.profileName === profile.name && Object.is(player.bankroll, profile.bankroll)) {
+        return player;
+      }
+      changed = true;
+      return { ...player, profileName: profile.name, bankroll: profile.bankroll };
+    };
+    const player = room.players.get(profile.id);
+    if (player) {
+      room.players.set(profile.id, update(player));
+    }
+    const spectator = room.spectators.get(profile.id);
+    if (spectator) {
+      room.spectators.set(profile.id, update(spectator));
+    }
+    return changed;
+  }
+
   protected gameSnapshot(room: RoomState): GameSnapshot | BlackjackSnapshot | BlackjackTableSnapshot | SlotSnapshot {
     if (room.model.kind === 'blackjack') {
       return room.model.table.snapshot(this.blackjackOccupants(room));
@@ -327,3 +447,5 @@ export abstract class RoomAuthorityBase {
     return { broadcasts: [], settlements: [], error: message };
   }
 }
+
+const unique = <Value>(values: readonly Value[]): Value[] => [...new Set(values)];

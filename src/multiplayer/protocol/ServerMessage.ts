@@ -21,6 +21,7 @@ export type ServerMessage =
     }
   | { readonly version: 1; readonly type: 'heartbeat'; readonly sentAt: number }
   | { readonly version: 1; readonly type: 'room-created'; readonly room: RoomSnapshot; readonly invitePath: string }
+  | { readonly version: 1; readonly type: 'room-closed'; readonly roomId: string; readonly gameId: RoomGameId; readonly reason: string }
   | { readonly version: 1; readonly type: 'room-list'; readonly gameId: RoomGameId; readonly rooms: readonly RoomSummary[] }
   | { readonly version: 1; readonly type: 'room-state'; readonly room: RoomSnapshot }
   | { readonly version: 1; readonly type: 'settlement'; readonly roomId: string; readonly sessionId: string; readonly settlements: readonly RoomSettlement[] }

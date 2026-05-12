@@ -6,11 +6,13 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer, type CasinoServerOptions } from '../../../src/multiplayer/serverEntry';
+import { mainBeatRoomId } from '../../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
 import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
 import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
+import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
 
 class SocketProbe {
@@ -65,6 +67,14 @@ class SocketProbe {
 
   public received(predicate: (message: ServerMessage) => boolean): readonly ServerMessage[] {
     return this.messages.filter(predicate);
+  }
+
+  public checkpoint(): number {
+    return this.messages.length;
+  }
+
+  public messagesSince(checkpoint: number): readonly ServerMessage[] {
+    return this.messages.slice(checkpoint);
   }
 
   public close(): void {
@@ -331,6 +341,262 @@ describe('multiplayer WebSocket server', () => {
     expect(updated.type === 'data-state' ? updated.profileState.profiles.find((profile) => profile.id === aliceProfile.id)?.bankroll : 0).toBe(1075);
   });
 
+  it('reconciles active rooms before data-state when an active profile is deleted', async () => {
+    const baseUrl = await startServer();
+    const alice = await connect(baseUrl.ws);
+    const bob = await connect(baseUrl.ws);
+    const aliceProfile = await createServerProfile(alice, 'Delete Room Alice');
+    const bobProfile = await createServerProfile(bob, 'Delete Room Bob');
+
+    alice.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: aliceProfile.name,
+      bankroll: aliceProfile.bankroll,
+    });
+    const created = await alice.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected room-created message.');
+    }
+    alice.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    await waitForRoom(
+      alice,
+      (room) => room.roomId === created.room.roomId && room.seats.some((seat) => seat.seatId === 'left' && seat.profileId === aliceProfile.id),
+    );
+    bob.send({
+      version: 1,
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId: created.room.roomId,
+      role: 'player',
+      profileId: bobProfile.id,
+      profileName: bobProfile.name,
+      bankroll: bobProfile.bankroll,
+    });
+    await waitForRoom(bob, (room) => room.roomId === created.room.roomId && room.spectators.some((player) => player.profileId === bobProfile.id));
+    bob.send({ version: 1, type: 'assign-seat', seatId: 'centre' });
+    await waitForRoom(
+      alice,
+      (room) => room.roomId === created.room.roomId && room.seats.some((seat) => seat.seatId === 'centre' && seat.profileId === bobProfile.id),
+    );
+
+    const aliceCheckpoint = alice.checkpoint();
+    const bobCheckpoint = bob.checkpoint();
+    bob.send({ version: 1, type: 'delete-profile', profileId: bobProfile.id });
+
+    const aliceRoomState = await waitForMessageSince(
+      alice,
+      aliceCheckpoint,
+      (message) =>
+        message.type === 'room-state' &&
+        message.room.roomId === created.room.roomId &&
+        message.room.players.every((player) => player.profileId !== bobProfile.id),
+    );
+    const bobClosed = await waitForMessageSince(
+      bob,
+      bobCheckpoint,
+      (message) => message.type === 'room-closed' && message.roomId === created.room.roomId && message.reason === 'profile-deleted',
+    );
+    await waitForMessageSince(
+      alice,
+      aliceCheckpoint,
+      (message) => message.type === 'data-state' && message.profileState.profiles.every((profile) => profile.id !== bobProfile.id),
+    );
+    await waitForMessageSince(
+      bob,
+      bobCheckpoint,
+      (message) => message.type === 'data-state' && message.profileState.profiles.every((profile) => profile.id !== bobProfile.id),
+    );
+
+    if (aliceRoomState.type !== 'room-state' || bobClosed.type !== 'room-closed') {
+      throw new Error('Expected room-state and room-closed reconciliation messages.');
+    }
+    expect(aliceRoomState.room.players.map((player) => player.profileId)).toEqual([aliceProfile.id]);
+    expect(aliceRoomState.room.seats.find((seat) => seat.seatId === 'centre')?.profileId).toBeUndefined();
+    expect(messageIndexSince(alice, aliceCheckpoint, (message) => message.type === 'room-state' && message.room.roomId === created.room.roomId)).toBeLessThan(
+      messageIndexSince(
+        alice,
+        aliceCheckpoint,
+        (message) => message.type === 'data-state' && message.profileState.profiles.every((profile) => profile.id !== bobProfile.id),
+      ),
+    );
+    expect(messageIndexSince(bob, bobCheckpoint, (message) => message.type === 'room-closed' && message.roomId === created.room.roomId)).toBeLessThan(
+      messageIndexSince(
+        bob,
+        bobCheckpoint,
+        (message) => message.type === 'data-state' && message.profileState.profiles.every((profile) => profile.id !== bobProfile.id),
+      ),
+    );
+  });
+
+  it('reconciles active room bankrolls before data-state for admin-bankroll and reset-all', async () => {
+    const baseUrl = await startServer('.', undefined, { adminToken: 'server-admin-secret' });
+    const alice = await connect(baseUrl.ws);
+    const admin = await connect(baseUrl.ws);
+    const aliceProfile = await createServerProfile(alice, 'Bankroll Room Alice');
+    await authorizeAdmin(admin, 'server-admin-secret');
+
+    alice.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: aliceProfile.name,
+      bankroll: aliceProfile.bankroll,
+    });
+    const created = await alice.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected room-created message.');
+    }
+    alice.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    await waitForRoom(alice, (room) => room.roomId === created.room.roomId && room.players.some((player) => player.profileId === aliceProfile.id));
+
+    const bankrollCheckpoint = alice.checkpoint();
+    admin.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 125 });
+    const increasedRoom = await waitForMessageSince(
+      alice,
+      bankrollCheckpoint,
+      (message) =>
+        message.type === 'room-state' &&
+        message.room.roomId === created.room.roomId &&
+        message.room.players.some((player) => player.profileId === aliceProfile.id && player.bankroll === 1125),
+    );
+    await waitForMessageSince(
+      alice,
+      bankrollCheckpoint,
+      (message) =>
+        message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.bankroll === 1125),
+    );
+    if (increasedRoom.type !== 'room-state') {
+      throw new Error('Expected admin-bankroll room-state reconciliation.');
+    }
+    expect(beat(increasedRoom.room).bankroll).toBe(1125);
+    expect(
+      messageIndexSince(alice, bankrollCheckpoint, (message) => message.type === 'room-state' && message.room.roomId === created.room.roomId),
+    ).toBeLessThan(
+      messageIndexSince(
+        alice,
+        bankrollCheckpoint,
+        (message) =>
+          message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.bankroll === 1125),
+      ),
+    );
+
+    const resetCheckpoint = alice.checkpoint();
+    admin.send({ version: 1, type: 'admin-reset-all' });
+    const resetRoom = await waitForMessageSince(
+      alice,
+      resetCheckpoint,
+      (message) =>
+        message.type === 'room-state' &&
+        message.room.roomId === created.room.roomId &&
+        message.room.players.some((player) => player.profileId === aliceProfile.id && player.bankroll === 1000),
+    );
+    await waitForMessageSince(
+      alice,
+      resetCheckpoint,
+      (message) =>
+        message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.bankroll === 1000),
+    );
+    if (resetRoom.type !== 'room-state') {
+      throw new Error('Expected admin-reset-all room-state reconciliation.');
+    }
+    expect(beat(resetRoom.room).bankroll).toBe(1000);
+    expect(messageIndexSince(alice, resetCheckpoint, (message) => message.type === 'room-state' && message.room.roomId === created.room.roomId)).toBeLessThan(
+      messageIndexSince(
+        alice,
+        resetCheckpoint,
+        (message) =>
+          message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.bankroll === 1000),
+      ),
+    );
+  });
+
+  it('clears user rooms, resets the server-managed room, and broadcasts before data-state on clear-server-data', async () => {
+    const baseUrl = await startServer('.', undefined, { adminToken: 'server-admin-secret' });
+    const admin = await connect(baseUrl.ws);
+    const host = await connect(baseUrl.ws);
+    const mainPlayer = await connect(baseUrl.ws);
+    await authorizeAdmin(admin, 'server-admin-secret');
+    const hostProfile = await createServerProfile(host, 'Clear Host');
+    const mainProfile = await createServerProfile(mainPlayer, 'Clear Main Player');
+
+    host.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: hostProfile.id,
+      profileName: hostProfile.name,
+      bankroll: hostProfile.bankroll,
+    });
+    const created = await host.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected room-created message.');
+    }
+    host.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    await waitForRoom(host, (room) => room.roomId === created.room.roomId && room.players.some((player) => player.profileId === hostProfile.id));
+
+    mainPlayer.send({
+      version: 1,
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId: mainBeatRoomId,
+      role: 'player',
+      profileId: mainProfile.id,
+      profileName: mainProfile.name,
+      bankroll: mainProfile.bankroll,
+    });
+    await waitForRoom(mainPlayer, (room) => room.roomId === mainBeatRoomId && room.spectators.some((player) => player.profileId === mainProfile.id));
+    mainPlayer.send({ version: 1, type: 'assign-seat', seatId: 'centre' });
+    await waitForRoom(mainPlayer, (room) => room.roomId === mainBeatRoomId && room.players.some((player) => player.profileId === mainProfile.id));
+
+    const hostCheckpoint = host.checkpoint();
+    const mainCheckpoint = mainPlayer.checkpoint();
+    const adminCheckpoint = admin.checkpoint();
+    admin.send({ version: 1, type: 'clear-server-data' });
+
+    await waitForMessageSince(host, hostCheckpoint, (message) => message.type === 'profile-access' && !message.ownedProfileIds.includes(hostProfile.id));
+    await waitForMessageSince(mainPlayer, mainCheckpoint, (message) => message.type === 'profile-access' && !message.ownedProfileIds.includes(mainProfile.id));
+    await waitForMessageSince(
+      host,
+      hostCheckpoint,
+      (message) => message.type === 'room-closed' && message.roomId === created.room.roomId && message.reason === 'server-data-cleared',
+    );
+    await waitForMessageSince(
+      mainPlayer,
+      mainCheckpoint,
+      (message) =>
+        (message.type === 'room-closed' && message.roomId === mainBeatRoomId && message.reason === 'server-data-cleared') ||
+        (message.type === 'room-state' && message.room.roomId === mainBeatRoomId && message.room.players.length === 0 && message.room.spectators.length === 0),
+    );
+    await waitForMessageSince(host, hostCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0);
+    await waitForMessageSince(mainPlayer, mainCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0);
+    await waitForMessageSince(admin, adminCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0);
+
+    expect(messageIndexSince(host, hostCheckpoint, (message) => message.type === 'room-closed' && message.roomId === created.room.roomId)).toBeLessThan(
+      messageIndexSince(host, hostCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0),
+    );
+    expect(
+      messageIndexSince(
+        mainPlayer,
+        mainCheckpoint,
+        (message) =>
+          (message.type === 'room-closed' && message.roomId === mainBeatRoomId) || (message.type === 'room-state' && message.room.roomId === mainBeatRoomId),
+      ),
+    ).toBeLessThan(messageIndexSince(mainPlayer, mainCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0));
+
+    const listCheckpoint = admin.checkpoint();
+    admin.send({ version: 1, type: 'list-rooms', gameId: 'beat-the-house' });
+    const roomList = await waitForMessageSince(admin, listCheckpoint, (message) => message.type === 'room-list' && message.gameId === 'beat-the-house');
+    if (roomList.type !== 'room-list') {
+      throw new Error('Expected room-list after clear-server-data.');
+    }
+    expect(roomList.rooms.map((room) => room.roomId)).toEqual([mainBeatRoomId]);
+    expect(roomList.rooms[0]).toMatchObject({ currentPlayers: 0, spectators: 0, status: 'waiting' });
+  });
+
   it('keeps server profiles available after a SQLite-backed server restart', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-profile-relogin-'));
     tempDirs.push(dir);
@@ -433,6 +699,9 @@ describe('multiplayer WebSocket server', () => {
         };
       },
       disconnect: () => ({ broadcasts: [], settlements: [] }),
+      removeProfile: () => ({ broadcasts: [], settlements: [] }),
+      reconcileProfiles: () => ({ broadcasts: [], settlements: [] }),
+      clearRooms: () => ({ broadcasts: [], settlements: [] }),
       listRoomSummaries: () => [],
     };
     const baseUrl = await startServer('.', authority);
@@ -523,6 +792,43 @@ const waitForReceivedCount = async (probe: SocketProbe, predicate: (message: Ser
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error(`Timed out waiting for ${count} matching WebSocket messages.`);
+};
+
+const waitForMessageSince = async (probe: SocketProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): Promise<ServerMessage> => {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    const message = probe.messagesSince(checkpoint).find(predicate);
+    if (message) {
+      return message;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('Timed out waiting for matching WebSocket message.');
+};
+
+const messageIndexSince = (probe: SocketProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): number => {
+  const index = probe.messagesSince(checkpoint).findIndex(predicate);
+  if (index < 0) {
+    throw new Error('Expected message was not received.');
+  }
+  return index;
+};
+
+const createServerProfile = async (probe: SocketProbe, profileName: string): Promise<CasinoProfile> => {
+  probe.send({ version: 1, type: 'create-profile', profileName });
+  const profileData = await probe.waitFor(
+    (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === profileName),
+  );
+  const profile = profileData.type === 'data-state' ? profileData.profileState.profiles.find((candidate) => candidate.name === profileName) : undefined;
+  if (!profile) {
+    throw new Error(`Expected profile ${profileName}.`);
+  }
+  return profile;
+};
+
+const authorizeAdmin = async (probe: SocketProbe, adminToken: string): Promise<void> => {
+  probe.send({ version: 1, type: 'authorize-admin', adminToken });
+  await expect(probe.waitFor((message) => message.type === 'admin-access' && message.authorized)).resolves.toMatchObject({ authorized: true });
 };
 
 const unauthorizedProfileError = (message: ServerMessage): boolean =>

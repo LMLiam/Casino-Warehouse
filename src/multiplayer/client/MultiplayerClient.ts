@@ -280,6 +280,13 @@ export class MultiplayerClient {
       this.events.onStatus(`${message.room.gameTitle} room ${message.room.roomId} ready. Invite path: ${message.invitePath}`);
       return;
     }
+    if (message.type === 'room-closed') {
+      if (this.lastRoom?.roomId === message.roomId) {
+        this.clearRoom();
+        this.events.onStatus(`Room ${message.roomId} closed: ${message.reason}.`);
+      }
+      return;
+    }
     if (message.type === 'room-list') {
       this.events.onRoomList(message.gameId, message.rooms);
       return;

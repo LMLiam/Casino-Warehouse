@@ -12,6 +12,7 @@ import type { ServerMessage } from '../protocol/ServerMessage';
 import { createSessionState } from '../../state/session/createSessionState';
 import { createDefaultServerDataStore } from '../../state/serverDataStore/createDefaultServerDataStore';
 import { profileTokenAuth } from '../../state/serverDataStore/profileTokenAuth';
+import type { CasinoRoomAuthority } from './CasinoRoomAuthority';
 import type { CasinoServer } from './CasinoServer';
 import type { CasinoServerOptions } from './CasinoServerOptions';
 
@@ -94,6 +95,45 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
   };
 
+  const emitAuthorityResult = (peer: Peer, result: ReturnType<CasinoRoomAuthority['handle']>, options: { readonly forceDataState?: boolean } = {}): void => {
+    if (result.error) {
+      send(peer, { version: protocolVersion, type: 'error', code: 'rejected', message: result.error });
+    }
+    if (result.roomList) {
+      send(peer, { version: protocolVersion, type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
+    }
+    if (result.direct) {
+      send(peer, {
+        version: protocolVersion,
+        type: 'room-created',
+        room: result.direct,
+        invitePath: createInvitePath(result.direct.gameId, result.direct.roomId),
+      });
+    }
+    for (const closure of result.roomClosures ?? []) {
+      broadcast(
+        { version: protocolVersion, type: 'room-closed', roomId: closure.roomId, gameId: closure.gameId, reason: closure.reason },
+        closure.connectionIds,
+      );
+    }
+    for (const snapshot of result.broadcasts) {
+      broadcast({ version: protocolVersion, type: 'room-state', room: snapshot }, connectionIds(snapshot));
+    }
+    broadcastRoomLists(roomListGameIds(result));
+    if (result.settlements.length > 0) {
+      const room = result.broadcasts.at(-1);
+      if (room) {
+        broadcast(
+          { version: protocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements },
+          connectionIds(room),
+        );
+      }
+    }
+    if (options.forceDataState || result.broadcasts.length > 0 || result.settlements.length > 0 || (result.roomClosures?.length ?? 0) > 0) {
+      broadcastDataState();
+    }
+  };
+
   const handleDataMessage = (peer: Peer, message: ReturnType<typeof parseClientMessage>['message']): boolean => {
     if (!message) {
       return false;
@@ -128,7 +168,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
           dataStore.deleteProfile(message.profileId);
           peer.ownedProfileIds.delete(message.profileId);
           sendProfileAccess(peer);
-          broadcastDataState();
+          emitAuthorityResult(peer, authority.removeProfile(message.profileId, 'profile-deleted'), { forceDataState: true });
           return true;
         case 'save-session':
           requireKnownProfiles(profileIdsInSession(message.session));
@@ -139,12 +179,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         case 'admin-bankroll':
           requireAdmin(peer);
           applyAdminBankroll(message.profileId, message.action, message.amount ?? 0);
-          broadcastDataState();
+          emitAuthorityResult(peer, authority.reconcileProfiles('bankroll-updated'), { forceDataState: true });
           return true;
         case 'admin-reset-all':
           requireAdmin(peer);
           resetAllBankrolls();
-          broadcastDataState();
+          emitAuthorityResult(peer, authority.reconcileProfiles('bankroll-reset'), { forceDataState: true });
           return true;
         case 'clear-server-data':
           requireAdmin(peer);
@@ -153,7 +193,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
             candidate.ownedProfileIds.clear();
             sendProfileAccess(candidate);
           }
-          broadcastDataState();
+          emitAuthorityResult(peer, authority.clearRooms('server-data-cleared'), { forceDataState: true });
           return true;
         default:
           return false;
@@ -307,36 +347,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     if (serverOwnedMessage.type === 'list-rooms') {
       peer.browsingGameId = serverOwnedMessage.gameId;
     }
-    if (result.error) {
-      send(peer, { version: protocolVersion, type: 'error', code: 'rejected', message: result.error });
-    }
-    if (result.roomList) {
-      send(peer, { version: protocolVersion, type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
-    }
-    if (result.direct) {
-      send(peer, {
-        version: protocolVersion,
-        type: 'room-created',
-        room: result.direct,
-        invitePath: createInvitePath(result.direct.gameId, result.direct.roomId),
-      });
-    }
-    for (const snapshot of result.broadcasts) {
-      broadcast({ version: protocolVersion, type: 'room-state', room: snapshot }, connectionIds(snapshot));
-    }
-    broadcastRoomLists(roomListGameIds(result));
-    if (result.settlements.length > 0) {
-      const room = result.broadcasts.at(-1);
-      if (room) {
-        broadcast(
-          { version: protocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements },
-          connectionIds(room),
-        );
-      }
-    }
-    if (result.broadcasts.length > 0 || result.settlements.length > 0) {
-      broadcastDataState();
-    }
+    emitAuthorityResult(peer, result);
   };
 
   const heartbeat = setInterval(() => {
@@ -431,11 +442,13 @@ const connectionIds = (room: {
 const roomListGameIds = (result: {
   readonly direct?: { readonly gameId: RoomGameId };
   readonly broadcasts: readonly { readonly gameId: RoomGameId }[];
+  readonly roomClosures?: readonly { readonly gameId: RoomGameId }[];
   readonly roomList?: { readonly gameId: RoomGameId };
 }): readonly RoomGameId[] => [
   ...(result.roomList ? [result.roomList.gameId] : []),
   ...(result.direct ? [result.direct.gameId] : []),
   ...result.broadcasts.map((room) => room.gameId),
+  ...(result.roomClosures ?? []).map((closure) => closure.gameId),
 ];
 
 const createInvitePath = (gameId: string, roomId: string): string => {

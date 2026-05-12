@@ -6,5 +6,8 @@ import type { RoomSummary } from '../protocol/RoomSummary';
 export interface CasinoRoomAuthority {
   handle(connectionId: string, message: ClientMessage): AuthorityResult;
   disconnect(connectionId: string): AuthorityResult;
+  removeProfile(profileId: string, reason: string): AuthorityResult;
+  reconcileProfiles(reason: string): AuthorityResult;
+  clearRooms(reason: string): AuthorityResult;
   listRoomSummaries(gameId?: RoomGameId): readonly RoomSummary[];
 }

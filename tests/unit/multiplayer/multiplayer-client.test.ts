@@ -241,6 +241,32 @@ describe('multiplayer realtime client reconnect reloads', () => {
     );
   });
 
+  it('clears active room state when the server closes that room', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'http://casino.test/', host: 'casino.test', protocol: 'http:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+    client.connect('ws://casino.test/ws');
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+    const room = createRoomSnapshot();
+    socket.serverMessage({ version: 1, type: 'room-created', room, invitePath: '/?game=beat-the-house&room=ROOM42' });
+
+    socket.serverMessage({ version: 1, type: 'room-closed', roomId: room.roomId, gameId: room.gameId, reason: 'profile-deleted' });
+
+    expect(client.room).toBeUndefined();
+    expect(events.onRoomCleared).toHaveBeenCalledOnce();
+    expect(events.onStatus).toHaveBeenCalledWith('Room ROOM42 closed: profile-deleted.');
+  });
+
   it('stores profile credentials and gates owned-profile and admin commands', () => {
     vi.useFakeTimers();
     const localStorage = createMemoryStorage();

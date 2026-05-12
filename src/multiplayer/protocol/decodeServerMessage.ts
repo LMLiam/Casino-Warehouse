@@ -46,6 +46,8 @@ const isServerMessage = (value: unknown): value is ServerMessage => {
       return isFiniteNumber(value.sentAt);
     case 'room-created':
       return isRoomSnapshot(value.room) && typeof value.invitePath === 'string';
+    case 'room-closed':
+      return typeof value.roomId === 'string' && isRoomGameId(value.gameId) && typeof value.reason === 'string';
     case 'room-list':
       return isRoomGameId(value.gameId) && Array.isArray(value.rooms) && value.rooms.every(isRoomSummary);
     case 'room-state':

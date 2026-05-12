@@ -108,6 +108,18 @@ export class RoomAuthority extends RoomAuthorityBase {
     return room ? this.leaveRoom(room, connectionId) : { broadcasts: [], settlements: [] };
   }
 
+  public removeProfile(profileId: string, reason: string): AuthorityResult {
+    return this.reconcileRooms(reason, profileId);
+  }
+
+  public reconcileProfiles(reason: string): AuthorityResult {
+    return this.reconcileRooms(reason);
+  }
+
+  public clearRooms(reason: string): AuthorityResult {
+    return this.clearAllRooms(reason);
+  }
+
   private createRoom(connectionId: string, message: Extract<ClientMessage, { type: 'create-room' }>): AuthorityResult {
     this.disconnect(connectionId);
     const catalogGame = findGame(message.gameId);
