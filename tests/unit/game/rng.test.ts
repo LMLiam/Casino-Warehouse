@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { secureRandomInt, secureRandomUnit } from '../../../src/game/rng';
+import { secureRandomInt } from '../../../src/game/rng/secureRandomInt';
+import { secureRandomUnit } from '../../../src/game/rng/secureRandomUnit';
 
 describe('game RNG abstraction', () => {
   it('rejects invalid integer bounds', () => {

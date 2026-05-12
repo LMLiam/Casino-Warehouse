@@ -1,0 +1,18 @@
+export const BET_RENDERING = {
+  zoneIdleAlpha: 0.004,
+  zoneBettableAlpha: 0.04,
+  zoneIdleStrokeAlpha: 0.08,
+  zoneBettableStrokeAlpha: 0.65,
+  zoneInvalidAlpha: 0.02,
+  zoneInvalidStrokeAlpha: 0.04,
+  zoneStrokeWidth: 2,
+  activeZoneStrokeWidth: 5,
+  hoverAlpha: 1.5,
+  mainWagerOffsetX: -28,
+  mainPayoutOffsetX: 50,
+  mainChipRadius: 20,
+  sideWagerOffsetX: -38,
+  sidePayoutOffsetX: 58,
+  sideChipRadius: 15,
+  sideLabelOffsetY: 34,
+};

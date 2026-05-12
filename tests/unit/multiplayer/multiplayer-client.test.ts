@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BeatTheHouseGame } from '../../../src/game/engine';
-import { defaultRealtimeUrl, MultiplayerClient, type MultiplayerClientEvents } from '../../../src/multiplayer/client';
-import type { RoomSnapshot, ServerMessage } from '../../../src/multiplayer/protocol';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { defaultRealtimeUrl } from '../../../src/multiplayer/client/defaultRealtimeUrl';
+import { MultiplayerClient } from '../../../src/multiplayer/client/MultiplayerClient';
+import type { MultiplayerClientEvents } from '../../../src/multiplayer/client/MultiplayerClientEvents';
+import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 
 class FakeWebSocket {
   public static readonly OPEN = 1;

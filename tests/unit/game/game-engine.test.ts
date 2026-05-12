@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { rigDeck, type Card } from '../../../src/game/cards';
-import { BeatTheHouseGame } from '../../../src/game/engine';
+import type { Card } from '../../../src/game/cards/Card';
+import { rigDeck } from '../../../src/game/cards/rigDeck';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 

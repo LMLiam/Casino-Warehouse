@@ -1,5 +1,8 @@
-import { CasinoAudio, defaultAudioSettings, sanitizeAudioSettings, type CasinoAudioSettings } from '../../audio/casinoAudio';
-import type { AppElements } from '../dom/appElements';
+import { CasinoAudio } from '../../audio/casinoAudio/CasinoAudio';
+import type { CasinoAudioSettings } from '../../audio/casinoAudio/CasinoAudioSettings';
+import { defaultAudioSettings } from '../../audio/casinoAudio/defaultAudioSettings';
+import { sanitizeAudioSettings } from '../../audio/casinoAudio/sanitizeAudioSettings';
+import type { AppElements } from '../dom/appElements/AppElements';
 
 export class AudioControls {
   private settings: CasinoAudioSettings = defaultAudioSettings();

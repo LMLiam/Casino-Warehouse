@@ -1,5 +1,5 @@
-import type { GameCatalogEntry } from '../../game/catalog';
-import type { AppElements } from '../dom/appElements';
+import type { GameCatalogEntry } from '../../game/catalog/GameCatalogEntry';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { renderRuleList } from '../format/ruleListHtml';
 
 export class RulesMenuView {

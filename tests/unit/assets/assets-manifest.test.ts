@@ -2,9 +2,13 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { allCasinoAssets, casinoAssets, gameTileAsset, slotFrameAsset, slotSymbolAsset } from '../../../src/assets/manifest';
-import { gameCatalog } from '../../../src/game/catalog';
-import type { SlotSymbol } from '../../../src/game/slots';
+import { allCasinoAssets } from '../../../src/assets/manifest/allCasinoAssets';
+import { casinoAssets } from '../../../src/assets/manifest/casinoAssets';
+import { gameTileAsset } from '../../../src/assets/manifest/gameTileAsset';
+import { slotFrameAsset } from '../../../src/assets/manifest/slotFrameAsset';
+import { slotSymbolAsset } from '../../../src/assets/manifest/slotSymbolAsset';
+import { gameCatalog } from '../../../src/game/catalog/gameCatalog';
+import type { SlotSymbol } from '../../../src/game/slots/SlotSymbol';
 
 const workspaceRoot = process.cwd();
 const allowedStatuses = new Set(['generated-final', 'approved-user-provided', 'intentional-final-vector']);
@@ -189,7 +193,7 @@ describe('casino asset manifest', () => {
   });
 
   it('keeps stale placeholders, legacy paths, and duplicate asset routes out of code and docs', () => {
-    expect(readFileSync(join(workspaceRoot, 'src', 'assets', 'manifest.ts'), 'utf8')).not.toMatch(forbiddenAssetLanguage);
+    expect(readFileSync(join(workspaceRoot, 'src', 'assets', 'manifest', 'casinoAssets.ts'), 'utf8')).not.toMatch(forbiddenAssetLanguage);
     expect(readTextFiles(docsAndReadme)).not.toMatch(forbiddenAssetLanguage);
     expect(readTextFiles([...sourceFiles, ...docsAndReadme])).not.toMatch(forbiddenLegacyPath);
     expect(existsSync(join(workspaceRoot, 'scripts', 'generate-assets.mjs'))).toBe(false);

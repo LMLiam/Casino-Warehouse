@@ -1,35 +1,41 @@
 import { Container, Texture } from 'pixi.js';
-import { CasinoAudio } from '../../audio/casinoAudio';
-import { findGame, type CasinoGameId } from '../../game/catalog';
-import type { BetType, HandId } from '../../game/types';
-import type { ChipValue } from '../../ui/chips';
-import { PixiTable } from '../../ui/PixiTable';
+import { CasinoAudio } from '../../audio/casinoAudio/CasinoAudio';
+import { findGame } from '../../game/catalog/findGame';
+import type { CasinoGameId } from '../../game/ids';
+import type { BetType } from '../../game/types/BetType';
+import type { HandId } from '../../game/types/HandId';
+import type { ChipValue } from '../../ui/chips/ChipValue';
+import { PixiTable } from '../../ui/PixiTable/PixiTable';
 import { mountRadixChrome } from '../../ui/radixChrome';
 import { CardRenderer } from '../../ui/renderers/CardRenderer';
 import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
 import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
-import type { CasinoProfile, CasinoSaveState } from '../../state/profiles';
-import { type CasinoSessionRoomState } from '../../state/session';
-import { defaultRealtimeUrl, MultiplayerClient, type RealtimeConnectionState } from '../../multiplayer/client';
-import {
-  protocolVersion,
-  type RoomGameId,
-  type RoomRole,
-  type RoomSeatId,
-  type RoomSettlement,
-  type RoomSnapshot,
-  type RoomSummary,
-} from '../../multiplayer/protocol';
-import { normalizeRoomMaxPlayers } from '../../multiplayer/roomLimits';
+import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
+import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
+import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
+import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
+import { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
+import type { RealtimeConnectionState } from '../../multiplayer/client/RealtimeConnectionState';
+import { protocolVersion } from '../../multiplayer/protocol/protocolVersion';
+import type { RoomGameId } from '../../multiplayer/protocol/RoomGameId';
+import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
+import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
+import type { RoomSettlement } from '../../multiplayer/protocol/RoomSettlement';
+import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import type { RoomSummary } from '../../multiplayer/protocol/RoomSummary';
+import { normalizeRoomMaxPlayers } from '../../multiplayer/roomLimits/normalizeRoomMaxPlayers';
 import { AppEventBinder, type BeatAction } from './AppEventBinder';
-import { collectElements, type AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
+import { collectElements } from '../dom/appElements/collectElements';
 import { renderTemplate } from '../dom/appTemplate';
-import { readCreditInput, readPositiveCreditInput } from '../input/appInputs';
+import { readCreditInput } from '../input/appInputs/readCreditInput';
+import { readPositiveCreditInput } from '../input/appInputs/readPositiveCreditInput';
 import { hitTestBetZone } from '../input/betZoneHitTest';
 import { defaultRoomMaxPlayers } from '../rooms/roomDefaults';
-import { isBeatSnapshot } from '../state/appSnapshots';
-import { createPlayerFromProfile, type CasinoPlayer } from '../state/casinoPlayer';
+import { isBeatSnapshot } from '../state/appSnapshots/isBeatSnapshot';
+import type { CasinoPlayer } from '../state/casinoPlayer/CasinoPlayer';
+import { createPlayerFromProfile } from '../state/casinoPlayer/createPlayerFromProfile';
 import { AudioControls } from '../views/AudioControls';
 import { BeatControlsView } from '../views/BeatControlsView';
 import { BeatSeatStatusView } from '../views/BeatSeatStatusView';

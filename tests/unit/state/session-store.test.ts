@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { BlackjackGame } from '../../../src/game/blackjack';
-import { slotThemes } from '../../../src/game/catalog';
-import { rigDeck, type Card } from '../../../src/game/cards';
-import { BeatTheHouseGame } from '../../../src/game/engine';
-import { SlotsGame } from '../../../src/game/slots';
-import { createPlayerFromProfile } from '../../../src/app/state/casinoPlayer';
-import { createSessionState, loadSessionState, parseSessionState, saveSessionState } from '../../../src/state/session';
-import { createProfile, type StorageLike } from '../../../src/state/profiles';
+import { BlackjackGame } from '../../../src/game/blackjack/BlackjackGame';
+import { slotThemes } from '../../../src/game/catalog/slotThemes';
+import type { Card } from '../../../src/game/cards/Card';
+import { rigDeck } from '../../../src/game/cards/rigDeck';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { SlotsGame } from '../../../src/game/slots/SlotsGame';
+import { createPlayerFromProfile } from '../../../src/app/state/casinoPlayer/createPlayerFromProfile';
+import { createSessionState } from '../../../src/state/session/createSessionState';
+import { loadSessionState } from '../../../src/state/session/loadSessionState';
+import { parseSessionState } from '../../../src/state/session/parseSessionState';
+import { saveSessionState } from '../../../src/state/session/saveSessionState';
+import { createProfile } from '../../../src/state/profiles/createProfile';
+import type { StorageLike } from '../../../src/state/profiles/StorageLike';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 

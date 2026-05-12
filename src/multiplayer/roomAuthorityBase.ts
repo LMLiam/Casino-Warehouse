@@ -1,22 +1,30 @@
-import type { BlackjackSnapshot } from '../game/blackjack';
-import type { BlackjackTableActionResult, BlackjackTableOccupant, BlackjackTableSnapshot } from '../game/blackjackTable';
-import { findSlotTheme } from '../game/catalog';
-import { BeatTheHouseGame } from '../game/engine';
-import { SlotsGame, type SlotSnapshot } from '../game/slots';
-import { handIds, type GameSnapshot } from '../game/types';
-import { createMemoryServerDataStore, type ServerDataStore } from '../state/serverDataStore';
-import type { RoomPlayer, RoomSeat, RoomSeatId, RoomSettlement, RoomSnapshot, RoomSummary } from './protocol';
-import {
-  createId,
-  createServerManagedBeatRoom,
-  mainBeatRoomId,
-  roomPhase,
-  roomStatus,
-  safeBankroll,
-  totalBeatStake,
-  type AuthorityResult,
-  type RoomState,
-} from './roomAuthorityModel';
+import type { BlackjackSnapshot } from '../game/blackjack/BlackjackSnapshot';
+import type { BlackjackTableActionResult } from '../game/blackjackTable/BlackjackTableActionResult';
+import type { BlackjackTableOccupant } from '../game/blackjackTable/BlackjackTableOccupant';
+import type { BlackjackTableSnapshot } from '../game/blackjackTable/BlackjackTableSnapshot';
+import { findSlotTheme } from '../game/catalog/findSlotTheme';
+import { BeatTheHouseGame } from '../game/engine/BeatTheHouseGame';
+import { SlotsGame } from '../game/slots/SlotsGame';
+import type { SlotSnapshot } from '../game/slots/SlotSnapshot';
+import type { GameSnapshot } from '../game/types/GameSnapshot';
+import { handIds } from '../game/types/handIds';
+import { createMemoryServerDataStore } from '../state/serverDataStore/createMemoryServerDataStore';
+import type { ServerDataStore } from '../state/serverDataStore/ServerDataStore';
+import type { RoomPlayer } from './protocol/RoomPlayer';
+import type { RoomSeat } from './protocol/RoomSeat';
+import type { RoomSeatId } from './protocol/RoomSeatId';
+import type { RoomSettlement } from './protocol/RoomSettlement';
+import type { RoomSnapshot } from './protocol/RoomSnapshot';
+import type { RoomSummary } from './protocol/RoomSummary';
+import type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
+import { createId } from './roomAuthorityModel/createId';
+import { createServerManagedBeatRoom } from './roomAuthorityModel/createServerManagedBeatRoom';
+import { mainBeatRoomId } from './roomAuthorityModel/mainBeatRoomId';
+import { roomPhase } from './roomAuthorityModel/roomPhase';
+import type { RoomState } from './roomAuthorityModel/RoomState';
+import { roomStatus } from './roomAuthorityModel/roomStatus';
+import { safeBankroll } from './roomAuthorityModel/safeBankroll';
+import { totalBeatStake } from './roomAuthorityModel/totalBeatStake';
 
 export abstract class RoomAuthorityBase {
   protected readonly rooms = new Map<string, RoomState>();

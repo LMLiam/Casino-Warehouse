@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { BlackjackGame, bestTotal } from '../../../src/game/blackjack';
-import { BlackjackTable, isBlackjackTableSnapshot, isCard } from '../../../src/game/blackjackTable';
-import { slotThemes } from '../../../src/game/catalog';
-import { cardLabel, rigDeck, type Card } from '../../../src/game/cards';
-import { BeatTheHouseGame } from '../../../src/game/engine';
-import { SlotsGame } from '../../../src/game/slots';
+import { bestTotal } from '../../../src/game/blackjack/bestTotal';
+import { BlackjackGame } from '../../../src/game/blackjack/BlackjackGame';
+import { BlackjackTable } from '../../../src/game/blackjackTable/BlackjackTable';
+import { isBlackjackTableSnapshot } from '../../../src/game/blackjackTable/isBlackjackTableSnapshot';
+import { isCard } from '../../../src/game/blackjackTable/isCard';
+import { slotThemes } from '../../../src/game/catalog/slotThemes';
+import type { Card } from '../../../src/game/cards/Card';
+import { cardLabel } from '../../../src/game/cards/cardLabel';
+import { rigDeck } from '../../../src/game/cards/rigDeck';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { SlotsGame } from '../../../src/game/slots/SlotsGame';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 

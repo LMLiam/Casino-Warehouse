@@ -1,5 +1,5 @@
-import type { CasinoGameId } from '../../game/catalog';
-import type { AppElements } from '../dom/appElements';
+import type { CasinoGameId } from '../../game/ids';
+import type { AppElements } from '../dom/appElements/AppElements';
 
 type BeatAction = 'clear-bets' | 'rebet' | 'start-round' | 'next-round' | { readonly type: 'player-action'; readonly action: 'hit' | 'stick' };
 

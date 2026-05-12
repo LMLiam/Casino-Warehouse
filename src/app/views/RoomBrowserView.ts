@@ -1,9 +1,11 @@
-import { findGame, type CasinoGameId } from '../../game/catalog';
-import type { RoomRole, RoomSummary } from '../../multiplayer/protocol';
+import { findGame } from '../../game/catalog/findGame';
+import type { CasinoGameId } from '../../game/ids';
+import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
+import type { RoomSummary } from '../../multiplayer/protocol/RoomSummary';
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { defaultRoomMaxPlayers } from '../rooms/roomDefaults';
-import { minRoomPlayers } from '../../multiplayer/roomLimits';
+import { minRoomPlayers } from '../../multiplayer/roomLimits/minRoomPlayers';
 
 export class RoomBrowserView {
   public constructor(private readonly elements: AppElements) {}

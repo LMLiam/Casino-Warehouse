@@ -1,7 +1,10 @@
 import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from 'gsap';
-import { toChipBreakdown, type ChipValue } from '../chips';
-import { CHIP_RENDERING, COLORS, TAG_RENDERING } from './renderingConstants';
+import type { ChipValue } from '../chips/ChipValue';
+import { toChipBreakdown } from '../chips/toChipBreakdown';
+import { CHIP_RENDERING } from './renderingConstants/CHIP_RENDERING';
+import { COLORS } from './renderingConstants/COLORS';
+import { TAG_RENDERING } from './renderingConstants/TAG_RENDERING';
 
 interface ChipStackAnimation {
   readonly key: string;

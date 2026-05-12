@@ -1,9 +1,11 @@
-import { slotFrameAsset, slotSymbolAsset } from '../../assets/manifest';
-import type { CasinoGameId } from '../../game/catalog';
-import { symbolLabel, type SlotSnapshot } from '../../game/slots';
-import type { RoomSnapshot } from '../../multiplayer/protocol';
+import { slotFrameAsset } from '../../assets/manifest/slotFrameAsset';
+import { slotSymbolAsset } from '../../assets/manifest/slotSymbolAsset';
+import type { CasinoGameId } from '../../game/ids';
+import type { SlotSnapshot } from '../../game/slots/SlotSnapshot';
+import { symbolLabel } from '../../game/slots/symbolLabel';
+import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 
 export class SlotsView {

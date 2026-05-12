@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CasinoAudio, defaultAudioSettings, sanitizeAudioSettings } from '../../../src/audio/casinoAudio';
+import { CasinoAudio } from '../../../src/audio/casinoAudio/CasinoAudio';
+import { defaultAudioSettings } from '../../../src/audio/casinoAudio/defaultAudioSettings';
+import { sanitizeAudioSettings } from '../../../src/audio/casinoAudio/sanitizeAudioSettings';
 
 describe('casino audio settings', () => {
   it('clamps saved volumes into a valid range', () => {

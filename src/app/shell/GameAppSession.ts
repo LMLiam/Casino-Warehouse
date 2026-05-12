@@ -1,18 +1,20 @@
-import { findGame, findSlotTheme } from '../../game/catalog';
-import { defaultRealtimeUrl, type ServerDataState } from '../../multiplayer/client';
-import type { RoomSnapshot } from '../../multiplayer/protocol';
-import type { CasinoProfile } from '../../state/profiles';
-import {
-  createSessionState,
-  loadSessionState,
-  saveSessionState,
-  sessionStorageKey,
-  type CasinoSessionRoomState,
-  type CasinoSessionState,
-} from '../../state/session';
-import { SlotsGame } from '../../game/slots';
-import { type CasinoPlayer, createPlayerFromProfile } from '../state/casinoPlayer';
-import { inviteServerUrl, parseGameId } from '../input/appInputs';
+import { findGame } from '../../game/catalog/findGame';
+import { findSlotTheme } from '../../game/catalog/findSlotTheme';
+import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
+import type { ServerDataState } from '../../multiplayer/client/ServerDataState';
+import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
+import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
+import type { CasinoSessionState } from '../../state/session/CasinoSessionState';
+import { createSessionState } from '../../state/session/createSessionState';
+import { loadSessionState } from '../../state/session/loadSessionState';
+import { saveSessionState } from '../../state/session/saveSessionState';
+import { sessionStorageKey } from '../../state/session/sessionStorageKey';
+import { SlotsGame } from '../../game/slots/SlotsGame';
+import type { CasinoPlayer } from '../state/casinoPlayer/CasinoPlayer';
+import { createPlayerFromProfile } from '../state/casinoPlayer/createPlayerFromProfile';
+import { inviteServerUrl } from '../input/appInputs/inviteServerUrl';
+import { parseGameId } from '../input/appInputs/parseGameId';
 import { GameAppRendering } from './GameAppRendering';
 
 export abstract class GameAppSession extends GameAppRendering {

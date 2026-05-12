@@ -1,8 +1,9 @@
 import { Container, Graphics } from 'pixi.js';
 import { gsap } from 'gsap';
-import type { GameEvent } from '../../game/types';
-import { tableSize } from '../layout';
-import { COLORS, SIDE_WIN_EFFECT } from './renderingConstants';
+import type { GameEvent } from '../../game/types/GameEvent';
+import { tableSize } from '../layout/tableSize';
+import { COLORS } from './renderingConstants/COLORS';
+import { SIDE_WIN_EFFECT } from './renderingConstants/SIDE_WIN_EFFECT';
 
 export class EffectRenderer {
   public constructor(private readonly layer: Container) {}

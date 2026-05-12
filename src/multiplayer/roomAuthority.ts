@@ -1,24 +1,33 @@
-import { findGame } from '../game/catalog';
-import { betTypes, handIds, type BetType, type HandId } from '../game/types';
-import { canRoomFlowTransition, canSharedSlotsTransition, deriveSharedSlotsPhase } from '../state/roomMachines';
-import type { ClientMessage, RoomGameId, RoomPlayer, RoomRole, RoomSeatId, RoomSnapshot, RoomSummary } from './protocol';
-import { normalizeRoomMaxPlayers } from './roomLimits';
+import { findGame } from '../game/catalog/findGame';
+import type { BetType } from '../game/types/BetType';
+import { betTypes } from '../game/types/betTypes';
+import type { HandId } from '../game/types/HandId';
+import { handIds } from '../game/types/handIds';
+import { canRoomFlowTransition } from '../state/roomMachines/canRoomFlowTransition';
+import { canSharedSlotsTransition } from '../state/roomMachines/canSharedSlotsTransition';
+import { deriveSharedSlotsPhase } from '../state/roomMachines/deriveSharedSlotsPhase';
+import type { ClientMessage } from './protocol/ClientMessage';
+import type { RoomGameId } from './protocol/RoomGameId';
+import type { RoomPlayer } from './protocol/RoomPlayer';
+import type { RoomRole } from './protocol/RoomRole';
+import type { RoomSeatId } from './protocol/RoomSeatId';
+import type { RoomSnapshot } from './protocol/RoomSnapshot';
+import type { RoomSummary } from './protocol/RoomSummary';
+import { normalizeRoomMaxPlayers } from './roomLimits/normalizeRoomMaxPlayers';
 import { RoomAuthorityBase } from './roomAuthorityBase';
-import {
-  cleanName,
-  compareRoomListOrder,
-  createGameModel,
-  createId,
-  createRoomId,
-  roomPhase,
-  roomStatus,
-  totalBeatStake,
-  type AuthorityResult,
-  type RoomState,
-} from './roomAuthorityModel';
+import type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
+import { cleanName } from './roomAuthorityModel/cleanName';
+import { compareRoomListOrder } from './roomAuthorityModel/compareRoomListOrder';
+import { createGameModel } from './roomAuthorityModel/createGameModel';
+import { createId } from './roomAuthorityModel/createId';
+import { createRoomId } from './roomAuthorityModel/createRoomId';
+import { roomPhase } from './roomAuthorityModel/roomPhase';
+import type { RoomState } from './roomAuthorityModel/RoomState';
+import { roomStatus } from './roomAuthorityModel/roomStatus';
+import { totalBeatStake } from './roomAuthorityModel/totalBeatStake';
 
-export { mainBeatRoomId } from './roomAuthorityModel';
-export type { AuthorityResult } from './roomAuthorityModel';
+export { mainBeatRoomId } from './roomAuthorityModel/mainBeatRoomId';
+export type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
 
 export class RoomAuthority extends RoomAuthorityBase {
   public handle(connectionId: string, message: ClientMessage): AuthorityResult {

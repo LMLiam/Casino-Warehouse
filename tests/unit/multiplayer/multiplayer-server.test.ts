@@ -4,10 +4,14 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { BeatTheHouseGame } from '../../../src/game/engine';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer, type CasinoServerOptions } from '../../../src/multiplayer/serverEntry';
-import { decodeServerMessage, encodeMessage, type ClientMessage, type RoomSnapshot, type ServerMessage } from '../../../src/multiplayer/protocol';
-import { SqliteServerDataStore } from '../../../src/state/serverDataStore';
+import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
+import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
+import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
+import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
+import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
 
 class SocketProbe {
   private readonly messages: ServerMessage[] = [];

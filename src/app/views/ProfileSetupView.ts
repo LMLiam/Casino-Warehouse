@@ -1,6 +1,7 @@
-import type { CasinoProfile, CasinoSaveState } from '../../state/profiles';
+import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
+import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
 import { escapeHtml } from '../../shared/html';
-import type { AppElements } from '../dom/appElements';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 
 export class ProfileSetupView {

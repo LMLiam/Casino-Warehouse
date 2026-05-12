@@ -1,8 +1,10 @@
-import type { BetType, GameSnapshot } from '../../game/types';
-import type { RoomSnapshot } from '../../multiplayer/protocol';
-import type { AppElements } from '../dom/appElements';
+import type { BetType } from '../../game/types/BetType';
+import type { GameSnapshot } from '../../game/types/GameSnapshot';
+import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
-import { isBeatSnapshot, totalOnTable } from '../state/appSnapshots';
+import { isBeatSnapshot } from '../state/appSnapshots/isBeatSnapshot';
+import { totalOnTable } from '../state/appSnapshots/totalOnTable';
 
 export class BeatControlsView {
   private pendingMainBet = false;

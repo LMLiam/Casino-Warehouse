@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { findGame, findSlotTheme, gameCatalog, slotThemes } from '../../../src/game/catalog';
+import { findGame } from '../../../src/game/catalog/findGame';
+import { findSlotTheme } from '../../../src/game/catalog/findSlotTheme';
+import { gameCatalog } from '../../../src/game/catalog/gameCatalog';
+import { slotThemes } from '../../../src/game/catalog/slotThemes';
 
 describe('game catalog', () => {
   it('provides rules and paytable copy for every lobby game', () => {

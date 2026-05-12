@@ -1,6 +1,9 @@
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import type { HandResult, SideBetState } from '../../game/types';
-import { COLORS, MARKER_RENDERING, TAG_RENDERING } from './renderingConstants';
+import type { HandResult } from '../../game/types/HandResult';
+import type { SideBetState } from '../../game/types/SideBetState';
+import { COLORS } from './renderingConstants/COLORS';
+import { MARKER_RENDERING } from './renderingConstants/MARKER_RENDERING';
+import { TAG_RENDERING } from './renderingConstants/TAG_RENDERING';
 
 export class TagRenderer {
   public constructor(private readonly layer: Container) {}

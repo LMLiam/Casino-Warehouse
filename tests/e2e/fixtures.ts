@@ -1,7 +1,7 @@
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import type { AddressInfo } from 'node:net';
 import { createCasinoServer, type CasinoServer } from '../../src/multiplayer/serverEntry';
-import { createMemoryServerDataStore } from '../../src/state/serverDataStore';
+import { createMemoryServerDataStore } from '../../src/state/serverDataStore/createMemoryServerDataStore';
 
 type WorkerFixtures = {
   readonly realtimeUrl: string;
