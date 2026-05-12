@@ -36,13 +36,13 @@ export abstract class GameAppSession extends GameAppRendering {
     this.players = this.players
       .map((player) => {
         const profile = this.profileState.profiles.find((candidate) => candidate.id === player.profileId);
-        if (profile) {
+        if (profile && this.ownedProfileIds.has(profile.id)) {
           player.beatTheHouse.syncBankroll(profile.bankroll);
         }
-        return profile ? player : undefined;
+        return profile && this.ownedProfileIds.has(profile.id) ? player : undefined;
       })
       .filter((player): player is CasinoPlayer => Boolean(player));
-    if (this.players.length === 0) {
+    if (this.players.length === 0 && this.profileAccessReceived) {
       const clientSession = this.loadClientSession();
       if (clientSession?.profileIds.length) {
         this.restoreSavedSession(clientSession);
@@ -91,10 +91,10 @@ export abstract class GameAppSession extends GameAppRendering {
   }
 
   protected restoreSavedSession(session: CasinoSessionState): void {
-    const restoredPlayers = session.profileIds
-      .map((profileId) => this.profileState.profiles.find((profile) => profile.id === profileId))
-      .filter((profile): profile is CasinoProfile => Boolean(profile))
-      .map((profile) => createPlayerFromProfile(profile, session.gameSnapshots[profile.id]));
+    const restoredPlayers = session.profileIds.flatMap((profileId) => {
+      const profile = this.profileState.profiles.find((candidate) => candidate.id === profileId);
+      return profile && this.ownedProfileIds.has(profile.id) ? [createPlayerFromProfile(profile, session.gameSnapshots[profile.id])] : [];
+    });
     if (restoredPlayers.length === 0) {
       this.clearClientSession();
       return;

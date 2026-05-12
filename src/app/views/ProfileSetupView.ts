@@ -20,6 +20,7 @@ export class ProfileSetupView {
   public render(
     profileState: CasinoSaveState,
     lastSaveError: string,
+    ownedProfileIds: ReadonlySet<string>,
     onRename: (profileId: string, nextName: string) => void,
     onDelete: (profileId: string) => void,
   ): void {
@@ -28,7 +29,7 @@ export class ProfileSetupView {
     this.elements.profileList.innerHTML =
       profileState.profiles.length === 0
         ? '<p class="empty-state">Create a profile to save bankroll, stats, and history.</p>'
-        : profileState.profiles.map((profile) => this.renderRow(profile)).join('');
+        : profileState.profiles.map((profile) => this.renderRow(profile, ownedProfileIds.has(profile.id))).join('');
 
     this.elements.profileList.querySelectorAll<HTMLInputElement>('[data-profile-select]').forEach((checkbox) => {
       checkbox.addEventListener('change', () => {
@@ -49,7 +50,7 @@ export class ProfileSetupView {
         if (button.dataset.profileAction === 'rename') {
           this.pendingRenameProfileId = profileId;
           this.pendingDeleteProfileId = '';
-          this.render(profileState, lastSaveError, onRename, onDelete);
+          this.render(profileState, lastSaveError, ownedProfileIds, onRename, onDelete);
         }
         if (button.dataset.profileAction === 'save-rename') {
           const input = this.elements.profileList.querySelector<HTMLInputElement>(`[data-profile-rename-input="${CSS.escape(profileId)}"]`);
@@ -62,7 +63,7 @@ export class ProfileSetupView {
         if (button.dataset.profileAction === 'delete') {
           this.pendingDeleteProfileId = profileId;
           this.pendingRenameProfileId = '';
-          this.render(profileState, lastSaveError, onRename, onDelete);
+          this.render(profileState, lastSaveError, ownedProfileIds, onRename, onDelete);
         }
         if (button.dataset.profileAction === 'confirm-delete') {
           this.pendingDeleteProfileId = '';
@@ -71,7 +72,7 @@ export class ProfileSetupView {
         if (button.dataset.profileAction === 'cancel') {
           this.pendingDeleteProfileId = '';
           this.pendingRenameProfileId = '';
-          this.render(profileState, lastSaveError, onRename, onDelete);
+          this.render(profileState, lastSaveError, ownedProfileIds, onRename, onDelete);
         }
       });
     });
@@ -80,7 +81,7 @@ export class ProfileSetupView {
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
           this.pendingRenameProfileId = '';
-          this.render(profileState, lastSaveError, onRename, onDelete);
+          this.render(profileState, lastSaveError, ownedProfileIds, onRename, onDelete);
         }
         if (event.key === 'Enter') {
           const nextName = input.value.trim();
@@ -93,13 +94,15 @@ export class ProfileSetupView {
     });
     this.elements.profileList.querySelector<HTMLInputElement>('[data-profile-rename-input]')?.focus();
     this.elements.saveStatus.textContent = lastSaveError;
-    this.elements.startSessionButton.disabled = profileState.profiles.length === 0;
+    this.elements.startSessionButton.disabled = profileState.profiles.every((profile) => !ownedProfileIds.has(profile.id));
   }
 
-  private renderRow(profile: CasinoProfile): string {
+  private renderRow(profile: CasinoProfile, owned: boolean): string {
     const isRenaming = this.pendingRenameProfileId === profile.id;
     const isDeleting = this.pendingDeleteProfileId === profile.id;
     const selected = this.selectedProfileIds.has(profile.id) ? 'checked' : '';
+    const disabled = owned ? '' : 'disabled';
+    const ownershipNote = owned ? '' : '<em>Profile is on this server, but this browser does not own it.</em>';
     const actionPrompt = isRenaming
       ? `
         <div class="profile-action-prompt rename" role="group" aria-label="Rename ${escapeHtml(profile.name)}">
@@ -120,15 +123,16 @@ export class ProfileSetupView {
     return `
       <article class="profile-row">
         <label>
-          <input type="checkbox" data-profile-select value="${escapeHtml(profile.id)}" ${selected} />
+          <input type="checkbox" data-profile-select value="${escapeHtml(profile.id)}" ${selected} ${disabled} />
           <span>
             <b>${escapeHtml(profile.name)}</b>
             <small>${money(profile.bankroll)} • ${profile.stats.gamesPlayed} games • biggest ${money(profile.stats.biggestWin)}</small>
+            ${ownershipNote}
           </span>
         </label>
         <div>
-          <button type="button" data-profile-action="rename" data-profile-id="${escapeHtml(profile.id)}">Rename</button>
-          <button type="button" data-profile-action="delete" data-profile-id="${escapeHtml(profile.id)}">Delete</button>
+          <button type="button" data-profile-action="rename" data-profile-id="${escapeHtml(profile.id)}" ${disabled}>Rename</button>
+          <button type="button" data-profile-action="delete" data-profile-id="${escapeHtml(profile.id)}" ${disabled}>Delete</button>
         </div>
         ${actionPrompt}
       </article>

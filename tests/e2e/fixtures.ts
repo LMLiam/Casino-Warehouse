@@ -14,7 +14,7 @@ type TestFixtures = {
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   realtimeUrl: [
     async ({ browserName: _browserName }, use) => {
-      const server = createCasinoServer({ dataStore: createMemoryServerDataStore(), heartbeatTimeoutMs: 300_000 });
+      const server = createCasinoServer({ adminToken: e2eAdminToken, dataStore: createMemoryServerDataStore(), heartbeatTimeoutMs: 300_000 });
       await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
       const address = server.address() as AddressInfo;
       try {
@@ -27,11 +27,15 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
   installRealtimeUrl: [
     async ({ context, realtimeUrl }, use) => {
-      await context.addInitScript((url) => {
-        if (!localStorage.getItem('casino_realtime_url')) {
-          localStorage.setItem('casino_realtime_url', url);
-        }
-      }, realtimeUrl);
+      await context.addInitScript(
+        ({ key, token, url }) => {
+          if (!localStorage.getItem('casino_realtime_url')) {
+            localStorage.setItem('casino_realtime_url', url);
+          }
+          localStorage.setItem(key, token);
+        },
+        { key: adminTokenStorageKey, token: e2eAdminToken, url: realtimeUrl },
+      );
       await use();
     },
     { auto: true },
@@ -41,11 +45,18 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 export { expect };
 export type { Locator, Page };
 
+export const e2eAdminToken = 'casino-e2e-admin-token';
+const adminTokenStorageKey = 'casino_warehouse_admin_token_v1';
+
 export const resetBrowserStorage = async (page: Page, realtimeUrl: string): Promise<void> => {
-  await page.evaluate((url) => {
-    localStorage.clear();
-    localStorage.setItem('casino_realtime_url', url);
-  }, realtimeUrl);
+  await page.evaluate(
+    ({ key, token, url }) => {
+      localStorage.clear();
+      localStorage.setItem('casino_realtime_url', url);
+      localStorage.setItem(key, token);
+    },
+    { key: adminTokenStorageKey, token: e2eAdminToken, url: realtimeUrl },
+  );
 };
 
 export const currentRealtimeUrl = async (page: Page): Promise<string> =>

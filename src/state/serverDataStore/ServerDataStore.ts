@@ -13,6 +13,10 @@ export interface ServerDataStore {
   saveSession(session: CasinoSessionState): ServerDataSnapshot;
   clear(): ServerDataSnapshot;
   ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile;
+  profileTokenHash(profileId: string): string | undefined;
+  setProfileTokenHash(profileId: string, tokenHash: string): void;
+  deleteProfileTokenHash(profileId: string): void;
+  clearProfileTokenHashes(): void;
   setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined;
   recordTransaction(
     profileId: string,

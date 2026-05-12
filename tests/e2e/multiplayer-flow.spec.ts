@@ -4,6 +4,7 @@ import { createCasinoServer, type CasinoServer } from '../../src/multiplayer/ser
 import { createMemoryServerDataStore } from '../../src/state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../../src/state/serverDataStore/ServerDataStore';
 import { createSessionState } from '../../src/state/session/createSessionState';
+import { profileTokenAuth } from '../../src/state/serverDataStore/profileTokenAuth';
 
 let realtimeServer: CasinoServer | undefined;
 
@@ -17,10 +18,10 @@ test.afterEach(async () => {
 
 test('multiplayer room lobby supports create, join, seat choice, spectate, leave, reconnect, and Blackjack table play', async ({ browser, baseURL }) => {
   test.setTimeout(120_000);
-  const wsUrl = await startRealtimeServer(['Alice', 'Bob', 'Sue']);
+  const { profileAuthByName, wsUrl } = await startRealtimeServer(['Alice', 'Bob', 'Sue']);
   const contexts: BrowserContext[] = [];
   const openPlayer = async (name: string): Promise<Page> => {
-    const context = await newPlayerContext(browser, wsUrl);
+    const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get(name));
     contexts.push(context);
     return newPlayerPage(context, baseURL, name);
   };
@@ -91,11 +92,11 @@ test('multiplayer room lobby supports create, join, seat choice, spectate, leave
 
 test('reconnected Beat the House clients return home when a restarted server has no active room', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
-  const dataStore = seedDataStore(['Restart Alice', 'Restart Bob']);
+  const { dataStore, profileAuthByName } = seedDataStore(['Restart Alice', 'Restart Bob']);
   const wsUrl = await startRealtimeServerWithStore(dataStore);
   const restartPort = Number(new URL(wsUrl).port);
-  const aliceContext = await newPlayerContext(browser, wsUrl);
-  const bobContext = await newPlayerContext(browser, wsUrl);
+  const aliceContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Restart Alice'));
+  const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Restart Bob'));
   try {
     const alice = await newPlayerPage(aliceContext, baseURL, 'Restart Alice');
     const bob = await newPlayerPage(bobContext, baseURL, 'Restart Bob');
@@ -134,14 +135,14 @@ test('reconnected Beat the House clients return home when a restarted server has
 
 test('new browsers do not inherit another saved profile session and can switch profiles', async ({ browser, baseURL }) => {
   test.setTimeout(60_000);
-  const dataStore = seedDataStore(['Server Alice', 'Server Bob']);
+  const { dataStore, profileAuthByName } = seedDataStore(['Server Alice', 'Server Bob']);
   const aliceProfile = dataStore.snapshot().profileState.profiles.find((profile) => profile.name === 'Server Alice');
   if (!aliceProfile) {
     throw new Error('Expected seeded Alice profile.');
   }
   dataStore.saveSession(createSessionState([aliceProfile.id], { activeGame: 'blackjack', showingGameLobby: false }));
   const wsUrl = await startRealtimeServerWithStore(dataStore);
-  const bobContext = await newPlayerContext(browser, wsUrl);
+  const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Server Bob'));
   try {
     const bob = await bobContext.newPage();
     await bob.goto(baseURL ?? '/', { waitUntil: 'domcontentloaded' });
@@ -174,9 +175,9 @@ test('new browsers do not inherit another saved profile session and can switch p
 
 test('reloaded Beat the House clients verify the saved room against the server and restore active state', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
-  const wsUrl = await startRealtimeServer(['Restore Alice', 'Restore Bob']);
-  const aliceContext = await newPlayerContext(browser, wsUrl);
-  const bobContext = await newPlayerContext(browser, wsUrl);
+  const { profileAuthByName, wsUrl } = await startRealtimeServer(['Restore Alice', 'Restore Bob']);
+  const aliceContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Restore Alice'));
+  const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Restore Bob'));
   try {
     const alice = await newPlayerPage(aliceContext, baseURL, 'Restore Alice');
     const bob = await newPlayerPage(bobContext, baseURL, 'Restore Bob');
@@ -216,8 +217,8 @@ test('reloaded Beat the House clients verify the saved room against the server a
 
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
-  const wsUrl = await startRealtimeServer(['Beat QA']);
-  const context = await newPlayerContext(browser, wsUrl);
+  const { profileAuthByName, wsUrl } = await startRealtimeServer(['Beat QA']);
+  const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Beat QA'));
   try {
     const page = await newPlayerPage(context, baseURL, 'Beat QA');
     await page.locator('[data-lobby-game="beat-the-house"]').click();
@@ -318,10 +319,10 @@ test('multiplayer Slots exposes shared readiness, spin result, spectating, and n
   baseURL,
 }) => {
   test.setTimeout(60_000);
-  const wsUrl = await startRealtimeServer(['Slots Alice', 'Slots Bob', 'Slots Watcher']);
+  const { profileAuthByName, wsUrl } = await startRealtimeServer(['Slots Alice', 'Slots Bob', 'Slots Watcher']);
   const contexts: BrowserContext[] = [];
   const openPlayer = async (name: string): Promise<Page> => {
-    const context = await newPlayerContext(browser, wsUrl);
+    const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get(name));
     contexts.push(context);
     return newPlayerPage(context, baseURL, name);
   };
@@ -368,16 +369,42 @@ test('multiplayer Slots exposes shared readiness, spin result, spectating, and n
   }
 });
 
-const startRealtimeServer = async (profileNames: readonly string[]): Promise<string> => {
-  return startRealtimeServerWithStore(seedDataStore(profileNames));
+type SeededProfileAuth = {
+  readonly profileId: string;
+  readonly profileToken: string;
 };
 
-const seedDataStore = (profileNames: readonly string[]): ServerDataStore => {
+type SeededRealtimeServer = {
+  readonly profileAuthByName: ReadonlyMap<string, SeededProfileAuth>;
+  readonly wsUrl: string;
+};
+
+type SeededDataStore = {
+  readonly dataStore: ServerDataStore;
+  readonly profileAuthByName: ReadonlyMap<string, SeededProfileAuth>;
+};
+
+const profileTokensStorageKey = 'casino_warehouse_profile_tokens_v1';
+
+const startRealtimeServer = async (profileNames: readonly string[]): Promise<SeededRealtimeServer> => {
+  const { dataStore, profileAuthByName } = seedDataStore(profileNames);
+  return { profileAuthByName, wsUrl: await startRealtimeServerWithStore(dataStore) };
+};
+
+const seedDataStore = (profileNames: readonly string[]): SeededDataStore => {
   const dataStore = createMemoryServerDataStore();
+  const profileAuthByName = new Map<string, SeededProfileAuth>();
   for (const profileName of profileNames) {
-    dataStore.createProfile(profileName);
+    const snapshot = dataStore.createProfile(profileName);
+    const profile = snapshot.profileState.profiles.find((candidate) => candidate.name === profileName);
+    if (!profile) {
+      throw new Error(`Expected seeded profile ${profileName}.`);
+    }
+    const profileToken = profileTokenAuth.createToken();
+    dataStore.setProfileTokenHash(profile.id, profileTokenAuth.hash(profile.id, profileToken));
+    profileAuthByName.set(profileName, { profileId: profile.id, profileToken });
   }
-  return dataStore;
+  return { dataStore, profileAuthByName };
 };
 
 const startRealtimeServerWithStore = async (dataStore: ServerDataStore, port = 0): Promise<string> => {
@@ -399,15 +426,21 @@ const closeRealtimeServer = async (): Promise<void> => {
   realtimeServer = undefined;
 };
 
-const newPlayerContext = async (browser: Browser, wsUrl: string): Promise<BrowserContext> => {
+const newPlayerContext = async (browser: Browser, wsUrl: string, profileAuth?: SeededProfileAuth): Promise<BrowserContext> => {
   const context = await browser.newContext();
-  await context.addInitScript((url) => {
-    if (!localStorage.getItem('casino_e2e_context_ready')) {
-      localStorage.clear();
-      localStorage.setItem('casino_e2e_context_ready', 'true');
-    }
-    localStorage.setItem('casino_realtime_url', url);
-  }, wsUrl);
+  await context.addInitScript(
+    ({ auth, profileTokensKey, url }) => {
+      if (!localStorage.getItem('casino_e2e_context_ready')) {
+        localStorage.clear();
+        localStorage.setItem('casino_e2e_context_ready', 'true');
+      }
+      localStorage.setItem('casino_realtime_url', url);
+      if (auth) {
+        localStorage.setItem(profileTokensKey, JSON.stringify({ [auth.profileId]: auth.profileToken }));
+      }
+    },
+    { auth: profileAuth, profileTokensKey: profileTokensStorageKey, url: wsUrl },
+  );
   return context;
 };
 
@@ -424,6 +457,7 @@ const newPlayerPage = async (context: BrowserContext, baseURL: string | undefine
 const startExistingProfileSession = async (page: Page, name: string): Promise<void> => {
   const row = page.locator('.profile-row').filter({ hasText: name });
   await expect(row).toBeVisible();
+  await expect(row.locator('[data-profile-select]')).toBeEnabled();
   await row.locator('[data-profile-select]').check();
   await page.getByRole('button', { name: 'Start Selected Session' }).click();
 };

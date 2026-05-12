@@ -7,18 +7,22 @@ import type { RoomRole } from '../protocol/RoomRole';
 import type { RoomSeatId } from '../protocol/RoomSeatId';
 import type { RoomSnapshot } from '../protocol/RoomSnapshot';
 import type { CasinoSessionState } from '../../state/session/CasinoSessionState';
+import { adminTokenStorageKey } from './adminTokenStorageKey';
 import { defaultRealtimeUrl } from './defaultRealtimeUrl';
 import type { MultiplayerClientEvents } from './MultiplayerClientEvents';
+import { profileTokensStorageKey } from './profileTokensStorageKey';
 import type { RealtimeConnectionState } from './RealtimeConnectionState';
 
 export class MultiplayerClient {
   private socket?: WebSocket;
   private lastRoom?: RoomSnapshot;
+  private readonly ownedProfileIds = new Set<string>();
   private reconnectUrl = '';
   private reconnectTimer: number | undefined;
   private heartbeatTimer: number | undefined;
   private lastHeartbeatAt = 0;
   private serverInstanceId = '';
+  private adminAuthorized = false;
 
   public constructor(private readonly events: MultiplayerClientEvents) {}
 
@@ -28,6 +32,14 @@ export class MultiplayerClient {
 
   public get connected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  public get hasAdminAccess(): boolean {
+    return this.adminAuthorized;
+  }
+
+  public ownsProfile(profileId: string): boolean {
+    return this.ownedProfileIds.has(profileId);
   }
 
   public connect(url = defaultRealtimeUrl()): void {
@@ -46,14 +58,21 @@ export class MultiplayerClient {
   }
 
   public renameProfile(profileId: string, profileName: string): void {
-    this.send({ version: protocolVersion, type: 'rename-profile', profileId, profileName });
+    this.sendOwnedProfileMessage(profileId, { version: protocolVersion, type: 'rename-profile', profileId, profileName });
   }
 
   public deleteProfile(profileId: string): void {
-    this.send({ version: protocolVersion, type: 'delete-profile', profileId });
+    if (this.sendOwnedProfileMessage(profileId, { version: protocolVersion, type: 'delete-profile', profileId })) {
+      this.forgetProfileToken(profileId);
+    }
   }
 
   public saveSession(session: Omit<CasinoSessionState, 'version' | 'updatedAt'>): void {
+    const profileIds = [...new Set([...session.profileIds, ...Object.keys(session.gameSnapshots)])];
+    if (!this.ownsEveryProfile(profileIds)) {
+      this.events.onError('This browser does not own every profile in this session.');
+      return;
+    }
     this.send({
       version: protocolVersion,
       type: 'save-session',
@@ -66,15 +85,27 @@ export class MultiplayerClient {
   }
 
   public adjustBankroll(profileId: string, action: 'add' | 'subtract' | 'reset', amount?: number): void {
-    this.send({ version: protocolVersion, type: 'admin-bankroll', profileId, action, amount });
+    this.sendAdminMessage({ version: protocolVersion, type: 'admin-bankroll', profileId, action, amount });
   }
 
   public resetAllBankrolls(): void {
-    this.send({ version: protocolVersion, type: 'admin-reset-all' });
+    this.sendAdminMessage({ version: protocolVersion, type: 'admin-reset-all' });
   }
 
   public clearServerData(): void {
-    this.send({ version: protocolVersion, type: 'clear-server-data' });
+    if (this.sendAdminMessage({ version: protocolVersion, type: 'clear-server-data' })) {
+      this.clearProfileTokens();
+    }
+  }
+
+  public authorizeAdmin(adminToken: string): void {
+    const token = adminToken.trim();
+    if (!token) {
+      this.events.onError('Enter an admin token first.');
+      return;
+    }
+    writeStorageValue(adminTokenStorageKey, token);
+    this.send({ version: protocolVersion, type: 'authorize-admin', adminToken: token });
   }
 
   private openSocket(url: string, state: RealtimeConnectionState): void {
@@ -90,6 +121,8 @@ export class MultiplayerClient {
       this.events.onConnectionState('connected');
       this.events.onStatus('Connected to the game server.');
       this.startHeartbeatMonitor();
+      this.authorizeStoredProfiles();
+      this.authorizeStoredAdminToken();
       this.requestData();
     });
     socket.addEventListener('close', () => {
@@ -109,11 +142,21 @@ export class MultiplayerClient {
   }
 
   public createRoom(gameId: RoomGameId, roomName: string, maxPlayers: number, profileId: string, profileName: string, bankroll: number): void {
-    this.send({ version: protocolVersion, type: 'create-room', gameId, roomName, maxPlayers, allowSpectators: true, profileId, profileName, bankroll });
+    this.sendOwnedProfileMessage(profileId, {
+      version: protocolVersion,
+      type: 'create-room',
+      gameId,
+      roomName,
+      maxPlayers,
+      allowSpectators: true,
+      profileId,
+      profileName,
+      bankroll,
+    });
   }
 
   public joinRoom(gameId: RoomGameId, roomId: string, role: RoomRole, profileId: string, profileName: string, bankroll: number, seatId?: RoomSeatId): void {
-    this.send({ version: protocolVersion, type: 'join-room', gameId, roomId, role, profileId, profileName, bankroll, seatId });
+    this.sendOwnedProfileMessage(profileId, { version: protocolVersion, type: 'join-room', gameId, roomId, role, profileId, profileName, bankroll, seatId });
   }
 
   public leaveRoom(): void {
@@ -132,6 +175,22 @@ export class MultiplayerClient {
     }
     this.socket.send(encodeMessage(message));
     return true;
+  }
+
+  private sendOwnedProfileMessage(profileId: string, message: ClientMessage): boolean {
+    if (!this.ownsProfile(profileId)) {
+      this.events.onError('This browser does not own that server profile.');
+      return false;
+    }
+    return this.send(message);
+  }
+
+  private sendAdminMessage(message: ClientMessage): boolean {
+    if (!this.adminAuthorized) {
+      this.events.onError('Admin controls are locked for this browser.');
+      return false;
+    }
+    return this.send(message);
   }
 
   private scheduleReconnect(): void {
@@ -187,6 +246,25 @@ export class MultiplayerClient {
       this.serverInstanceId = message.serverInstanceId;
       return;
     }
+    if (message.type === 'profile-credentials') {
+      this.storeProfileToken(message.profileId, message.profileToken);
+      return;
+    }
+    if (message.type === 'profile-access') {
+      this.ownedProfileIds.clear();
+      message.ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));
+      this.pruneStoredProfileTokens(message.ownedProfileIds);
+      this.events.onProfileAccess(message.ownedProfileIds);
+      return;
+    }
+    if (message.type === 'admin-access') {
+      this.adminAuthorized = message.authorized;
+      if (!message.authorized) {
+        removeStorageValue(adminTokenStorageKey);
+      }
+      this.events.onAdminAccess(message.authorized);
+      return;
+    }
     if (message.type === 'reload-required') {
       this.events.onStatus(message.message);
       window.location.reload();
@@ -228,4 +306,112 @@ export class MultiplayerClient {
       return url;
     }
   }
+
+  private authorizeStoredProfiles(): void {
+    this.send({ version: protocolVersion, type: 'authorize-profiles', profileTokens: profileTokenEntries(readProfileTokens()) });
+  }
+
+  private authorizeStoredAdminToken(): void {
+    const adminToken = readStorageValue(adminTokenStorageKey);
+    if (adminToken) {
+      this.send({ version: protocolVersion, type: 'authorize-admin', adminToken });
+    }
+  }
+
+  private ownsEveryProfile(profileIds: readonly string[]): boolean {
+    return profileIds.every((profileId) => this.ownsProfile(profileId));
+  }
+
+  private storeProfileToken(profileId: string, profileToken: string): void {
+    const profileTokens = readProfileTokens();
+    profileTokens.set(profileId, profileToken);
+    writeProfileTokens(profileTokens);
+  }
+
+  private forgetProfileToken(profileId: string): void {
+    const profileTokens = readProfileTokens();
+    profileTokens.delete(profileId);
+    writeProfileTokens(profileTokens);
+    this.ownedProfileIds.delete(profileId);
+  }
+
+  private clearProfileTokens(): void {
+    removeStorageValue(profileTokensStorageKey);
+    this.ownedProfileIds.clear();
+    this.events.onProfileAccess([]);
+  }
+
+  private pruneStoredProfileTokens(ownedProfileIds: readonly string[]): void {
+    const owned = new Set(ownedProfileIds);
+    const profileTokens = readProfileTokens();
+    for (const profileId of profileTokens.keys()) {
+      if (!owned.has(profileId)) {
+        profileTokens.delete(profileId);
+      }
+    }
+    writeProfileTokens(profileTokens);
+  }
 }
+
+type StoredProfileToken = {
+  readonly profileId: string;
+  readonly profileToken: string;
+};
+
+const readProfileTokens = (): Map<string, string> => {
+  const value = readStorageValue(profileTokensStorageKey);
+  if (!value) {
+    return new Map();
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return new Map(parsed.filter(isStoredProfileToken).map((entry) => [entry.profileId, entry.profileToken]));
+    }
+    return isStringRecord(parsed) ? new Map(Object.entries(parsed)) : new Map();
+  } catch {
+    return new Map();
+  }
+};
+
+const writeProfileTokens = (profileTokens: ReadonlyMap<string, string>): void => {
+  writeStorageValue(profileTokensStorageKey, JSON.stringify(profileTokenEntries(profileTokens)));
+};
+
+const profileTokenEntries = (profileTokens: ReadonlyMap<string, string>): StoredProfileToken[] =>
+  [...profileTokens.entries()].map(([profileId, profileToken]) => ({ profileId, profileToken }));
+
+const readStorageValue = (key: string): string => {
+  try {
+    return globalThis.localStorage?.getItem(key) ?? '';
+  } catch {
+    return '';
+  }
+};
+
+const writeStorageValue = (key: string, value: string): void => {
+  try {
+    globalThis.localStorage?.setItem(key, value);
+  } catch {
+    // Browser storage can be unavailable in private contexts; the server remains authoritative.
+  }
+};
+
+const removeStorageValue = (key: string): void => {
+  try {
+    globalThis.localStorage?.removeItem(key);
+  } catch {
+    // Browser storage can be unavailable in private contexts; the server remains authoritative.
+  }
+};
+
+const isStringRecord = (value: unknown): value is Record<string, string> =>
+  typeof value === 'object' && value !== null && Object.values(value).every((recordValue) => typeof recordValue === 'string');
+
+const isStoredProfileToken = (value: unknown): value is StoredProfileToken =>
+  typeof value === 'object' &&
+  value !== null &&
+  'profileId' in value &&
+  'profileToken' in value &&
+  typeof value.profileId === 'string' &&
+  typeof value.profileToken === 'string';

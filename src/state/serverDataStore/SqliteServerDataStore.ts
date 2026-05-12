@@ -21,6 +21,9 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     if (stored.profileState) {
       this.loadProfilesFromJson(JSON.stringify(stored.profileState));
     }
+    if (stored.profileAuth) {
+      this.loadProfileTokenHashesFromJson(JSON.stringify(stored.profileAuth));
+    }
     if (stored.session) {
       this.saveSession(stored.session);
     }
@@ -35,7 +38,9 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   public override deleteProfile(profileId: string): ServerDataSnapshot {
-    return this.persist(super.deleteProfile(profileId));
+    const snapshot = super.deleteProfile(profileId);
+    this.persistProfileAuth();
+    return this.persist(snapshot);
   }
 
   public override saveSession(session: CasinoSessionState): ServerDataSnapshot {
@@ -43,7 +48,24 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   public override clear(): ServerDataSnapshot {
-    return this.persist(super.clear());
+    const snapshot = super.clear();
+    this.persistProfileAuth();
+    return this.persist(snapshot);
+  }
+
+  public override setProfileTokenHash(profileId: string, tokenHash: string): void {
+    super.setProfileTokenHash(profileId, tokenHash);
+    this.persistProfileAuth();
+  }
+
+  public override deleteProfileTokenHash(profileId: string): void {
+    super.deleteProfileTokenHash(profileId);
+    this.persistProfileAuth();
+  }
+
+  public override clearProfileTokenHashes(): void {
+    super.clearProfileTokenHashes();
+    this.persistProfileAuth();
   }
 
   public override ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile {
@@ -77,9 +99,13 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     return snapshot;
   }
 
-  private readStoredState(): Partial<Pick<ServerDataSnapshot, 'profileState' | 'session'>> {
+  private persistProfileAuth(): void {
+    this.writeValue('profile_auth', Object.fromEntries(this.profileTokenHashEntries()));
+  }
+
+  private readStoredState(): Partial<Pick<ServerDataSnapshot, 'profileState' | 'session'> & { readonly profileAuth: Record<string, string> }> {
     const rows = this.db.prepare('SELECT key, value FROM server_state').all() as Array<{ key: string; value: string }>;
-    return Object.fromEntries(rows.map((row) => [row.key === 'profiles' ? 'profileState' : row.key, JSON.parse(row.value)]));
+    return Object.fromEntries(rows.map((row) => [storedStateKey(row.key), JSON.parse(row.value)]));
   }
 
   private writeValue(key: string, value: unknown): void {
@@ -90,3 +116,5 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
 }
 
 const defaultSqlitePath = (): string => resolve(process.cwd(), '.casino', 'casino.sqlite');
+
+const storedStateKey = (key: string): string => (key === 'profiles' ? 'profileState' : key === 'profile_auth' ? 'profileAuth' : key);

@@ -9,6 +9,9 @@ import type { RoomSummary } from './RoomSummary';
 export type ServerMessage =
   | { readonly version: 1; readonly type: 'server-hello'; readonly serverInstanceId: string }
   | { readonly version: 1; readonly type: 'reload-required'; readonly reason: 'server-restarted'; readonly message: string }
+  | { readonly version: 1; readonly type: 'profile-credentials'; readonly profileId: string; readonly profileToken: string }
+  | { readonly version: 1; readonly type: 'profile-access'; readonly ownedProfileIds: readonly string[] }
+  | { readonly version: 1; readonly type: 'admin-access'; readonly authorized: boolean }
   | {
       readonly version: 1;
       readonly type: 'data-state';

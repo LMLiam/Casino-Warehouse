@@ -63,6 +63,10 @@ class SocketProbe {
     });
   }
 
+  public received(predicate: (message: ServerMessage) => boolean): readonly ServerMessage[] {
+    return this.messages.filter(predicate);
+  }
+
   public close(): void {
     this.socket.close();
   }
@@ -242,6 +246,91 @@ describe('multiplayer WebSocket server', () => {
     expect(afterDisconnect.players[0].profileId).toBe(aliceProfile.id);
   });
 
+  it('rejects second-socket profile impersonation and locks admin-only data actions', async () => {
+    const baseUrl = await startServer('.', undefined, { adminToken: 'server-admin-secret' });
+    const alice = await connect(baseUrl.ws);
+    const intruder = await connect(baseUrl.ws);
+
+    alice.send({ version: 1, type: 'create-profile', profileName: 'Protected Alice' });
+    const credentials = await alice.waitFor((message) => message.type === 'profile-credentials');
+    const profileData = await alice.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Protected Alice'),
+    );
+    const aliceProfile =
+      profileData.type === 'data-state' ? profileData.profileState.profiles.find((profile) => profile.name === 'Protected Alice') : undefined;
+    if (!aliceProfile || credentials.type !== 'profile-credentials') {
+      throw new Error('Expected protected profile and credentials.');
+    }
+    expect(credentials.profileId).toBe(aliceProfile.id);
+
+    intruder.send({ version: 1, type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Stolen Alice' });
+    intruder.send({ version: 1, type: 'delete-profile', profileId: aliceProfile.id });
+    intruder.send({
+      version: 1,
+      type: 'save-session',
+      session: {
+        profileIds: [aliceProfile.id],
+        selectedPlayerIndex: 0,
+        activeGame: 'beat-the-house',
+        showingGameLobby: true,
+        wagerLimit: 0,
+        wagered: 0,
+        gameSnapshots: {},
+      },
+    });
+    intruder.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: 'Stolen Alice',
+      bankroll: 1,
+    });
+    await waitForReceivedCount(intruder, unauthorizedProfileError, 4);
+
+    alice.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: 'Spoof Alice',
+      bankroll: 1,
+    });
+    const created = await alice.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected Alice to create a room.');
+    }
+    intruder.send({
+      version: 1,
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId: created.room.roomId,
+      role: 'player',
+      profileId: aliceProfile.id,
+      profileName: 'Stolen Alice',
+      bankroll: 1,
+    });
+    await waitForReceivedCount(intruder, unauthorizedProfileError, 5);
+
+    intruder.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 500 });
+    intruder.send({ version: 1, type: 'admin-reset-all' });
+    intruder.send({ version: 1, type: 'clear-server-data' });
+    await waitForReceivedCount(intruder, adminLockedError, 3);
+
+    intruder.send({ version: 1, type: 'authorize-admin', adminToken: 'wrong-secret' });
+    await expect(intruder.waitFor((message) => message.type === 'admin-access' && !message.authorized)).resolves.toMatchObject({ authorized: false });
+
+    intruder.send({ version: 1, type: 'authorize-admin', adminToken: 'server-admin-secret' });
+    await expect(intruder.waitFor((message) => message.type === 'admin-access' && message.authorized)).resolves.toMatchObject({ authorized: true });
+    intruder.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 75 });
+    const updated = await intruder.waitFor(
+      (message) =>
+        message.type === 'data-state' &&
+        message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.name === 'Protected Alice' && profile.bankroll === 1075),
+    );
+    expect(updated.type === 'data-state' ? updated.profileState.profiles.find((profile) => profile.id === aliceProfile.id)?.bankroll : 0).toBe(1075);
+  });
+
   it('keeps server profiles available after a SQLite-backed server restart', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-profile-relogin-'));
     tempDirs.push(dir);
@@ -250,7 +339,14 @@ describe('multiplayer WebSocket server', () => {
     let baseUrl = await startServer('.', undefined, { dataStore: new SqliteServerDataStore(dbPath) });
     const alice = await connect(baseUrl.ws);
     alice.send({ version: 1, type: 'create-profile', profileName: 'Returning Alice' });
-    await alice.waitFor((message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Returning Alice'));
+    const credentials = await alice.waitFor((message) => message.type === 'profile-credentials');
+    const profileData = await alice.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Returning Alice'),
+    );
+    const profile = profileData.type === 'data-state' ? profileData.profileState.profiles.find((candidate) => candidate.name === 'Returning Alice') : undefined;
+    if (!profile || credentials.type !== 'profile-credentials') {
+      throw new Error('Expected Returning Alice profile and credentials.');
+    }
 
     await closeCurrentServer();
 
@@ -261,6 +357,13 @@ describe('multiplayer WebSocket server', () => {
     );
 
     expect(restored.type === 'data-state' ? restored.profileState.profiles.map((profile) => profile.name) : []).toContain('Returning Alice');
+    returning.send({ version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: profile.id, profileToken: credentials.profileToken }] });
+    await expect(returning.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(profile.id))).resolves.toMatchObject({
+      type: 'profile-access',
+      ownedProfileIds: [profile.id],
+    });
+    returning.send({ version: 1, type: 'create-room', gameId: 'beat-the-house', profileId: profile.id, profileName: 'Spoofed', bankroll: 1 });
+    await expect(returning.waitFor((message) => message.type === 'room-created')).resolves.toMatchObject({ type: 'room-created' });
   });
 
   it('tells clients from a previous server instance to reload on reconnect', async () => {
@@ -410,6 +513,23 @@ const waitForRoom = async (probe: SocketProbe, predicate: (room: RoomSnapshot) =
   }
   return message.room;
 };
+
+const waitForReceivedCount = async (probe: SocketProbe, predicate: (message: ServerMessage) => boolean, count: number): Promise<void> => {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    if (probe.received(predicate).length >= count) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Timed out waiting for ${count} matching WebSocket messages.`);
+};
+
+const unauthorizedProfileError = (message: ServerMessage): boolean =>
+  message.type === 'error' && message.code === 'rejected' && message.message === 'This browser is not authorized to use that profile.';
+
+const adminLockedError = (message: ServerMessage): boolean =>
+  message.type === 'error' && message.code === 'rejected' && message.message === 'Admin controls are locked for this browser.';
 
 const beat = (room: RoomSnapshot) => room.game as ReturnType<BeatTheHouseGame['snapshot']>;
 

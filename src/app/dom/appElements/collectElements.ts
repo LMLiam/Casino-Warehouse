@@ -77,6 +77,8 @@ export const collectElements = (): AppElements => ({
   resetAllButton: query('#resetAllBtn'),
   clearSavesButton: query('#clearSavesBtn'),
   layoutOverlayButton: query('#layoutOverlayBtn'),
+  adminTokenInput: query('#adminTokenInput'),
+  authorizeAdminButton: query('#authorizeAdminBtn'),
   moneyInput: query('#moneyInput'),
   blackjackWager: query('#blackjackWager'),
   blackjackDealButton: query('#blackjackDealBtn'),

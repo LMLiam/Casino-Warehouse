@@ -116,6 +116,11 @@ export const renderTemplate = (): string => `
             <summary>Admin</summary>
             <div class="admin-menu-content">
               <label>
+                Admin token
+                <input id="adminTokenInput" type="password" autocomplete="off" />
+              </label>
+              <button id="authorizeAdminBtn" type="button">Unlock Admin</button>
+              <label>
                 Add bankroll
                 <input id="moneyInput" type="number" min="1" value="1000" />
               </label>

@@ -75,6 +75,8 @@ export interface AppElements {
   readonly resetAllButton: HTMLButtonElement;
   readonly clearSavesButton: HTMLButtonElement;
   readonly layoutOverlayButton: HTMLButtonElement;
+  readonly adminTokenInput: HTMLInputElement;
+  readonly authorizeAdminButton: HTMLButtonElement;
   readonly moneyInput: HTMLInputElement;
   readonly blackjackWager: HTMLInputElement;
   readonly blackjackDealButton: HTMLButtonElement;

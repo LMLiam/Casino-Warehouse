@@ -11,14 +11,17 @@ import type { RoomGameId } from '../protocol/RoomGameId';
 import type { ServerMessage } from '../protocol/ServerMessage';
 import { createSessionState } from '../../state/session/createSessionState';
 import { createDefaultServerDataStore } from '../../state/serverDataStore/createDefaultServerDataStore';
+import { profileTokenAuth } from '../../state/serverDataStore/profileTokenAuth';
 import type { CasinoServer } from './CasinoServer';
 import type { CasinoServerOptions } from './CasinoServerOptions';
 
 interface Peer {
   readonly id: string;
   readonly socket: import('node:net').Socket;
+  readonly ownedProfileIds: Set<string>;
   lastPongAt: number;
   browsingGameId?: RoomGameId;
+  isAdmin: boolean;
 }
 
 export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoServer => {
@@ -27,6 +30,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const authority = options.authority ?? new RoomAuthority(dataStore);
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 2_000;
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 30_000;
+  const adminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
   const serverInstanceId = options.serverInstanceId ?? randomUUID();
   const peers = new Map<string, Peer>();
 
@@ -76,6 +80,14 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     send(peer, { version: protocolVersion, type: 'data-state', database: snapshot.database, profileState: snapshot.profileState, session: snapshot.session });
   };
 
+  const sendProfileAccess = (peer: Peer): void => {
+    send(peer, { version: protocolVersion, type: 'profile-access', ownedProfileIds: [...peer.ownedProfileIds] });
+  };
+
+  const sendAdminAccess = (peer: Peer): void => {
+    send(peer, { version: protocolVersion, type: 'admin-access', authorized: peer.isAdmin });
+  };
+
   const broadcastDataState = (): void => {
     for (const peer of peers.values()) {
       sendDataState(peer);
@@ -91,38 +103,56 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         case 'heartbeat-ack':
           peer.lastPongAt = Date.now();
           return true;
+        case 'authorize-profiles':
+          authorizeProfiles(peer, message.profileTokens);
+          sendProfileAccess(peer);
+          return true;
+        case 'authorize-admin':
+          peer.isAdmin = adminToken.length > 0 && profileTokenAuth.safeSecretEqual(adminToken, message.adminToken);
+          sendAdminAccess(peer);
+          return true;
         case 'request-data':
           sendDataState(peer);
           return true;
         case 'create-profile':
-          dataStore.createProfile(message.profileName, 1000);
+          createOwnedProfile(peer, message.profileName);
           broadcastDataState();
           return true;
         case 'rename-profile':
-          requireProfile(message.profileId);
+          requireOwnedProfile(peer, message.profileId);
           dataStore.renameProfile(message.profileId, message.profileName);
           broadcastDataState();
           return true;
         case 'delete-profile':
-          requireProfile(message.profileId);
+          requireOwnedProfile(peer, message.profileId);
           dataStore.deleteProfile(message.profileId);
+          peer.ownedProfileIds.delete(message.profileId);
+          sendProfileAccess(peer);
           broadcastDataState();
           return true;
         case 'save-session':
-          requireKnownProfiles(message.session.profileIds);
+          requireKnownProfiles(profileIdsInSession(message.session));
+          requireOwnedProfiles(peer, profileIdsInSession(message.session));
           dataStore.saveSession(createSessionState(message.session.profileIds, message.session));
           sendDataState(peer);
           return true;
         case 'admin-bankroll':
+          requireAdmin(peer);
           applyAdminBankroll(message.profileId, message.action, message.amount ?? 0);
           broadcastDataState();
           return true;
         case 'admin-reset-all':
+          requireAdmin(peer);
           resetAllBankrolls();
           broadcastDataState();
           return true;
         case 'clear-server-data':
+          requireAdmin(peer);
           dataStore.clear();
+          for (const candidate of peers.values()) {
+            candidate.ownedProfileIds.clear();
+            sendProfileAccess(candidate);
+          }
           broadcastDataState();
           return true;
         default:
@@ -132,6 +162,59 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       send(peer, { version: protocolVersion, type: 'error', code: 'rejected', message: error instanceof Error ? error.message : 'Server data action failed.' });
       return true;
     }
+  };
+
+  const createOwnedProfile = (peer: Peer, profileName: string): void => {
+    const snapshot = dataStore.createProfile(profileName, 1000);
+    const profile = snapshot.profileState.profiles.at(-1);
+    if (!profile) {
+      throw new Error('Profile could not be created.');
+    }
+    const profileToken = profileTokenAuth.createToken();
+    dataStore.setProfileTokenHash(profile.id, profileTokenAuth.hash(profile.id, profileToken));
+    peer.ownedProfileIds.add(profile.id);
+    send(peer, { version: protocolVersion, type: 'profile-credentials', profileId: profile.id, profileToken });
+    sendProfileAccess(peer);
+  };
+
+  const authorizeProfiles = (
+    peer: Peer,
+    profileTokens: readonly {
+      readonly profileId: string;
+      readonly profileToken: string;
+    }[],
+  ): void => {
+    peer.ownedProfileIds.clear();
+    for (const { profileId, profileToken } of profileTokens) {
+      if (isProfileTokenValid(profileId, profileToken)) {
+        peer.ownedProfileIds.add(profileId);
+      }
+    }
+  };
+
+  const requireOwnedProfile = (peer: Peer, profileId: string) => {
+    const profile = requireProfile(profileId);
+    if (!peer.ownedProfileIds.has(profileId)) {
+      throw new Error('This browser is not authorized to use that profile.');
+    }
+    return profile;
+  };
+
+  const requireOwnedProfiles = (peer: Peer, profileIds: readonly string[]): void => {
+    for (const profileId of profileIds) {
+      requireOwnedProfile(peer, profileId);
+    }
+  };
+
+  const requireAdmin = (peer: Peer): void => {
+    if (!peer.isAdmin) {
+      throw new Error('Admin controls are locked for this browser.');
+    }
+  };
+
+  const isProfileTokenValid = (profileId: string, profileToken: string): boolean => {
+    const expectedHash = dataStore.profileTokenHash(profileId);
+    return Boolean(expectedHash) && profileTokenAuth.matches(profileId, profileToken, expectedHash ?? '');
   };
 
   const applyAdminBankroll = (profileId: string, action: 'add' | 'subtract' | 'reset', amount: number): void => {
@@ -177,11 +260,15 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
   };
 
-  const useServerProfile = (message: ClientMessage): ClientMessage => {
+  const profileIdsInSession = (session: Extract<ClientMessage, { type: 'save-session' }>['session']): readonly string[] => [
+    ...new Set([...session.profileIds, ...Object.keys(session.gameSnapshots)]),
+  ];
+
+  const useServerProfile = (peer: Peer, message: ClientMessage): ClientMessage => {
     if (message.type !== 'create-room' && message.type !== 'join-room') {
       return message;
     }
-    const profile = requireProfile(message.profileId);
+    const profile = requireOwnedProfile(peer, message.profileId);
     return { ...message, profileName: profile.name, bankroll: profile.bankroll };
   };
 
@@ -205,7 +292,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
     let serverOwnedMessage: ClientMessage;
     try {
-      serverOwnedMessage = useServerProfile(parsed.message);
+      serverOwnedMessage = useServerProfile(peer, parsed.message);
     } catch (error) {
       send(peer, {
         version: protocolVersion,
@@ -286,7 +373,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       ['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', `Sec-WebSocket-Accept: ${acceptKey(key)}`, '', ''].join('\r\n'),
     );
 
-    const peer: Peer = { id: randomUUID(), socket: socket as Socket, lastPongAt: Date.now() };
+    const peer: Peer = { id: randomUUID(), socket: socket as Socket, ownedProfileIds: new Set(), lastPongAt: Date.now(), isAdmin: false };
     const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
     if (clientServerInstanceId && clientServerInstanceId !== serverInstanceId) {
       send(peer, {

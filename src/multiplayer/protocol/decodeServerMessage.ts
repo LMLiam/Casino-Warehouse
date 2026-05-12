@@ -34,6 +34,12 @@ const isServerMessage = (value: unknown): value is ServerMessage => {
       return typeof value.serverInstanceId === 'string';
     case 'reload-required':
       return value.reason === 'server-restarted' && typeof value.message === 'string';
+    case 'profile-credentials':
+      return typeof value.profileId === 'string' && typeof value.profileToken === 'string';
+    case 'profile-access':
+      return Array.isArray(value.ownedProfileIds) && value.ownedProfileIds.every((profileId) => typeof profileId === 'string');
+    case 'admin-access':
+      return typeof value.authorized === 'boolean';
     case 'data-state':
       return isServerDatabaseChoice(value.database) && isCasinoSaveState(value.profileState) && (value.session === undefined || isRecord(value.session));
     case 'heartbeat':

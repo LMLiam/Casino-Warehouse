@@ -1,4 +1,4 @@
-import { expect, test, currentRealtimeUrl, resetBrowserStorage, type Locator, type Page } from './fixtures';
+import { e2eAdminToken, expect, test, currentRealtimeUrl, resetBrowserStorage, type Locator, type Page } from './fixtures';
 
 const consoleFailures = new WeakMap<Page, string[]>();
 
@@ -327,19 +327,24 @@ const waitForRealtime = async (page: Page): Promise<void> => {
 };
 
 const clearServerData = async (page: Page): Promise<void> => {
-  await page.evaluate(async () => {
+  await page.evaluate(async (adminToken) => {
     const url = localStorage.getItem('casino_realtime_url') ?? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
     await new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(url);
+      let authorized = false;
       const timer = window.setTimeout(() => {
         socket.close();
         reject(new Error('Timed out clearing server data.'));
       }, 5_000);
       socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ version: 1, type: 'clear-server-data' }));
+        socket.send(JSON.stringify({ version: 1, type: 'authorize-admin', adminToken }));
       });
       socket.addEventListener('message', (event) => {
-        const message = JSON.parse(String(event.data)) as { type?: string; profileState?: { profiles?: unknown[] }; session?: unknown };
+        const message = JSON.parse(String(event.data)) as { type?: string; authorized?: boolean; profileState?: { profiles?: unknown[] }; session?: unknown };
+        if (message.type === 'admin-access' && message.authorized && !authorized) {
+          authorized = true;
+          socket.send(JSON.stringify({ version: 1, type: 'clear-server-data' }));
+        }
         if (message.type === 'data-state' && message.profileState?.profiles?.length === 0 && message.session === undefined) {
           window.clearTimeout(timer);
           socket.close();
@@ -351,7 +356,7 @@ const clearServerData = async (page: Page): Promise<void> => {
         reject(new Error('Failed to connect while clearing server data.'));
       });
     });
-  });
+  }, e2eAdminToken);
 };
 
 const requestServerData = async (page: Page): Promise<E2EServerData> =>

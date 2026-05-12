@@ -22,6 +22,13 @@ const identitySchema = z.object({
   bankroll: networkCreditSchema,
 });
 
+const profileTokenSchema = z.string().trim().min(1).max(256);
+
+const profileTokenEntrySchema = z.object({
+  profileId: profileIdSchema,
+  profileToken: profileTokenSchema,
+});
+
 const clientSessionStateSchema = z.object({
   profileIds: z.array(profileIdSchema),
   selectedPlayerIndex: networkCreditSchema,
@@ -46,6 +53,8 @@ const clientSessionStateSchema = z.object({
 
 export const clientMessageSchema = z.discriminatedUnion('type', [
   baseClientMessageSchema.extend({ type: z.literal('request-data') }),
+  baseClientMessageSchema.extend({ type: z.literal('authorize-profiles'), profileTokens: z.array(profileTokenEntrySchema) }),
+  baseClientMessageSchema.extend({ type: z.literal('authorize-admin'), adminToken: profileTokenSchema }),
   baseClientMessageSchema.extend({ type: z.literal('create-profile'), profileName: profileNameSchema }),
   baseClientMessageSchema.extend({ type: z.literal('rename-profile'), profileId: profileIdSchema, profileName: profileNameSchema }),
   baseClientMessageSchema.extend({ type: z.literal('delete-profile'), profileId: profileIdSchema }),

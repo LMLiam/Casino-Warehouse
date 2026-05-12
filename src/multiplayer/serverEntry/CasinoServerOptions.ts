@@ -7,5 +7,6 @@ export interface CasinoServerOptions {
   readonly dataStore?: ServerDataStore;
   readonly heartbeatIntervalMs?: number;
   readonly heartbeatTimeoutMs?: number;
+  readonly adminToken?: string;
   readonly serverInstanceId?: string;
 }

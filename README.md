@@ -56,6 +56,14 @@ For a one-command built app plus realtime server:
 npm run dev:full
 ```
 
+Destructive admin controls are locked unless the server has an admin token. To enable them for a local maintenance session:
+
+```bash
+CASINO_ADMIN_TOKEN=change-me npm run dev:server
+```
+
+Enter the same token in the app's admin panel to unlock bankroll edits, reset-all, and clear-server-data for that browser.
+
 ## Play on Another Device
 
 To share a temporary public URL for another desktop or tablet, use the integrated ngrok flow:
@@ -68,6 +76,8 @@ npm run dev:public
 Share the printed app URL with the other device. The public tunnel stays open only while the command is running.
 
 ngrok exposes your local development server to the internet while it is running. Use it only for trusted demo sessions.
+
+Public tunnel sessions use two separate trust checks. Server-created profiles receive browser-local profile credentials, so another browser can see public server profiles but cannot rename, delete, save with, host as, or join rooms as a profile it does not own. Destructive admin actions require `CASINO_ADMIN_TOKEN`; leave it unset for public demos that do not need admin controls, or set a temporary token and share it only with trusted maintainers.
 
 ## Local Data
 

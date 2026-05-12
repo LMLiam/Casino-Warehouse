@@ -75,6 +75,8 @@ export class GameApp extends GameAppSession {
   protected readonly multiplayer: MultiplayerClient;
   protected players: CasinoPlayer[] = [];
   protected profileState: CasinoSaveState = { version: 1, profiles: [] };
+  protected readonly ownedProfileIds = new Set<string>();
+  protected profileAccessReceived = false;
   protected lastSaveError = '';
   protected pendingInviteRoomCode = '';
   protected pendingInviteServerUrl = '';
@@ -118,6 +120,8 @@ export class GameApp extends GameAppSession {
         }
       },
       onDataState: (state) => this.applyServerData(state),
+      onProfileAccess: (ownedProfileIds) => this.applyProfileAccess(ownedProfileIds),
+      onAdminAccess: (authorized) => this.applyAdminAccess(authorized),
       onError: (message) => {
         if (this.restoringRoomAfterReconnect) {
           const hadRoomState = Boolean(this.multiplayer.room);
@@ -180,6 +184,7 @@ export class GameApp extends GameAppSession {
     this.bindEvents();
     this.audioControls.load();
     this.renderProfileSetup();
+    this.renderAdminControls();
     this.applyInviteFromUrl();
     this.ensureRealtimeConnected();
     document.body.dataset.appReady = 'true';
@@ -215,6 +220,7 @@ export class GameApp extends GameAppSession {
       addMoney: () => this.adjustCurrentBankroll('add'),
       subtractMoney: () => this.adjustCurrentBankroll('subtract'),
       resetMoney: () => this.adjustCurrentBankroll('reset'),
+      authorizeAdmin: () => this.authorizeAdmin(),
       resetAllProfiles: () => this.resetAllBankrolls(),
       clearSaves: () => this.clearServerData(),
       toggleLayoutOverlay: () => this.table.toggleDebugOverlay(),
@@ -436,9 +442,13 @@ export class GameApp extends GameAppSession {
     }
 
     const selectedIds = [...this.elements.profileList.querySelectorAll<HTMLInputElement>('[data-profile-select]:checked')].map((checkbox) => checkbox.value);
-    const ids = selectedIds.length > 0 ? selectedIds : this.profileState.profiles.slice(0, 1).map((profile) => profile.id);
+    const ownedIds = this.profileState.profiles.filter((profile) => this.ownedProfileIds.has(profile.id)).map((profile) => profile.id);
+    const ids = selectedIds.filter((profileId) => this.ownedProfileIds.has(profileId));
+    if (ids.length === 0 && selectedIds.length === 0 && ownedIds.length > 0) {
+      ids.push(ownedIds[0]);
+    }
     if (ids.length === 0) {
-      this.lastSaveError = 'Create at least one profile before starting a session.';
+      this.lastSaveError = 'Create or unlock a profile in this browser before starting a session.';
       this.renderProfileSetup();
       return;
     }
@@ -566,6 +576,10 @@ export class GameApp extends GameAppSession {
     this.multiplayer.adjustBankroll(profile.id, action, readPositiveCreditInput(this.elements.moneyInput));
   }
 
+  private authorizeAdmin(): void {
+    this.multiplayer.authorizeAdmin(this.elements.adminTokenInput.value);
+  }
+
   private resetAllBankrolls(): void {
     if (!this.canUseServer() || !window.confirm('Reset every server profile bankroll to £1,000?')) {
       return;
@@ -586,6 +600,54 @@ export class GameApp extends GameAppSession {
     this.elements.shell.classList.add('hidden');
     this.elements.setup.classList.remove('hidden');
     this.renderProfileSetup();
+  }
+
+  private applyProfileAccess(ownedProfileIds: readonly string[]): void {
+    this.profileAccessReceived = true;
+    this.ownedProfileIds.clear();
+    ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));
+    this.players = this.players.filter((player) => this.ownedProfileIds.has(player.profileId));
+    if (this.players.length === 0) {
+      const clientSession = this.loadClientSession();
+      if (clientSession?.profileIds.some((profileId) => this.ownedProfileIds.has(profileId))) {
+        this.restoreSavedSession(clientSession);
+      }
+    }
+    this.selectedPlayerIndex = Math.min(this.selectedPlayerIndex, Math.max(0, this.players.length - 1));
+    this.renderProfileSetup();
+    if (this.players.length > 0) {
+      this.elements.setup.classList.add('hidden');
+      this.elements.shell.classList.remove('hidden');
+      this.renderPlayerButtons();
+      this.renderGameLobby();
+      this.renderCasino();
+    }
+  }
+
+  private applyAdminAccess(authorized: boolean): void {
+    if (authorized) {
+      this.elements.adminTokenInput.value = '';
+      this.elements.roomStatus.textContent = 'Admin controls unlocked.';
+    } else {
+      this.elements.roomStatus.textContent = 'Admin token was not accepted.';
+    }
+    this.renderAdminControls();
+  }
+
+  private renderAdminControls(): void {
+    const adminButtons = [
+      this.elements.addMoneyButton,
+      this.elements.subtractMoneyButton,
+      this.elements.resetMoneyButton,
+      this.elements.resetAllButton,
+      this.elements.clearSavesButton,
+    ];
+    adminButtons.forEach((button) => {
+      button.disabled = !this.multiplayer.hasAdminAccess;
+    });
+    this.elements.authorizeAdminButton.textContent = this.multiplayer.hasAdminAccess ? 'Admin Unlocked' : 'Unlock Admin';
+    this.elements.authorizeAdminButton.disabled = this.multiplayer.hasAdminAccess;
+    this.elements.adminTokenInput.disabled = this.multiplayer.hasAdminAccess;
   }
 
   private canWager(amount: number): boolean {
