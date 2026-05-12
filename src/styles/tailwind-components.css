@@ -1,0 +1,59 @@
+.casino-button,
+button {
+  @apply min-h-10 rounded-casino border border-casino-line bg-casino-button px-3 text-casino-cream;
+}
+
+button.primary {
+  @apply border-casino-gold bg-[#9a6a16] text-white;
+}
+
+.setup-panel,
+.room-create,
+.money-pill,
+.admin-panel,
+.log-panel,
+.room-card,
+.profile-row,
+.blackjack-table-seat,
+.slots-player,
+.card-row {
+  @apply rounded-casino border-casino-line;
+}
+
+.setup-panel,
+.room-create,
+.money-pill,
+.admin-panel {
+  @apply bg-casino-panel shadow-casino-panel;
+}
+
+.admin-panel.hud-menu {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.profile-create input,
+.settings-panel textarea,
+.room-create input,
+.game-controls input,
+.admin-panel input {
+  @apply rounded-casino border border-casino-line bg-black/40 text-white;
+}
+
+.room-seat,
+.status,
+.blackjack-rail {
+  @apply rounded-casino-pill border border-casino-line;
+}
+
+.fictional-notice,
+.session-notice,
+.room-card span,
+.slots-player span,
+.slots-player small,
+.profile-row small,
+.empty-state,
+.save-status {
+  @apply text-casino-muted;
+}
