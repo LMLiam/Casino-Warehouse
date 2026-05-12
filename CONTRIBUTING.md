@@ -37,6 +37,8 @@ The `main` branch ruleset requires the CodeQL code scanning tool to report resul
 
 GitHub Code Quality is not enabled for this repository yet, so the ruleset does not currently enforce a Code Quality gate. When the `CodeQL - Code Quality / Analyze` check is available and passing on pull requests, maintainers should enable the native Code Quality ruleset requirement with an `Errors` threshold first. Contributors blocked by either gate should inspect the pull request checks and code scanning or Code Quality annotations, fix the reported finding, and push an updated commit.
 
+Supply-chain controls are documented in [docs/supply-chain-security.md](docs/supply-chain-security.md). Workflow changes must keep external GitHub Actions pinned to full commit SHAs with same-line version comments, Dependabot updates enabled for GitHub Actions, and Dependency Review configured for moderate-or-higher vulnerabilities in runtime, development, and unknown scopes.
+
 ## Source File Shape
 
 Keep new `src/` modules focused on one exported top-level element. Classes, React components, exported functions, exported constants, interfaces, types, enums, schemas, and exported variable declarations all count as top-level elements. Private helpers may live next to the one exported element they support.
