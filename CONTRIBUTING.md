@@ -10,6 +10,7 @@ Casino Warehouse is a public, source-available, noncommercial demo project. Publ
 
 - Read the [README](README.md) for local setup.
 - Read the [license](LICENSE). Commercial use is not permitted.
+- Read the [governance policy](GOVERNANCE.md) for maintainer decisions, issue triage, and pull request review expectations.
 - Check existing issues and pull requests before opening duplicates.
 - Keep changes focused. Separate unrelated fixes into separate pull requests.
 
