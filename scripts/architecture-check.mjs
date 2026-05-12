@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mathRandomErrors } from './math-random-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
@@ -75,9 +76,7 @@ function checkImportBoundaries(relativePath, source) {
 }
 
 function checkMathRandom(relativePath, source) {
-  if (relativePath.startsWith('src/game/') && relativePath !== 'src/game/rng/secureRandomUnit.ts' && /\bMath\.random\s*\(/.test(source)) {
-    errors.push(`${relativePath} calls Math.random directly. Inject or import the game RNG abstraction from src/game/rng/secureRandomUnit.ts.`);
-  }
+  errors.push(...mathRandomErrors(relativePath, source));
 }
 
 function checkBankrollMutation(relativePath, source) {

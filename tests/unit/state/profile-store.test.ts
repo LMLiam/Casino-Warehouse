@@ -9,6 +9,7 @@ import { renameProfile } from '../../../src/state/profiles/renameProfile';
 import { replaceProfile } from '../../../src/state/profiles/replaceProfile';
 import { saveProfileStore } from '../../../src/state/profiles/saveProfileStore';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
+import { createStateId } from '../../../src/state/profiles/createStateId';
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -74,6 +75,96 @@ describe('profile store', () => {
     expect(profile.stats.perGame.blackjack).toMatchObject({ gamesPlayed: 1, wagered: 25, won: 50, netProfit: 25 });
     expect(profile.transactions.map((tx) => tx.balanceAfter)).toEqual([1025, 975]);
     expect(profile.transactions[0]).toMatchObject({ profileId: profile.id, balanceBefore: 975, description: 'Blackjack win' });
+  });
+
+  it('creates secure state ids without Math.random', () => {
+    const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    const mathRandom = vi.spyOn(Math, 'random').mockImplementation(() => {
+      throw new Error('Math.random should not be used for state ids.');
+    });
+    const randomUUID = vi
+      .fn<() => `${string}-${string}-${string}-${string}-${string}`>()
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000001')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000002')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000003')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000004');
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { randomUUID } });
+
+    try {
+      const now = new Date('2026-05-04T12:00:00Z');
+      const state = createProfile(createProfile({ version: 1, profiles: [] }, 'One', 100, now), 'Two', 200, now);
+      const firstProfile = state.profiles[0];
+      const secondProfile = state.profiles[1];
+      const updated = recordTransaction(
+        recordTransaction(firstProfile, { gameId: 'slots', type: 'wager', amount: -10, description: 'Spin', metadata: {} }, now),
+        { gameId: 'slots', type: 'payout', amount: 20, description: 'Win', metadata: {} },
+        now,
+      );
+
+      expect(firstProfile.id).toMatch(/^profile-[a-z0-9]+-00000000-0000-4000-8000-000000000001$/);
+      expect(secondProfile.id).toMatch(/^profile-[a-z0-9]+-00000000-0000-4000-8000-000000000002$/);
+      expect(firstProfile.id).not.toBe(secondProfile.id);
+      expect(updated.transactions.map((transaction) => transaction.id)).toEqual([
+        expect.stringMatching(/^tx-[a-z0-9]+-00000000-0000-4000-8000-000000000004$/),
+        expect.stringMatching(/^tx-[a-z0-9]+-00000000-0000-4000-8000-000000000003$/),
+      ]);
+      expect(randomUUID).toHaveBeenCalledTimes(4);
+      expect(mathRandom).not.toHaveBeenCalled();
+    } finally {
+      mathRandom.mockRestore();
+      if (cryptoDescriptor) {
+        Object.defineProperty(globalThis, 'crypto', cryptoDescriptor);
+      }
+    }
+  });
+
+  it('keeps deterministic id generator seams for state unit tests', () => {
+    const profileNow = new Date('2026-05-04T12:00:00Z');
+    const transactionNow = new Date('2026-05-04T12:01:00Z');
+    const idGenerator = vi.fn((prefix: string, now: Date) => `${prefix}-${now.toISOString()}`);
+    const state = createProfile({ version: 1, profiles: [] }, 'Deterministic', 1000, profileNow, idGenerator);
+    const profile = recordTransaction(
+      state.profiles[0],
+      { gameId: 'blackjack', type: 'wager', amount: -25, description: 'Wager', metadata: {} },
+      transactionNow,
+      idGenerator,
+    );
+
+    expect(state.profiles[0].id).toBe('profile-2026-05-04T12:00:00.000Z');
+    expect(profile.transactions[0].id).toBe('tx-2026-05-04T12:01:00.000Z');
+    expect(idGenerator).toHaveBeenNthCalledWith(1, 'profile', profileNow);
+    expect(idGenerator).toHaveBeenNthCalledWith(2, 'tx', transactionNow);
+  });
+
+  it('falls back to secure random bytes for state ids when randomUUID is unavailable', () => {
+    const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      bytes.set([0, 1, 2, 3, 4, 5, 6, 7, 128, 129, 130, 131, 132, 133, 134, 135]);
+      return bytes;
+    });
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: { getRandomValues } });
+
+    try {
+      expect(createStateId('profile', new Date('2026-05-04T12:00:00Z'))).toMatch(/^profile-[a-z0-9]+-00010203-0405-4607-8081-828384858687$/);
+      expect(getRandomValues).toHaveBeenCalledOnce();
+    } finally {
+      if (cryptoDescriptor) {
+        Object.defineProperty(globalThis, 'crypto', cryptoDescriptor);
+      }
+    }
+  });
+
+  it('fails clearly when secure state id generation is unavailable', () => {
+    const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: undefined });
+
+    try {
+      expect(() => createStateId('profile', new Date('2026-05-04T12:00:00Z'))).toThrow('secure state IDs are unavailable');
+    } finally {
+      if (cryptoDescriptor) {
+        Object.defineProperty(globalThis, 'crypto', cryptoDescriptor);
+      }
+    }
   });
 
   it('does not count pushes or admin adjustments as gambling wins', () => {

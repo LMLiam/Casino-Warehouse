@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
 
 describe('topLevelElementErrors', () => {
@@ -63,5 +64,18 @@ export type ScorePhase = 'idle' | 'settled';
 `,
       ),
     ).toEqual(['src/game/gameTypes.ts exports 2 top-level elements (ScoreInput, ScorePhase). Keep one primary exported element per file.']);
+  });
+});
+
+describe('mathRandomErrors', () => {
+  it('rejects direct Math.random calls in non-visual source modules', () => {
+    expect(mathRandomErrors('src/state/profiles/createProfile.ts', 'const id = Math.random().toString(36);')).toEqual([
+      'src/state/profiles/createProfile.ts calls Math.random directly. Use an injected RNG, secure random helper, or keep visual-only randomness in an allowlisted renderer.',
+    ]);
+  });
+
+  it('allows direct Math.random only in visual effect renderers', () => {
+    expect(mathRandomErrors('src/ui/renderers/EffectRenderer.ts', 'const offset = Math.random() * 10;')).toEqual([]);
+    expect(mathRandomErrors('src/state/profiles/createStateId.ts', 'const id = crypto.randomUUID();')).toEqual([]);
   });
 });
