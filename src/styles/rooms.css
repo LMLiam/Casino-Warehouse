@@ -1,0 +1,124 @@
+.room-seat-actions,
+.room-seats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.room-browser {
+  display: grid;
+  gap: 8px;
+  max-height: 190px;
+  overflow: auto;
+  margin-top: 10px;
+}
+
+.room-lobby .room-browser {
+  align-content: start;
+  max-height: min(620px, calc(100vh - 96px));
+  margin-top: 0;
+}
+
+.room-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(255, 213, 107, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+.room-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.room-card b,
+.room-card span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-card span {
+  color: #d9c37b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.room-seat {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 213, 107, 0.28);
+  border-radius: 8px;
+  padding: 6px;
+  color: #f2e8c8;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-seat.mine {
+  border-color: #75ff92;
+  color: #75ff92;
+}
+
+button.room-seat {
+  min-height: 34px;
+  text-align: left;
+}
+
+.room-seat.claimable {
+  border-color: rgba(117, 255, 146, 0.42);
+  color: #ffffff;
+  background: rgba(117, 255, 146, 0.12);
+}
+
+.log-panel {
+  margin-top: 12px;
+  padding: 10px 0 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 213, 107, 0.24);
+  border-radius: 0;
+  background: transparent;
+}
+
+.log-panel summary {
+  cursor: pointer;
+  color: var(--gold-bright);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#log,
+#auditLog {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  max-height: 220px;
+  margin-top: 10px;
+  overflow: auto;
+  color: #ded6ba;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+#log p,
+#auditLog p {
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#auditLog b {
+  color: var(--gold-bright);
+}

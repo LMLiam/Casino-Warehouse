@@ -1,0 +1,254 @@
+.unsupported-device {
+  display: none;
+}
+
+.connection-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 6, 5, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.connection-overlay div {
+  display: grid;
+  gap: 10px;
+  width: min(360px, calc(100vw - 48px));
+  padding: 22px;
+  border: 1px solid rgba(255, 213, 107, 0.44);
+  border-radius: 8px;
+  background: rgba(6, 13, 10, 0.94);
+  text-align: center;
+}
+
+.setup-screen {
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100vh;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.58)),
+    url('/assets/lobby/warehouse-lobby.png') center / cover;
+}
+
+@media (max-width: 719px) {
+  body {
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .setup-screen,
+  .game-shell {
+    display: none !important;
+  }
+
+  .unsupported-device {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 24px;
+    background:
+      linear-gradient(rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.76)),
+      url('/assets/lobby/warehouse-lobby.png') center / cover;
+  }
+
+  .unsupported-device div {
+    display: grid;
+    gap: 12px;
+    max-width: 420px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+}
+
+.setup-panel {
+  display: grid;
+  gap: 18px;
+  width: min(760px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 28px;
+  border: 1px solid rgba(255, 213, 107, 0.54);
+  border-radius: 8px;
+  background: rgba(6, 13, 10, 0.9);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.56);
+}
+
+.setup-panel .eyebrow {
+  color: var(--gold-bright);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.profile-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+  align-items: end;
+}
+
+.profile-create label,
+.settings-panel {
+  display: grid;
+  gap: 6px;
+  color: #d9c37b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.profile-create input,
+.settings-panel textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.settings-panel textarea {
+  min-height: 110px;
+  resize: vertical;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+}
+
+.settings-panel input[type='range'] {
+  width: 100%;
+  accent-color: var(--gold-bright);
+}
+
+.toggle-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.profile-list {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(255, 213, 107, 0.28);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.profile-row label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.profile-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--gold-bright);
+}
+
+.profile-row span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.profile-row b,
+.profile-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-row small,
+.empty-state,
+.save-status {
+  color: #d9c37b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.profile-row div {
+  display: flex;
+  gap: 6px;
+}
+
+.profile-row button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.profile-action-prompt {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 213, 107, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 213, 107, 0.08);
+  animation: profile-prompt-in 180ms ease both;
+}
+
+.profile-action-prompt input {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.42);
+  accent-color: auto;
+}
+
+.profile-action-prompt span {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.profile-action-prompt.danger {
+  border-color: rgba(255, 125, 125, 0.56);
+  background: rgba(255, 125, 125, 0.1);
+}
+
+.profile-action-prompt.danger button:first-of-type {
+  border-color: #ff7d7d;
+  background: #642323;
+}
+
+@keyframes profile-prompt-in {
+  from {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.settings-panel summary {
+  cursor: pointer;
+  color: var(--gold-bright);
+  font-weight: 900;
+}
