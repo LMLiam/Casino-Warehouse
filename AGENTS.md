@@ -118,7 +118,8 @@ When asked to complete an issue, follow this loop:
 6. Fix the issues identified by those review comments.
 7. Push the fixes to the pull request and wait for CI to pass.
 8. Respond to the review comments and resolve the review threads or conversations.
-9. Continue again from step 4, repeating the review, comment, fix, push, CI-wait, respond, and resolve loop until no further issues are found.
+9. Before presenting the pull request as complete or ready, verify that the pull request branch is up to date with the latest target branch, normally `main`. Do not rely on mergeability alone. If the branch is stale, update it from the target branch, push the updated branch, and wait for the required checks to pass again.
+10. Continue again from step 4, repeating the review, comment, fix, push, CI-wait, base-branch freshness check, respond, and resolve loop until no further issues are found.
 
 The loop ends with the pull request ready to merge. Do not self-merge unless the user or a maintainer explicitly asks for merge handling.
 
@@ -134,6 +135,7 @@ Before opening or updating a PR:
 - Add the right `type:*` and `area:*` labels.
 - Link the issue being completed when applicable.
 - Run the relevant local checks and record the exact commands.
+- Confirm the pull request branch is up to date with the latest target branch, normally `main`, before marking the work complete.
 - Confirm generated build output is not committed.
 
 ## Documentation Guidance
