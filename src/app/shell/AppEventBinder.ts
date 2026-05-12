@@ -19,6 +19,7 @@ interface AppEventCallbacks {
   readonly addMoney: () => void;
   readonly subtractMoney: () => void;
   readonly resetMoney: () => void;
+  readonly authorizeAdmin: () => void;
   readonly resetAllProfiles: () => void;
   readonly clearSaves: () => void;
   readonly toggleLayoutOverlay: () => void;
@@ -87,6 +88,7 @@ export class AppEventBinder {
     this.elements.addMoneyButton.addEventListener('click', () => this.callbacks.addMoney());
     this.elements.subtractMoneyButton.addEventListener('click', () => this.callbacks.subtractMoney());
     this.elements.resetMoneyButton.addEventListener('click', () => this.callbacks.resetMoney());
+    this.elements.authorizeAdminButton.addEventListener('click', () => this.callbacks.authorizeAdmin());
     this.elements.resetAllButton.addEventListener('click', () => this.callbacks.resetAllProfiles());
     this.elements.clearSavesButton.addEventListener('click', () => this.callbacks.clearSaves());
     this.elements.layoutOverlayButton.addEventListener('click', () => this.callbacks.toggleLayoutOverlay());

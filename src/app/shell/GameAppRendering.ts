@@ -55,6 +55,8 @@ export abstract class GameAppRendering {
   protected abstract sessionWagered: number;
   protected abstract multiplayerRooms: readonly RoomSummary[];
   protected abstract connectionState: RealtimeConnectionState;
+  protected abstract readonly ownedProfileIds: ReadonlySet<string>;
+  protected abstract profileAccessReceived: boolean;
   protected abstract get currentPlayer(): CasinoPlayer | undefined;
 
   protected abstract currentProfile(): CasinoProfile | undefined;
@@ -90,6 +92,7 @@ export abstract class GameAppRendering {
     this.profileSetupView.render(
       this.profileState,
       this.lastSaveError,
+      this.ownedProfileIds,
       (profileId, nextName) => {
         if (this.canUseServer()) {
           this.multiplayer.renameProfile(profileId, nextName);

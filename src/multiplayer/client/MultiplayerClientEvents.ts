@@ -10,6 +10,8 @@ export interface MultiplayerClientEvents {
   readonly onStatus: (status: string) => void;
   readonly onConnectionState: (state: RealtimeConnectionState) => void;
   readonly onDataState: (state: ServerDataState) => void;
+  readonly onProfileAccess: (ownedProfileIds: readonly string[]) => void;
+  readonly onAdminAccess: (authorized: boolean) => void;
   readonly onRoom: (room: RoomSnapshot) => void;
   readonly onRoomCleared: () => void;
   readonly onRoomList: (gameId: RoomGameId, rooms: readonly RoomSummary[]) => void;

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { adminTokenStorageKey } from '../../../src/multiplayer/client/adminTokenStorageKey';
 import { defaultRealtimeUrl } from '../../../src/multiplayer/client/defaultRealtimeUrl';
 import { MultiplayerClient } from '../../../src/multiplayer/client/MultiplayerClient';
 import type { MultiplayerClientEvents } from '../../../src/multiplayer/client/MultiplayerClientEvents';
+import { profileTokensStorageKey } from '../../../src/multiplayer/client/profileTokensStorageKey';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 
@@ -166,6 +168,8 @@ describe('multiplayer realtime client reconnect reloads', () => {
     vi.useFakeTimers();
     const localStorage = {
       getItem: vi.fn((key: string) => (key === 'casino_realtime_url' ? 'wss://saved.example/ws' : null)),
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
     };
     vi.stubGlobal('localStorage', localStorage);
     vi.stubGlobal('WebSocket', FakeWebSocket);
@@ -185,6 +189,8 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.connect('ws://casino.test/ws');
     const socket = FakeWebSocket.instances[0];
     socket.open();
+    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    socket.serverMessage({ version: 1, type: 'admin-access', authorized: true });
     socket.rawMessage('{broken');
     expect(events.onError).toHaveBeenCalledWith('Received an invalid server message.');
 
@@ -198,7 +204,6 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.requestData();
     client.createProfile('Alice');
     client.renameProfile('profile-a', 'Alicia');
-    client.deleteProfile('profile-a');
     client.saveSession({
       profileIds: ['profile-a'],
       selectedPlayerIndex: 0,
@@ -212,8 +217,10 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.resetAllBankrolls();
     client.clearServerData();
     client.listRooms('blackjack');
+    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
     client.createRoom('beat-the-house', 'QA Room', 3, 'profile-a', 'Alice', 1000);
     client.joinRoom('beat-the-house', 'ROOM42', 'player', 'profile-a', 'Alice', 1000);
+    client.deleteProfile('profile-a');
     client.leaveRoom();
 
     expect(socket.sent.map((payload) => JSON.parse(payload).type)).toEqual(
@@ -233,10 +240,60 @@ describe('multiplayer realtime client reconnect reloads', () => {
       ]),
     );
   });
+
+  it('stores profile credentials and gates owned-profile and admin commands', () => {
+    vi.useFakeTimers();
+    const localStorage = createMemoryStorage();
+    vi.stubGlobal('localStorage', localStorage);
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'https://casino.test/play', host: 'casino.test', protocol: 'https:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+    client.connect('ws://casino.test/ws');
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+
+    expect(socket.sent.map((payload) => JSON.parse(payload).type)).toEqual(['authorize-profiles', 'request-data']);
+
+    client.createRoom('beat-the-house', 'Blocked Room', 3, 'profile-a', 'Alice', 1000);
+    client.adjustBankroll('profile-a', 'add', 100);
+    expect(events.onError).toHaveBeenCalledWith('This browser does not own that server profile.');
+    expect(events.onError).toHaveBeenCalledWith('Admin controls are locked for this browser.');
+
+    socket.serverMessage({ version: 1, type: 'profile-credentials', profileId: 'profile-a', profileToken: 'profile-token' });
+    expect(JSON.parse(localStorage.getItem(profileTokensStorageKey) ?? '[]')).toEqual([{ profileId: 'profile-a', profileToken: 'profile-token' }]);
+
+    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    expect(client.ownsProfile('profile-a')).toBe(true);
+    expect(events.onProfileAccess).toHaveBeenCalledWith(['profile-a']);
+    client.createRoom('beat-the-house', 'Allowed Room', 3, 'profile-a', 'Alice', 1000);
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'create-room', profileId: 'profile-a' });
+
+    client.authorizeAdmin(' admin-secret ');
+    expect(localStorage.getItem(adminTokenStorageKey)).toBe('admin-secret');
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({ version: 1, type: 'authorize-admin', adminToken: 'admin-secret' });
+
+    socket.serverMessage({ version: 1, type: 'admin-access', authorized: false });
+    expect(localStorage.getItem(adminTokenStorageKey)).toBeNull();
+    expect(client.hasAdminAccess).toBe(false);
+
+    socket.serverMessage({ version: 1, type: 'admin-access', authorized: true });
+    client.adjustBankroll('profile-a', 'add', 100);
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'admin-bankroll', profileId: 'profile-a' });
+  });
 });
 
 const createEvents = (): MultiplayerClientEvents => ({
   onConnectionState: vi.fn(),
+  onProfileAccess: vi.fn(),
+  onAdminAccess: vi.fn(),
   onDataState: vi.fn(),
   onError: vi.fn(),
   onRoom: vi.fn(),
@@ -245,6 +302,19 @@ const createEvents = (): MultiplayerClientEvents => ({
   onSettlement: vi.fn(),
   onStatus: vi.fn(),
 });
+
+const createMemoryStorage = () => {
+  const store = new Map<string, string>();
+  return {
+    getItem: vi.fn((key: string) => store.get(key) ?? null),
+    removeItem: vi.fn((key: string) => {
+      store.delete(key);
+    }),
+    setItem: vi.fn((key: string, value: string) => {
+      store.set(key, value);
+    }),
+  };
+};
 
 const createRoomSnapshot = (): RoomSnapshot => ({
   roomId: 'ROOM42',

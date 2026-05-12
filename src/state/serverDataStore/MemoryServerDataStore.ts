@@ -20,6 +20,7 @@ export class MemoryServerDataStore implements ServerDataStore {
   public readonly database: ServerDatabaseChoice = 'memory';
   private profileState: CasinoSaveState = emptySaveState();
   private session: CasinoSessionState | undefined;
+  private profileTokenHashes = new Map<string, string>();
 
   public snapshot(): ServerDataSnapshot {
     return { database: this.database, profileState: this.profileState, session: this.session };
@@ -37,6 +38,7 @@ export class MemoryServerDataStore implements ServerDataStore {
 
   public deleteProfile(profileId: string): ServerDataSnapshot {
     this.profileState = deleteProfile(this.profileState, profileId);
+    this.deleteProfileTokenHash(profileId);
     this.session = this.session
       ? createSessionState(
           this.session.profileIds.filter((id) => id !== profileId),
@@ -60,6 +62,7 @@ export class MemoryServerDataStore implements ServerDataStore {
   public clear(): ServerDataSnapshot {
     this.profileState = emptySaveState();
     this.session = undefined;
+    this.clearProfileTokenHashes();
     return this.snapshot();
   }
 
@@ -81,6 +84,35 @@ export class MemoryServerDataStore implements ServerDataStore {
     };
     this.profileState = { ...this.profileState, profiles: [...this.profileState.profiles, profile] };
     return profile;
+  }
+
+  public profileTokenHash(profileId: string): string | undefined {
+    return this.profileTokenHashes.get(profileId);
+  }
+
+  public setProfileTokenHash(profileId: string, tokenHash: string): void {
+    this.profileTokenHashes.set(profileId, tokenHash);
+  }
+
+  public deleteProfileTokenHash(profileId: string): void {
+    this.profileTokenHashes.delete(profileId);
+  }
+
+  public clearProfileTokenHashes(): void {
+    this.profileTokenHashes.clear();
+  }
+
+  protected loadProfileTokenHashesFromJson(profileAuthJson: string): void {
+    const parsed: unknown = JSON.parse(profileAuthJson);
+    if (!isProfileTokenHashRecord(parsed)) {
+      this.profileTokenHashes.clear();
+      return;
+    }
+    this.profileTokenHashes = new Map(Object.entries(parsed));
+  }
+
+  protected profileTokenHashEntries(): readonly (readonly [string, string])[] {
+    return [...this.profileTokenHashes.entries()];
   }
 
   public setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined {
@@ -112,3 +144,6 @@ export class MemoryServerDataStore implements ServerDataStore {
 }
 
 const safeMoney = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0);
+
+const isProfileTokenHashRecord = (value: unknown): value is Record<string, string> =>
+  typeof value === 'object' && value !== null && Object.values(value).every((tokenHash) => typeof tokenHash === 'string');

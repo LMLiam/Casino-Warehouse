@@ -43,6 +43,10 @@ describe('per-game multiplayer protocol', () => {
   it('requires game-scoped create, list, and join messages', () => {
     expect(parseClientMessage({ version: 1, type: 'request-data' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'heartbeat-ack', sentAt: Date.now() })).toMatchObject({ ok: true });
+    expect(parseClientMessage({ version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: 'a', profileToken: 'profile-token' }] })).toMatchObject({
+      ok: true,
+    });
+    expect(parseClientMessage({ version: 1, type: 'authorize-admin', adminToken: 'admin-token' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'create-profile', profileName: 'Ada' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'admin-bankroll', profileId: 'a', action: 'add', amount: 50 })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'list-rooms', gameId: 'blackjack' })).toMatchObject({ ok: true });
@@ -108,6 +112,15 @@ describe('per-game multiplayer protocol', () => {
     const message = join('slots:thai-princess', 'ROOM01', 'alice', 300, 'spectator');
     const room = new RoomAuthority().handle('a', create('beat-the-house', 'alice')).direct;
     expect(parseClientMessage(JSON.parse(encodeMessage(message))).message).toEqual(message);
+    expect(decodeServerMessage('{"version":1,"type":"profile-credentials","profileId":"alice","profileToken":"token"}')).toMatchObject({
+      type: 'profile-credentials',
+      profileId: 'alice',
+    });
+    expect(decodeServerMessage('{"version":1,"type":"profile-access","ownedProfileIds":["alice"]}')).toMatchObject({
+      type: 'profile-access',
+      ownedProfileIds: ['alice'],
+    });
+    expect(decodeServerMessage('{"version":1,"type":"admin-access","authorized":true}')).toMatchObject({ type: 'admin-access', authorized: true });
     expect(decodeServerMessage(JSON.stringify({ version: 1, type: 'room-state', room }))?.type).toBe('room-state');
     expect(decodeServerMessage('{"version":1,"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();
