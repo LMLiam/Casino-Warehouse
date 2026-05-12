@@ -995,7 +995,15 @@ const expectBaselineSecurityHeaders = (response: Response): void => {
   expect(response.headers.get('x-content-type-options')).toBe('nosniff');
   expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   expect(response.headers.get('x-frame-options')).toBe('DENY');
+  expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+  expect(response.headers.get('cross-origin-resource-policy')).toBe('same-origin');
+  expect(response.headers.get('origin-agent-cluster')).toBe('?1');
   expect(response.headers.get('permissions-policy')).toBe('camera=(), geolocation=(), microphone=(), payment=(), usb=()');
+  expect(response.headers.get('strict-transport-security')).toBeNull();
+  expect(response.headers.get('x-dns-prefetch-control')).toBe('off');
+  expect(response.headers.get('x-download-options')).toBe('noopen');
+  expect(response.headers.get('x-permitted-cross-domain-policies')).toBe('none');
+  expect(response.headers.get('x-xss-protection')).toBe('0');
   expect(response.headers.get('content-security-policy')).toBe(
     [
       "default-src 'self'",
@@ -1010,7 +1018,7 @@ const expectBaselineSecurityHeaders = (response: Response): void => {
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
       "worker-src 'self' blob:",
-    ].join('; '),
+    ].join(';'),
   );
 };
 
