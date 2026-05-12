@@ -16,6 +16,13 @@ export const scoreTotal = (value: number): number => value * privateScale;
     ).toEqual([]);
   });
 
+  it('accepts the supported single exported declaration shapes', () => {
+    expect(topLevelElementErrors('src/ui/Example.tsx', 'export default class Example {}')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'export default function example() { return 1; }')).toEqual([]);
+    expect(topLevelElementErrors('src/game/Phase.ts', "export enum Phase { Betting = 'betting' }")).toEqual([]);
+    expect(topLevelElementErrors('src/game/ignored.ts', '')).toEqual([]);
+  });
+
   it('rejects multiple exported top-level elements', () => {
     const errors = topLevelElementErrors(
       'src/game/example.ts',

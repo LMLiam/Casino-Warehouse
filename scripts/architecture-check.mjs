@@ -75,13 +75,13 @@ function checkImportBoundaries(relativePath, source) {
 }
 
 function checkMathRandom(relativePath, source) {
-  if (relativePath.startsWith('src/game/') && relativePath !== 'src/game/rng.ts' && /\bMath\.random\s*\(/.test(source)) {
-    errors.push(`${relativePath} calls Math.random directly. Inject or import the game RNG abstraction from src/game/rng.ts.`);
+  if (relativePath.startsWith('src/game/') && relativePath !== 'src/game/rng/secureRandomUnit.ts' && /\bMath\.random\s*\(/.test(source)) {
+    errors.push(`${relativePath} calls Math.random directly. Inject or import the game RNG abstraction from src/game/rng/secureRandomUnit.ts.`);
   }
 }
 
 function checkBankrollMutation(relativePath, source) {
-  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/multiplayer/roomAuthority.ts', 'src/state/profiles.ts']);
+  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/multiplayer/roomAuthority.ts']);
   const mutatesBankroll = /\bthis\.bankroll\s*(?:[+\-*/]?=|\+\+|--)|\.bankroll\s*(?:[+\-*/]?=|\+\+|--)/.test(source);
   if (mutatesBankroll && !allowed.has(relativePath)) {
     errors.push(`${relativePath} mutates bankroll directly. Route changes through the authorised game/room/profile ledger modules.`);

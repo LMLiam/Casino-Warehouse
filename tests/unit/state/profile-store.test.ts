@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createProfile } from '../../../src/state/profiles/createProfile';
 import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
+import { parseCasinoProfile } from '../../../src/state/profiles/parseCasinoProfile';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import { recordTransaction } from '../../../src/state/profiles/recordTransaction';
 import { renameProfile } from '../../../src/state/profiles/renameProfile';
@@ -126,6 +127,55 @@ describe('profile store', () => {
     expect(imported.profiles[0].stats.netProfit).toBe(10);
     expect(imported.profiles[0].transactions.map((transaction) => transaction.type)).toEqual(['push_refund', 'admin_adjustment']);
     expect(imported.profiles[0].transactions[0].description).toBe('Old push');
+  });
+
+  it('normalizes partial profile records that bypass save-state schema defaults', () => {
+    const empty = parseCasinoProfile({ id: 'empty', name: '   ', stats: null });
+    const rich = parseCasinoProfile({
+      id: 'rich',
+      name: '  Rich  ',
+      bankroll: Number.NaN,
+      stats: {
+        perGame: {
+          ignored: null,
+          slots: { gamesPlayed: 2, wagered: Number.NaN, won: 25, netProfit: 7 },
+        },
+      },
+      transactions: [
+        {
+          id: 'reset',
+          gameId: 'admin',
+          roomId: 'room-1',
+          sessionId: 'session-1',
+          type: 'reset',
+          amount: Number.NaN,
+          balanceBefore: Number.NaN,
+          balanceAfter: Number.NaN,
+          metadata: { keep: 'yes', count: 2, flag: false, drop: {} },
+        },
+        { id: 'import', gameId: 'admin', type: 'import', amount: 5, balanceBefore: 0, balanceAfter: 5 },
+        { id: 'correction', gameId: 'admin', type: 'correction', amount: -5, balanceBefore: 5, balanceAfter: 0 },
+      ],
+    });
+
+    expect(empty).toMatchObject({ name: 'Player', bankroll: 0, transactions: [] });
+    expect(rich).toMatchObject({
+      name: 'Rich',
+      bankroll: 0,
+      transactions: [
+        expect.objectContaining({
+          roomId: 'room-1',
+          sessionId: 'session-1',
+          type: 'reset',
+          amount: 0,
+          description: 'Imported legacy transaction.',
+          metadata: { keep: 'yes', count: 2, flag: false },
+        }),
+        expect.objectContaining({ type: 'import' }),
+        expect.objectContaining({ type: 'correction' }),
+      ],
+    });
+    expect(rich.stats.perGame.slots).toMatchObject({ gamesPlayed: 2, wagered: 0, won: 25, netProfit: 7 });
   });
 
   it('rejects invalid imported profiles and transactions', () => {
