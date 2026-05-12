@@ -27,10 +27,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 function checkWorkflowActionPins(failures) {
-  for (const file of workflowFiles()) {
-    const lines = readFileSync(file, 'utf8').split('\n');
+  const workflows = workflowFiles().map((file) => ({
+    path: file,
+    source: readFileSync(file, 'utf8'),
+  }));
+  failures.push(...workflowActionPinFailures(workflows));
+}
+
+export function workflowActionPinFailures(workflows) {
+  const failures = [];
+
+  for (const workflow of workflows) {
+    const lines = workflow.source.split('\n');
     lines.forEach((line, index) => {
-      const match = line.match(/^\s*uses:\s*([^#\s]+)(?:\s+#\s*(\S.*))?$/);
+      const match = line.match(/^\s*(?:-\s*)?uses:\s*([^#\s]+)(?:\s+#\s*(\S.*))?$/);
       if (!match) {
         return;
       }
@@ -42,19 +52,21 @@ function checkWorkflowActionPins(failures) {
 
       const [, ref] = target.split('@');
       if (!ref) {
-        failures.push(`${file}:${index + 1} uses ${target} without an explicit ref.`);
+        failures.push(`${workflow.path}:${index + 1} uses ${target} without an explicit ref.`);
         return;
       }
 
       if (!fullShaPattern.test(ref)) {
-        failures.push(`${file}:${index + 1} uses ${target}. Pin external actions to a full 40-character commit SHA.`);
+        failures.push(`${workflow.path}:${index + 1} uses ${target}. Pin external actions to a full 40-character commit SHA.`);
       }
 
       if (!match[2]) {
-        failures.push(`${file}:${index + 1} must keep a same-line version comment for Dependabot, for example "# v1.2.3".`);
+        failures.push(`${workflow.path}:${index + 1} must keep a same-line version comment for Dependabot, for example "# v1.2.3".`);
       }
     });
   }
+
+  return failures;
 }
 
 function checkDependabotActionsUpdates(failures) {
@@ -95,13 +107,20 @@ export function dependabotActionsUpdateFailures(source, path = dependabotPath) {
 
 function checkDependencyReviewPolicy(failures) {
   const source = readFileSync(dependencyReviewPath, 'utf8');
+  failures.push(...dependencyReviewPolicyFailures(source, dependencyReviewPath));
+}
+
+export function dependencyReviewPolicyFailures(source, path = dependencyReviewPath) {
   const requiredFragments = ['fail-on-severity: moderate', 'fail-on-scopes: runtime,development,unknown'];
+  const failures = [];
 
   for (const fragment of requiredFragments) {
     if (!source.includes(fragment)) {
-      failures.push(`${dependencyReviewPath} must include "${fragment}".`);
+      failures.push(`${path} must include "${fragment}".`);
     }
   }
+
+  return failures;
 }
 
 function workflowFiles() {
