@@ -198,6 +198,7 @@ export abstract class RoomAuthorityBase {
   protected clearAllRooms(reason: string): AuthorityResult {
     const broadcasts: RoomSnapshot[] = [];
     const roomClosures: Array<NonNullable<AuthorityResult['roomClosures']>[number]> = [];
+    const broadcastRecipients: Array<NonNullable<AuthorityResult['broadcastRecipients']>[number]> = [];
 
     for (const room of [...this.rooms.values()]) {
       const connectionIds = this.roomConnectionIds(room);
@@ -206,17 +207,18 @@ export abstract class RoomAuthorityBase {
         this.rooms.delete(room.roomId);
         continue;
       }
-      if (connectionIds.length > 0) {
-        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds, reason });
-      }
       room.players.clear();
       room.spectators.clear();
       room.connectionToMember.clear();
       this.resetServerManagedRoom(room);
-      broadcasts.push(this.broadcast(room).broadcasts[0]);
+      const snapshot = this.broadcast(room).broadcasts[0];
+      broadcasts.push(snapshot);
+      if (connectionIds.length > 0) {
+        broadcastRecipients.push({ roomId: snapshot.roomId, connectionIds });
+      }
     }
 
-    return { broadcasts, settlements: [], roomClosures };
+    return { broadcasts, settlements: [], roomClosures, broadcastRecipients };
   }
 
   protected snapshot(room: RoomState): RoomSnapshot {

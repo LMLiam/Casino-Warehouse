@@ -116,8 +116,9 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         closure.connectionIds,
       );
     }
+    const broadcastRecipients = new Map((result.broadcastRecipients ?? []).map((entry) => [entry.roomId, entry.connectionIds]));
     for (const snapshot of result.broadcasts) {
-      broadcast({ version: protocolVersion, type: 'room-state', room: snapshot }, connectionIds(snapshot));
+      broadcast({ version: protocolVersion, type: 'room-state', room: snapshot }, broadcastRecipients.get(snapshot.roomId) ?? connectionIds(snapshot));
     }
     broadcastRoomLists(roomListGameIds(result));
     if (result.settlements.length > 0) {
@@ -161,7 +162,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         case 'rename-profile':
           requireOwnedProfile(peer, message.profileId);
           dataStore.renameProfile(message.profileId, message.profileName);
-          broadcastDataState();
+          emitAuthorityResult(peer, authority.reconcileProfiles('profile-renamed'), { forceDataState: true });
           return true;
         case 'delete-profile':
           requireOwnedProfile(peer, message.profileId);

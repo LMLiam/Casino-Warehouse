@@ -431,6 +431,56 @@ describe('multiplayer WebSocket server', () => {
     );
   });
 
+  it('reconciles active room profile names before data-state when a profile is renamed', async () => {
+    const baseUrl = await startServer();
+    const alice = await connect(baseUrl.ws);
+    const aliceProfile = await createServerProfile(alice, 'Rename Room Alice');
+
+    alice.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: aliceProfile.name,
+      bankroll: aliceProfile.bankroll,
+    });
+    const created = await alice.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected room-created message.');
+    }
+
+    const checkpoint = alice.checkpoint();
+    alice.send({ version: 1, type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Renamed Room Alice' });
+    const renamedRoom = await waitForMessageSince(
+      alice,
+      checkpoint,
+      (message) =>
+        message.type === 'room-state' &&
+        message.room.roomId === created.room.roomId &&
+        roomMembers(message.room).some((player) => player.profileId === aliceProfile.id && player.profileName === 'Renamed Room Alice'),
+    );
+    await waitForMessageSince(
+      alice,
+      checkpoint,
+      (message) =>
+        message.type === 'data-state' &&
+        message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.name === 'Renamed Room Alice'),
+    );
+
+    if (renamedRoom.type !== 'room-state') {
+      throw new Error('Expected rename room-state reconciliation.');
+    }
+    expect(messageIndexSince(alice, checkpoint, (message) => message.type === 'room-state' && message.room.roomId === created.room.roomId)).toBeLessThan(
+      messageIndexSince(
+        alice,
+        checkpoint,
+        (message) =>
+          message.type === 'data-state' &&
+          message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.name === 'Renamed Room Alice'),
+      ),
+    );
+  });
+
   it('reconciles active room bankrolls before data-state for admin-bankroll and reset-all', async () => {
     const baseUrl = await startServer('.', undefined, { adminToken: 'server-admin-secret' });
     const alice = await connect(baseUrl.ws);
@@ -564,28 +614,28 @@ describe('multiplayer WebSocket server', () => {
       hostCheckpoint,
       (message) => message.type === 'room-closed' && message.roomId === created.room.roomId && message.reason === 'server-data-cleared',
     );
-    await waitForMessageSince(
+    const mainReset = await waitForMessageSince(
       mainPlayer,
       mainCheckpoint,
       (message) =>
-        (message.type === 'room-closed' && message.roomId === mainBeatRoomId && message.reason === 'server-data-cleared') ||
-        (message.type === 'room-state' && message.room.roomId === mainBeatRoomId && message.room.players.length === 0 && message.room.spectators.length === 0),
+        message.type === 'room-state' && message.room.roomId === mainBeatRoomId && message.room.players.length === 0 && message.room.spectators.length === 0,
     );
     await waitForMessageSince(host, hostCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0);
     await waitForMessageSince(mainPlayer, mainCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0);
     await waitForMessageSince(admin, adminCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0);
 
+    if (mainReset.type !== 'room-state') {
+      throw new Error('Expected server-managed room reset state.');
+    }
+    expect(mainReset.room.players).toEqual([]);
+    expect(mainReset.room.spectators).toEqual([]);
+    expect(mainPlayer.messagesSince(mainCheckpoint).some((message) => message.type === 'room-closed' && message.roomId === mainBeatRoomId)).toBe(false);
     expect(messageIndexSince(host, hostCheckpoint, (message) => message.type === 'room-closed' && message.roomId === created.room.roomId)).toBeLessThan(
       messageIndexSince(host, hostCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0),
     );
-    expect(
-      messageIndexSince(
-        mainPlayer,
-        mainCheckpoint,
-        (message) =>
-          (message.type === 'room-closed' && message.roomId === mainBeatRoomId) || (message.type === 'room-state' && message.room.roomId === mainBeatRoomId),
-      ),
-    ).toBeLessThan(messageIndexSince(mainPlayer, mainCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0));
+    expect(messageIndexSince(mainPlayer, mainCheckpoint, (message) => message.type === 'room-state' && message.room.roomId === mainBeatRoomId)).toBeLessThan(
+      messageIndexSince(mainPlayer, mainCheckpoint, (message) => message.type === 'data-state' && message.profileState.profiles.length === 0),
+    );
 
     const listCheckpoint = admin.checkpoint();
     admin.send({ version: 1, type: 'list-rooms', gameId: 'beat-the-house' });
@@ -793,6 +843,8 @@ const waitForReceivedCount = async (probe: SocketProbe, predicate: (message: Ser
   }
   throw new Error(`Timed out waiting for ${count} matching WebSocket messages.`);
 };
+
+const roomMembers = (room: RoomSnapshot) => [...room.players, ...room.spectators];
 
 const waitForMessageSince = async (probe: SocketProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): Promise<ServerMessage> => {
   const deadline = Date.now() + 2_000;
