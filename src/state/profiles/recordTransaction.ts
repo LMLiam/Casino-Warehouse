@@ -1,12 +1,16 @@
 import type { BankrollTransaction } from './BankrollTransaction';
 import type { CasinoProfile } from './CasinoProfile';
+import { createStateId } from './createStateId';
 import type { PerGameStats } from './PerGameStats';
 import type { ProfileStats } from './ProfileStats';
+
+type StateIdGenerator = (prefix: string, now: Date) => string;
 
 export const recordTransaction = (
   profile: CasinoProfile,
   transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
   now = new Date(),
+  idGenerator: StateIdGenerator = createStateId,
 ): CasinoProfile => {
   const amount = Math.floor(transaction.amount);
   const balanceBefore = profile.bankroll;
@@ -41,7 +45,7 @@ export const recordTransaction = (
     stats: nextStats,
     transactions: [
       {
-        id: createId('tx', now),
+        id: idGenerator('tx', now),
         profileId: profile.id,
         at: now.toISOString(),
         gameId: transaction.gameId,
@@ -59,8 +63,6 @@ export const recordTransaction = (
     updatedAt: now.toISOString(),
   };
 };
-
-const createId = (prefix: string, now: Date): string => `${prefix}-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const emptyPerGameStats = (): PerGameStats => ({
   gamesPlayed: 0,
