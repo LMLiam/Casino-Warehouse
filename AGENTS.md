@@ -108,6 +108,8 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 
 ## Issue Completion Workflow
 
+This workflow is mandatory for any issue or pull-request completion work, including follow-up chats, resumed goals, stale-branch updates, review-fix requests, and "is this ready?" checks. Do not present an issue or pull request as complete, ready, or ready to merge until the full loop below has been run against the current pull-request head and the latest target branch.
+
 When asked to complete an issue, follow this loop:
 
 1. Do the work requested by the issue.
@@ -121,7 +123,7 @@ When asked to complete an issue, follow this loop:
 9. Before presenting the pull request as complete or ready, verify that the pull request branch is up to date with the latest target branch, normally `main`. Do not rely on mergeability alone. If the branch is stale, update it from the target branch, push the updated branch, and wait for the required checks to pass again.
 10. Continue again from step 4, repeating the review, comment, fix, push, CI-wait, base-branch freshness check, respond, and resolve loop until no further issues are found.
 
-The loop ends with the pull request ready to merge. Do not self-merge unless the user or a maintainer explicitly asks for merge handling.
+After any new commit, rebase, merge from the target branch, force-push, PR body edit that reruns checks, or resolved-comment action, treat the pull request as needing another pass through the loop. The loop ends only when the current PR head is up to date with the target branch, required checks are passing, review threads are resolved or intentionally left open with a clear note, and a fresh self-review finds no further issues. Do not self-merge unless the user or a maintainer explicitly asks for merge handling.
 
 ## Pull Request Checklist
 
@@ -136,6 +138,7 @@ Before opening or updating a PR:
 - Link the issue being completed when applicable.
 - Run the relevant local checks and record the exact commands.
 - Confirm the pull request branch is up to date with the latest target branch, normally `main`, before marking the work complete.
+- Confirm the issue completion review loop has been run on the current PR head, including after any rebase or follow-up fix.
 - Confirm generated build output is not committed.
 
 ## Documentation Guidance
