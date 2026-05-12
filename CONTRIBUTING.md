@@ -69,7 +69,23 @@ npm run visual
 ```
 
 Playwright defaults to two workers so browser tests catch shared-state
-collisions quickly. For debugging a flaky browser test serially, use:
+collisions quickly without overloading local laptops. CI runs the same
+`npm run visual` script through a coverage matrix to shorten the e2e
+wall-clock time while keeping visual regression and browser workflow coverage
+on laptop and tablet, plus multiplayer coverage in the required aggregate
+`test` check. To reproduce a CI lane locally, use one of:
+
+```bash
+npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts
+npm run visual -- --project=tablet tests/e2e/casino-visual.spec.ts
+npm run visual -- --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/ngrok-smoke.spec.ts
+```
+
+Serial execution is reserved for debugging with `npm run visual:serial`.
+The committed e2e config does not force any spec file into serial mode;
+the multi-context specs in `tests/e2e/multiplayer-flow.spec.ts` and
+`tests/e2e/ngrok-smoke.spec.ts` skip tablet project duplication inside the
+test files. For debugging a flaky browser test serially, use:
 
 ```bash
 npm run visual:serial

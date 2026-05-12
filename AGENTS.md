@@ -41,7 +41,7 @@ Primary references:
 - `npm run visual:serial`: run Playwright with one worker for debugging shared-state issues.
 - `npm run check`: run lint, format, coverage, server build, and visual tests.
 
-Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual` or `npm run visual:serial`.
+Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual` or `npm run visual:serial`. CI runs `npm run visual` through laptop visual, tablet visual, and laptop multiplayer matrix lanes while preserving the aggregate `test` check; reproduce one lane locally with `npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts`.
 
 ## Repository Rules
 
