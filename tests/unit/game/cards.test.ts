@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { cardLabel, createDeck, isBlackAce, isRed, rankValue, rigDeck, suitSymbols, type Card } from '../../../src/game/cards';
+import type { Card } from '../../../src/game/cards/Card';
+import { cardLabel } from '../../../src/game/cards/cardLabel';
+import { createDeck } from '../../../src/game/cards/createDeck';
+import { isBlackAce } from '../../../src/game/cards/isBlackAce';
+import { isRed } from '../../../src/game/cards/isRed';
+import { rankValue } from '../../../src/game/cards/rankValue';
+import { rigDeck } from '../../../src/game/cards/rigDeck';
+import { suitSymbols } from '../../../src/game/cards/suitSymbols';
 
 describe('shared card helpers', () => {
   it('labels cards and classifies colors and black Aces', () => {
