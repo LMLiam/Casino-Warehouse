@@ -299,6 +299,16 @@ describe('multiplayer WebSocket server', () => {
     unmasked.send(encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' }), { masked: false }));
     await waitForCloseCodeSince(unmasked, unmaskedCloseCheckpoint, 1002);
 
+    const invalidOpcode = await connectRawWebSocket(baseUrl.port);
+    const invalidOpcodeCloseCheckpoint = invalidOpcode.closeCodeCheckpoint();
+    invalidOpcode.send(encodeClientFrame(Buffer.from([0x01]), { opcode: 0x03 }));
+    await waitForCloseCodeSince(invalidOpcode, invalidOpcodeCloseCheckpoint, 1002);
+
+    const invalidCloseCode = await connectRawWebSocket(baseUrl.port);
+    const invalidCloseCodeCheckpoint = invalidCloseCode.closeCodeCheckpoint();
+    invalidCloseCode.send(encodeClientFrame(Buffer.from([0x03, 0xe7]), { opcode: 0x08 }));
+    await waitForCloseCodeSince(invalidCloseCode, invalidCloseCodeCheckpoint, 1002);
+
     const oversized = await connectRawWebSocket(baseUrl.port);
     const oversizedCloseCheckpoint = oversized.closeCodeCheckpoint();
     oversized.send(encodeClientFrame(Buffer.alloc(64 * 1024 + 1, 0x61)));
