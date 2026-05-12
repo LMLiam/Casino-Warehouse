@@ -178,6 +178,44 @@ describe('issue standards comments', () => {
       upsertIssueStandardsComment({ fetchImpl: createFetch, repository: 'LMLiam/Casino-Warehouse', token: 'token', issueNumber: 18, failures: [] }),
     ).resolves.toEqual({ action: 'skipped' });
   });
+
+  it('updates one canonical marker comment and deletes duplicates', async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push([options.method ?? 'GET', url, options.body ? JSON.parse(options.body) : undefined]);
+      if ((options.method ?? 'GET') === 'GET') {
+        return response([
+          { id: 7, body: `${issueStandardsCommentMarker}\nold guidance` },
+          { id: 8, body: 'regular issue discussion' },
+          { id: 9, body: `${issueStandardsCommentMarker}\nduplicate guidance` },
+          { id: 10, body: `${issueStandardsCommentMarker}\nolder duplicate guidance` },
+        ]);
+      }
+      return response((options.method ?? 'GET') === 'DELETE' ? undefined : { id: 7 });
+    };
+
+    await expect(
+      upsertIssueStandardsComment({
+        fetchImpl,
+        repository: 'LMLiam/Casino-Warehouse',
+        token: 'token',
+        issueNumber: 18,
+        failures: ['Add a status label.'],
+      }),
+    ).resolves.toEqual({ action: 'updated', commentId: 7, deletedCommentIds: [9, 10] });
+
+    expect(calls.filter(([method]) => method === 'PATCH')).toEqual([
+      [
+        'PATCH',
+        'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/comments/7',
+        expect.objectContaining({ body: expect.stringContaining('- Add a status label.') }),
+      ],
+    ]);
+    expect(calls.filter(([method]) => method === 'DELETE').map(([, url]) => url)).toEqual([
+      'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/comments/9',
+      'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/comments/10',
+    ]);
+  });
 });
 
 function response(data) {
