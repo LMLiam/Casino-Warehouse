@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dependabotActionsUpdateFailures } from '../../../scripts/supply-chain-check.mjs';
+import { dependabotActionsUpdateFailures, dependencyReviewPolicyFailures, workflowActionPinFailures } from '../../../scripts/supply-chain-check.mjs';
 
 const validDependabot = `version: 2
 updates:
@@ -61,5 +61,61 @@ describe('dependabotActionsUpdateFailures', () => {
     const failures = dependabotActionsUpdateFailures(validDependabot.replace('  - package-ecosystem: github-actions', '  - package-ecosystem: docker'));
 
     expect(failures).toEqual(['.github/dependabot.yml must include a github-actions update block for bounded GitHub Actions updates.']);
+  });
+});
+
+describe('workflowActionPinFailures', () => {
+  it('accepts full-SHA external actions with version comments', () => {
+    const failures = workflowActionPinFailures([
+      {
+        path: '.github/workflows/example.yml',
+        source: `
+steps:
+  - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+  - uses: './.github/actions/local-action'
+`,
+      },
+    ]);
+
+    expect(failures).toEqual([]);
+  });
+
+  it('rejects external actions without explicit SHA pins and version comments', () => {
+    const failures = workflowActionPinFailures([
+      {
+        path: '.github/workflows/example.yml',
+        source: `
+steps:
+  - uses: actions/checkout
+  - uses: actions/setup-node@v5
+  - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
+`,
+      },
+    ]);
+
+    expect(failures).toEqual([
+      '.github/workflows/example.yml:3 uses actions/checkout without an explicit ref.',
+      '.github/workflows/example.yml:4 uses actions/setup-node@v5. Pin external actions to a full 40-character commit SHA.',
+      '.github/workflows/example.yml:4 must keep a same-line version comment for Dependabot, for example "# v1.2.3".',
+      '.github/workflows/example.yml:5 must keep a same-line version comment for Dependabot, for example "# v1.2.3".',
+    ]);
+  });
+});
+
+describe('dependencyReviewPolicyFailures', () => {
+  it('accepts the configured Dependency Review severity and scope policy', () => {
+    expect(
+      dependencyReviewPolicyFailures(`with:
+  fail-on-severity: moderate
+  fail-on-scopes: runtime,development,unknown
+`),
+    ).toEqual([]);
+  });
+
+  it('requires both Dependency Review policy fragments', () => {
+    expect(dependencyReviewPolicyFailures('with:\n  fail-on-severity: high\n')).toEqual([
+      '.github/workflows/dependency-review.yml must include "fail-on-severity: moderate".',
+      '.github/workflows/dependency-review.yml must include "fail-on-scopes: runtime,development,unknown".',
+    ]);
   });
 });
