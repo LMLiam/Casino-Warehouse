@@ -12,6 +12,8 @@ External contributions are welcome when they fit the demo's scope, especially do
 
 The package is marked `"private": true` in `package.json` intentionally. Casino Warehouse is meant to be installed and run from the repository checkout, and the private package flag helps prevent accidental npm publication; it does not change the public repository status or the noncommercial license.
 
+Maintainer decision-making, issue triage, and pull request review expectations are documented in [GOVERNANCE.md](GOVERNANCE.md).
+
 ## Requirements
 
 - Git
