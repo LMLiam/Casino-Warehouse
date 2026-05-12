@@ -4,6 +4,14 @@ Casino Warehouse is a fictional-money casino arcade for desktop and tablet brows
 
 This is a demo game. Credits have no cash value, and the app has no deposits, withdrawals, payments, crypto, NFTs, or cash-out flow.
 
+## Project Status
+
+Casino Warehouse is a public, source-available, noncommercial demo project. You may read, run, study, and contribute to the code under the terms of the [PolyForm Noncommercial License 1.0.0](LICENSE), but public availability does not grant commercial use rights.
+
+External contributions are welcome when they fit the demo's scope, especially documentation, tests, accessibility improvements, security fixes, bug fixes, gameplay polish, and repository tooling. Larger feature or policy changes should start as an issue so maintainers can confirm the direction before implementation.
+
+The package is marked `"private": true` in `package.json` intentionally. Casino Warehouse is meant to be installed and run from the repository checkout, and the private package flag helps prevent accidental npm publication; it does not change the public repository status or the noncommercial license.
+
 ## Requirements
 
 - Git
@@ -97,4 +105,4 @@ https://github.com/LMLiam/Casino-Warehouse/wiki
 
 ## License
 
-Casino Warehouse is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use is not permitted.
+Casino Warehouse is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use is not permitted, even though the repository is public.
