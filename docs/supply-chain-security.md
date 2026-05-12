@@ -35,6 +35,14 @@ GitHub Actions updates are also checked weekly using GitHub's [`github-actions` 
 
 Dependabot labels both npm and GitHub Actions update pull requests with `dependencies`, `area:tooling`, and `type:maintenance`; GitHub Actions updates also carry the `security` label because they alter CI trust inputs.
 
+## Dependabot Alerting Policy
+
+Dependabot alerts, Dependabot malware alerts, and Dependabot security updates are expected to remain enabled in the repository's GitHub security settings. Dependabot alerts surface known vulnerable dependencies from the dependency graph, while Dependabot security updates can open remediation pull requests for supported vulnerable dependencies.
+
+Dependabot malware alerts are an additional alerting and triage signal for known malicious dependencies on the default branch. They are currently most relevant to this npm project because GitHub makes malware alerts available for packages in the `npm` ecosystem. Treat these alerts as high-priority security-health signals: triage the affected package, remove or replace the malicious dependency, and open a focused follow-up issue or pull request when remediation cannot happen immediately.
+
+Malware alerts are not a complete malware scanner. GitHub documents that alerts cannot catch every issue, newly discovered malware can take time to appear in the GitHub Advisory Database, and only GitHub-reviewed advisories trigger alerts. Keep reviewing dependency changes, preserving the lockfile-backed dependency graph, and relying on Dependency Review for pull request-time blocking.
+
 ## Dependency Review Policy
 
 The Dependency Review workflow is required on pull requests to `main`. It fails when a pull request introduces a known vulnerable dependency at `moderate` severity or higher in `runtime`, `development`, or `unknown` scopes.
