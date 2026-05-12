@@ -1,0 +1,124 @@
+.game-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at 45% 45%, rgba(46, 36, 18, 0.65), transparent 42%), linear-gradient(135deg, #050403, #0f120c 54%, #060905);
+}
+
+.table-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.table-host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.table-host canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.seat-status-overlay {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.seat-status-pill {
+  position: absolute;
+  display: grid;
+  gap: 1px;
+  min-width: 96px;
+  max-width: 150px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 213, 107, 0.38);
+  border-radius: 999px;
+  color: #d9c37b;
+  background: rgba(0, 0, 0, 0.62);
+  text-align: center;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.36);
+  transform: translate(-50%, 0);
+}
+
+button.seat-status-pill {
+  min-height: auto;
+  cursor: pointer;
+}
+
+.seat-status-pill.claimable {
+  pointer-events: auto;
+}
+
+.seat-status-pill.occupied {
+  color: #ffffff;
+  border-color: rgba(255, 213, 107, 0.6);
+  background: rgba(23, 37, 29, 0.88);
+}
+
+.seat-status-pill.mine {
+  border-color: #75ff92;
+  box-shadow:
+    0 0 0 2px rgba(117, 255, 146, 0.2),
+    0 12px 26px rgba(0, 0, 0, 0.36);
+}
+
+.seat-status-pill b,
+.seat-status-pill small,
+.seat-status-pill span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-status-pill b {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.seat-status-pill small {
+  color: #d9c37b;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.seat-status-pill .seat-bankroll {
+  color: #ffffff;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.seat-status-pill .session-delta.gain {
+  color: #75ff92;
+}
+
+.seat-status-pill .session-delta.loss {
+  color: #ff8b8b;
+}
+
+.table-host.layout-debug::after {
+  position: absolute;
+  inset: 12px;
+  z-index: 5;
+  pointer-events: none;
+  border: 2px dashed #75ff92;
+  background: linear-gradient(90deg, rgba(117, 255, 146, 0.18) 1px, transparent 1px), linear-gradient(rgba(117, 255, 146, 0.18) 1px, transparent 1px);
+  background-size: 10% 10%;
+  color: #75ff92;
+  content: 'Layout overlay: bet zones/card slots use src/ui/layout.ts relative coordinates';
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 900;
+}

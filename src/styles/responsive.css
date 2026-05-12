@@ -1,0 +1,148 @@
+@media (max-width: 900px) {
+  body {
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .game-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr);
+    height: 100vh;
+    min-height: 100vh;
+  }
+
+  .game-hud {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    gap: 8px;
+  }
+
+  .hud-button,
+  .hud-menu > summary {
+    min-width: 62px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .player-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .game-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-lobby {
+    padding: 24px;
+    align-content: start;
+    overflow: auto;
+  }
+
+  .room-lobby {
+    grid-template-columns: 1fr;
+    align-content: start;
+    padding: 24px;
+  }
+
+  .game-lobby-header h2 {
+    font-size: 40px;
+  }
+
+  .room-lobby-header h2 {
+    font-size: 38px;
+  }
+
+  .game-lobby-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .room-create {
+    grid-template-columns: 1fr;
+  }
+
+  .money-pill {
+    left: 10px;
+    bottom: 12px;
+    width: 136px;
+  }
+
+  .money-pill strong {
+    font-size: 22px;
+  }
+
+  .chip-rail {
+    bottom: 12px;
+    gap: 6px;
+    padding: 7px 10px;
+    transform: translateX(-50%) scale(0.82);
+    transform-origin: bottom center;
+  }
+
+  .action-dock {
+    bottom: 92px;
+    width: min(620px, calc(100% - 20px));
+  }
+
+  .seat-status-pill {
+    min-width: 82px;
+    max-width: 118px;
+    padding: 5px 8px;
+  }
+
+  .slot-reels {
+    grid-template-columns: repeat(3, minmax(70px, 1fr));
+    grid-template-rows: repeat(5, minmax(70px, 1fr));
+    width: min(100%, 340px);
+  }
+
+  .slot-reels span {
+    min-height: 70px;
+  }
+
+  .slot-symbol-img {
+    width: min(86px, 76%);
+    height: min(86px, 76%);
+  }
+
+  .slots-room-players {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .blackjack-table-view {
+    padding: 20px;
+  }
+
+  .blackjack-table-felt {
+    width: 100%;
+    min-height: 500px;
+    padding: 24px 18px;
+    border-width: 12px;
+    border-radius: 28px;
+  }
+
+  .blackjack-center h2 {
+    font-size: 42px;
+  }
+
+  .blackjack-seat-grid {
+    grid-template-columns: repeat(5, minmax(70px, 1fr));
+    overflow-x: auto;
+  }
+
+  .playing-card {
+    width: 62px;
+    height: 88px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
