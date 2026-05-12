@@ -1,15 +1,16 @@
 import type { Card } from '../cards/Card';
 import { cardLabel } from '../cards/cardLabel';
 import { createDeck } from '../cards/createDeck';
-import { ranks } from '../cards/ranks';
-import { suits } from '../cards/suits';
 import type { Rng } from '../rng/Rng';
 import { bestTotal } from './bestTotal';
 import type { BlackjackOptions } from './BlackjackOptions';
 import type { BlackjackPhase } from './BlackjackPhase';
 import type { BlackjackResult } from './BlackjackResult';
 import type { BlackjackSnapshot } from './BlackjackSnapshot';
-import { isSoft } from './isSoft';
+import { dealerMustHit } from './dealerMustHit';
+import { handText } from './handText';
+import { isBlackjack } from './isBlackjack';
+import { isCard } from './isCard';
 
 export class BlackjackGame {
   private deck: Card[];
@@ -225,14 +226,3 @@ export class BlackjackGame {
     return card;
   }
 }
-
-const isBlackjack = (cards: readonly Card[]): boolean => cards.length === 2 && bestTotal(cards) === 21;
-
-const dealerMustHit = (cards: readonly Card[]): boolean => {
-  const total = bestTotal(cards);
-  return total < 17 || (total === 17 && isSoft(cards));
-};
-
-const handText = (cards: readonly Card[]): string => `${cards.map(cardLabel).join(' ')} (${bestTotal(cards)})`;
-
-const isCard = (card: Card): card is Card => suits.includes(card.suit) && ranks.includes(card.rank);

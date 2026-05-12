@@ -4,6 +4,19 @@ import { defaultAudioSettings } from './defaultAudioSettings';
 import { sanitizeAudioSettings } from './sanitizeAudioSettings';
 
 export class CasinoAudio {
+  private static readonly cueConfig: Record<
+    Exclude<AudioCue, 'music'>,
+    { readonly type: OscillatorType; readonly startFrequency: number; readonly endFrequency: number; readonly duration: number; readonly volume: number }
+  > = {
+    deal: { type: 'square', startFrequency: 520, endFrequency: 380, duration: 0.08, volume: 0.22 },
+    chip: { type: 'triangle', startFrequency: 760, endFrequency: 960, duration: 0.06, volume: 0.2 },
+    spin: { type: 'sawtooth', startFrequency: 220, endFrequency: 620, duration: 0.32, volume: 0.16 },
+    win: { type: 'triangle', startFrequency: 540, endFrequency: 1080, duration: 0.36, volume: 0.3 },
+    bonus: { type: 'sine', startFrequency: 330, endFrequency: 1320, duration: 0.5, volume: 0.34 },
+    ui: { type: 'sine', startFrequency: 640, endFrequency: 700, duration: 0.05, volume: 0.14 },
+    ambience: { type: 'triangle', startFrequency: 120, endFrequency: 130, duration: 0.8, volume: 0.08 },
+  };
+
   private context?: AudioContext;
   private musicOscillator?: OscillatorNode;
   private musicGain?: GainNode;
@@ -29,7 +42,7 @@ export class CasinoAudio {
     const gain = context.createGain();
     const oscillator = context.createOscillator();
     const now = context.currentTime;
-    const config = cueConfig[cue];
+    const config = CasinoAudio.cueConfig[cue];
 
     oscillator.type = config.type;
     oscillator.frequency.setValueAtTime(config.startFrequency, now);
@@ -102,16 +115,3 @@ export class CasinoAudio {
     return this.effectLevel() * categoryVolume;
   }
 }
-
-const cueConfig: Record<
-  Exclude<AudioCue, 'music'>,
-  { readonly type: OscillatorType; readonly startFrequency: number; readonly endFrequency: number; readonly duration: number; readonly volume: number }
-> = {
-  deal: { type: 'square', startFrequency: 520, endFrequency: 380, duration: 0.08, volume: 0.22 },
-  chip: { type: 'triangle', startFrequency: 760, endFrequency: 960, duration: 0.06, volume: 0.2 },
-  spin: { type: 'sawtooth', startFrequency: 220, endFrequency: 620, duration: 0.32, volume: 0.16 },
-  win: { type: 'triangle', startFrequency: 540, endFrequency: 1080, duration: 0.36, volume: 0.3 },
-  bonus: { type: 'sine', startFrequency: 330, endFrequency: 1320, duration: 0.5, volume: 0.34 },
-  ui: { type: 'sine', startFrequency: 640, endFrequency: 700, duration: 0.05, volume: 0.14 },
-  ambience: { type: 'triangle', startFrequency: 120, endFrequency: 130, duration: 0.8, volume: 0.08 },
-};

@@ -2,15 +2,10 @@ import { Container, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import { gsap } from 'gsap';
 import type { ChipValue } from '../chips/ChipValue';
 import { toChipBreakdown } from '../chips/toChipBreakdown';
+import type { ChipStackAnimation } from './ChipStackAnimation';
 import { CHIP_RENDERING } from './renderingConstants/CHIP_RENDERING';
 import { COLORS } from './renderingConstants/COLORS';
 import { TAG_RENDERING } from './renderingConstants/TAG_RENDERING';
-
-interface ChipStackAnimation {
-  readonly key: string;
-  readonly from?: { readonly x: number; readonly y: number };
-  readonly to?: { readonly x: number; readonly y: number };
-}
 
 export class ChipRenderer {
   private readonly animatedStacks = new Set<string>();
@@ -54,7 +49,7 @@ export class ChipRenderer {
       );
     }
 
-    if (!animationKey || this.animatedStacks.has(animationKey) || prefersReducedMotion()) {
+    if (!animationKey || this.animatedStacks.has(animationKey) || ChipRenderer.prefersReducedMotion()) {
       return;
     }
 
@@ -105,6 +100,8 @@ export class ChipRenderer {
     group.addChild(backing, label);
     layer.addChild(group);
   }
-}
 
-const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private static prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+}

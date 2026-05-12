@@ -73,7 +73,7 @@ export class PixiTable {
     this.root.addChild(this.zoneLayer, this.effectLayer, this.cardLayer, this.dynamicLayer);
 
     const [tableTexture, chipSheet] = await Promise.all([Assets.load<Texture>(beatTheHouseTableUrl), Assets.load<Texture>(beatTheHouseChipsUrl)]);
-    this.chipRenderer = this.dependencies.createChipRenderer(this.dynamicLayer, createChipTextures(chipSheet));
+    this.chipRenderer = this.dependencies.createChipRenderer(this.dynamicLayer, PixiTable.createChipTextures(chipSheet));
     const table = new Sprite(tableTexture);
     table.width = tableSize.width;
     table.height = tableSize.height;
@@ -130,7 +130,7 @@ export class PixiTable {
       this.settlementVisible = false;
       window.clearTimeout(this.settlementTimer);
     }
-    this.cardAnimationQueue = createCardAnimationQueue(snapshot.lastEvents);
+    this.cardAnimationQueue = PixiTable.createCardAnimationQueue(snapshot.lastEvents);
     this.prepareSettlementVisibility(snapshot);
     this.host.dataset.settlementVisible = String(this.shouldShowSettlement(snapshot));
     this.host.dataset.settlementHandCount = String(this.shouldShowSettlement(snapshot) ? snapshot.summaries.length : 0);
@@ -310,7 +310,7 @@ export class PixiTable {
       }
 
       const point = toPixels(layout.popup);
-      const popup = settlementPopupForSummary(snapshot, summary);
+      const popup = PixiTable.settlementPopupForSummary(snapshot, summary);
       this.tagRenderer.drawResultPopup(
         popup.mainLine,
         popup.sideLine,
@@ -413,7 +413,7 @@ export class PixiTable {
         this.settlementVisible = true;
         this.render(this.snapshot);
       },
-      prefersReducedMotion() ? 0 : settlementRevealDelay(this.cardAnimationQueue),
+      PixiTable.prefersReducedMotion() ? 0 : PixiTable.settlementRevealDelay(this.cardAnimationQueue),
     );
   }
 
@@ -426,127 +426,133 @@ export class PixiTable {
       return [];
     }
 
-    return snapshot.summaries.flatMap((summary) => sideLinesForSummary(snapshot, summary));
+    return snapshot.summaries.flatMap((summary) => PixiTable.sideLinesForSummary(snapshot, summary));
+  }
+
+  private static createChipTextures(sheetTexture: Texture): Map<ChipValue, Texture> {
+    const textures = new Map<ChipValue, Texture>();
+
+    chipValues.forEach((value) => {
+      const crop = chipCropByValue.get(value);
+      if (!crop) {
+        return;
+      }
+
+      textures.set(
+        value,
+        new Texture({
+          source: sheetTexture.source,
+          frame: new Rectangle(crop.x, crop.y, crop.size, crop.size),
+        }),
+      );
+    });
+
+    return textures;
+  }
+
+  private static createCardAnimationQueue(events: readonly GameEvent[]): Map<string, number> {
+    const queue = new Map<string, number>();
+    let order = 0;
+
+    for (const event of events) {
+      if (event.type === 'player-card' && event.handId && event.cardIndex !== undefined) {
+        queue.set(`player-${event.handId}-${event.cardIndex}`, order);
+        order += 1;
+      }
+
+      if (event.type === 'dealer-hole') {
+        queue.set('dealer-hole', order);
+        order += 1;
+      }
+
+      if (event.type === 'dealer-card' && event.cardIndex === 0) {
+        queue.set('dealer-hole-reveal', order);
+        order += 1;
+      } else if (event.type === 'dealer-card' && event.cardIndex !== undefined) {
+        queue.set(`dealer-${event.cardIndex}`, order);
+        order += 1;
+      }
+    }
+
+    return queue;
+  }
+
+  private static formatProfit(profit: number): string {
+    return `${profit >= 0 ? '+' : '-'}£${Math.abs(profit)}`;
+  }
+
+  private static settlementPopupForSummary(snapshot: GameSnapshot, summary: RoundSummary) {
+    const mainStake = snapshot.bets[summary.handId].main;
+    const sideStake = (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).reduce(
+      (total, betType) => total + snapshot.bets[summary.handId][betType],
+      0,
+    );
+    const mainProfit = PixiTable.mainProfitForSummary(summary.mainResult, mainStake);
+    const sideProfit = summary.profit - mainProfit;
+    return {
+      mainLine: `Main ${summary.mainResult.toUpperCase()} ${PixiTable.formatProfit(mainProfit)}`,
+      sideLine: `Side bets ${sideStake > 0 ? PixiTable.netLabel(sideProfit, 'EVEN') : 'NONE'} ${PixiTable.formatProfit(sideProfit)}`,
+      totalLine: `Total ${PixiTable.netLabel(summary.profit, 'PUSH')} ${PixiTable.formatProfit(summary.profit)}`,
+      result: PixiTable.resultForProfit(summary.profit),
+    };
+  }
+
+  private static mainProfitForSummary(result: RoundSummary['mainResult'], mainStake: number): number {
+    if (result === 'win') {
+      return mainStake;
+    }
+    if (result === 'lose') {
+      return -mainStake;
+    }
+    return 0;
+  }
+
+  private static netLabel(profit: number, zeroLabel: string): string {
+    if (profit > 0) {
+      return 'WIN';
+    }
+    if (profit < 0) {
+      return 'LOSE';
+    }
+    return zeroLabel;
+  }
+
+  private static resultForProfit(profit: number): RoundSummary['mainResult'] {
+    if (profit > 0) {
+      return 'win';
+    }
+    if (profit < 0) {
+      return 'lose';
+    }
+    return 'push';
+  }
+
+  private static sideLinesForSummary(snapshot: GameSnapshot, summary: RoundSummary): string[] {
+    return (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).flatMap((betType) => {
+      const stake = snapshot.bets[summary.handId][betType];
+      const sideWin = summary.sideWins.find((win) => win.betType === betType);
+      if (sideWin) {
+        return [`${sideWin.label} WIN +£${sideWin.profit}`];
+      }
+      return stake > 0 && snapshot.sideStates[summary.handId][betType] === 'lose' ? [`${PixiTable.betTypeLabel(betType)} LOSE -£${stake}`] : [];
+    });
+  }
+
+  private static settlementRevealDelay(queue: ReadonlyMap<string, number>): number {
+    const maxOrder = Math.max(0, ...queue.values());
+    return (maxOrder * CARD_ANIMATION.delayStep + CARD_ANIMATION.duration + 0.2) * 1000;
+  }
+
+  private static betTypeLabel(betType: Exclude<BetType, 'main'>): string {
+    return {
+      aceFlash: 'Ace Flash',
+      dealerBust: 'Dealer Bust',
+      matchPush: 'Match Push',
+      dealerSevens: 'Dealer Sevens',
+    }[betType];
+  }
+
+  private static prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 }
-
-const createChipTextures = (sheetTexture: Texture): Map<ChipValue, Texture> => {
-  const textures = new Map<ChipValue, Texture>();
-
-  chipValues.forEach((value) => {
-    const crop = chipCropByValue.get(value);
-    if (!crop) {
-      return;
-    }
-
-    textures.set(
-      value,
-      new Texture({
-        source: sheetTexture.source,
-        frame: new Rectangle(crop.x, crop.y, crop.size, crop.size),
-      }),
-    );
-  });
-
-  return textures;
-};
-
-const createCardAnimationQueue = (events: readonly GameEvent[]): Map<string, number> => {
-  const queue = new Map<string, number>();
-  let order = 0;
-
-  for (const event of events) {
-    if (event.type === 'player-card' && event.handId && event.cardIndex !== undefined) {
-      queue.set(`player-${event.handId}-${event.cardIndex}`, order);
-      order += 1;
-    }
-
-    if (event.type === 'dealer-hole') {
-      queue.set('dealer-hole', order);
-      order += 1;
-    }
-
-    if (event.type === 'dealer-card' && event.cardIndex === 0) {
-      queue.set('dealer-hole-reveal', order);
-      order += 1;
-    } else if (event.type === 'dealer-card' && event.cardIndex !== undefined) {
-      queue.set(`dealer-${event.cardIndex}`, order);
-      order += 1;
-    }
-  }
-
-  return queue;
-};
-
-const formatProfit = (profit: number): string => `${profit >= 0 ? '+' : '-'}£${Math.abs(profit)}`;
-
-const settlementPopupForSummary = (snapshot: GameSnapshot, summary: RoundSummary) => {
-  const mainStake = snapshot.bets[summary.handId].main;
-  const sideStake = (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).reduce(
-    (total, betType) => total + snapshot.bets[summary.handId][betType],
-    0,
-  );
-  const mainProfit = mainProfitForSummary(summary.mainResult, mainStake);
-  const sideProfit = summary.profit - mainProfit;
-  return {
-    mainLine: `Main ${summary.mainResult.toUpperCase()} ${formatProfit(mainProfit)}`,
-    sideLine: `Side bets ${sideStake > 0 ? netLabel(sideProfit, 'EVEN') : 'NONE'} ${formatProfit(sideProfit)}`,
-    totalLine: `Total ${netLabel(summary.profit, 'PUSH')} ${formatProfit(summary.profit)}`,
-    result: resultForProfit(summary.profit),
-  };
-};
-
-const mainProfitForSummary = (result: RoundSummary['mainResult'], mainStake: number): number => {
-  if (result === 'win') {
-    return mainStake;
-  }
-  if (result === 'lose') {
-    return -mainStake;
-  }
-  return 0;
-};
-
-const netLabel = (profit: number, zeroLabel: string): string => {
-  if (profit > 0) {
-    return 'WIN';
-  }
-  if (profit < 0) {
-    return 'LOSE';
-  }
-  return zeroLabel;
-};
-
-const resultForProfit = (profit: number): RoundSummary['mainResult'] => {
-  if (profit > 0) {
-    return 'win';
-  }
-  if (profit < 0) {
-    return 'lose';
-  }
-  return 'push';
-};
-
-const sideLinesForSummary = (snapshot: GameSnapshot, summary: RoundSummary): string[] =>
-  (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).flatMap((betType) => {
-    const stake = snapshot.bets[summary.handId][betType];
-    const sideWin = summary.sideWins.find((win) => win.betType === betType);
-    if (sideWin) {
-      return [`${sideWin.label} WIN +£${sideWin.profit}`];
-    }
-    return stake > 0 && snapshot.sideStates[summary.handId][betType] === 'lose' ? [`${betTypeLabel(betType)} LOSE -£${stake}`] : [];
-  });
-
-const settlementRevealDelay = (queue: ReadonlyMap<string, number>): number => {
-  const maxOrder = Math.max(0, ...queue.values());
-  return (maxOrder * CARD_ANIMATION.delayStep + CARD_ANIMATION.duration + 0.2) * 1000;
-};
-
-const betTypeLabel = (betType: Exclude<BetType, 'main'>): string =>
-  ({
-    aceFlash: 'Ace Flash',
-    dealerBust: 'Dealer Bust',
-    matchPush: 'Match Push',
-    dealerSevens: 'Dealer Sevens',
-  })[betType];
-
-const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

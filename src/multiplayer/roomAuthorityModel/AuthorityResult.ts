@@ -2,18 +2,8 @@ import type { RoomGameId } from '../protocol/RoomGameId';
 import type { RoomSettlement } from '../protocol/RoomSettlement';
 import type { RoomSnapshot } from '../protocol/RoomSnapshot';
 import type { RoomSummary } from '../protocol/RoomSummary';
-
-interface RoomClosure {
-  readonly roomId: string;
-  readonly gameId: RoomGameId;
-  readonly connectionIds: readonly string[];
-  readonly reason: string;
-}
-
-interface RoomBroadcastRecipients {
-  readonly roomId: string;
-  readonly connectionIds: readonly string[];
-}
+import type { RoomBroadcastRecipients } from './RoomBroadcastRecipients';
+import type { RoomClosure } from './RoomClosure';
 
 export interface AuthorityResult {
   readonly broadcasts: readonly RoomSnapshot[];

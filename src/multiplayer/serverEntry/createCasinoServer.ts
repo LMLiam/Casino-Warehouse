@@ -15,20 +15,11 @@ import { profileTokenAuth } from '../../state/serverDataStore/profileTokenAuth';
 import type { CasinoRoomAuthority } from './CasinoRoomAuthority';
 import type { CasinoServer } from './CasinoServer';
 import type { CasinoServerOptions } from './CasinoServerOptions';
-
-interface Peer {
-  readonly id: string;
-  readonly socket: WebSocket;
-  readonly ownedProfileIds: Set<string>;
-  lastPongAt: number;
-  browsingGameId?: RoomGameId;
-  isAdmin: boolean;
-}
-
-const closeUnsupportedData = 1003;
-const maxClientMessageBytes = 64 * 1024;
+import type { Peer } from './Peer';
 
 export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoServer => {
+  const closeUnsupportedData = 1003;
+  const maxClientMessageBytes = 64 * 1024;
   const distRoot = options.distRoot ?? process.env.CASINO_STATIC_ROOT ?? 'dist';
   const dataStore = options.dataStore ?? createDefaultServerDataStore();
   const authority = options.authority ?? new RoomAuthority(dataStore);
@@ -433,6 +424,79 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     });
   });
 
+  function send(peer: Peer, message: ServerMessage): void {
+    if (peer.socket.readyState === WebSocket.OPEN) {
+      peer.socket.send(JSON.stringify(message));
+    }
+  }
+
+  function connectionIds(room: {
+    readonly players: readonly { readonly connectionId: string }[];
+    readonly spectators: readonly { readonly connectionId: string }[];
+  }): readonly string[] {
+    return [...room.players.map((player) => player.connectionId), ...room.spectators.map((player) => player.connectionId)];
+  }
+
+  function roomListGameIds(result: {
+    readonly direct?: { readonly gameId: RoomGameId };
+    readonly broadcasts: readonly { readonly gameId: RoomGameId }[];
+    readonly roomClosures?: readonly { readonly gameId: RoomGameId }[];
+    readonly roomList?: { readonly gameId: RoomGameId };
+  }): readonly RoomGameId[] {
+    return [
+      ...(result.roomList ? [result.roomList.gameId] : []),
+      ...(result.direct ? [result.direct.gameId] : []),
+      ...result.broadcasts.map((room) => room.gameId),
+      ...(result.roomClosures ?? []).map((closure) => closure.gameId),
+    ];
+  }
+
+  function createInvitePath(gameId: string, roomId: string): string {
+    const publicBaseUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, '');
+    const query = `?game=${encodeURIComponent(gameId)}&room=${encodeURIComponent(roomId)}`;
+    if (!publicBaseUrl) {
+      return `/${query}`;
+    }
+    return `${publicBaseUrl}/${query}&server=${encodeURIComponent(publicBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/ws')}`;
+  }
+
+  function textPayload(data: RawData): string {
+    if (Array.isArray(data)) {
+      return Buffer.concat(data).toString('utf8');
+    }
+    if (data instanceof ArrayBuffer) {
+      return Buffer.from(new Uint8Array(data)).toString('utf8');
+    }
+    return data.toString('utf8');
+  }
+
+  function staticPath(request: IncomingMessage, distRoot: string): string | undefined {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const pathname = normalize(url.pathname === '/' ? '/index.html' : url.pathname).replace(/^(\.\.[/\\])+/, '');
+    const filePath = join(distRoot, pathname);
+    return filePath.startsWith(distRoot) ? filePath : undefined;
+  }
+
+  function contentType(filePath: string): string {
+    return (
+      {
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'text/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.png': 'image/png',
+        '.svg': 'image/svg+xml',
+      }[extname(filePath)] ?? 'application/octet-stream'
+    );
+  }
+
+  function cacheHeaders(filePath: string): Record<string, string> {
+    const headers = { 'content-type': contentType(filePath) };
+    if (extname(filePath) === '.html') {
+      return { ...headers, 'cache-control': 'no-store' };
+    }
+    return headers;
+  }
+
   return Object.assign(server, {
     closePeers: () => {
       for (const peer of peers.values()) {
@@ -441,70 +505,4 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       peers.clear();
     },
   });
-};
-
-const send = (peer: Peer, message: ServerMessage): void => {
-  if (peer.socket.readyState === WebSocket.OPEN) {
-    peer.socket.send(JSON.stringify(message));
-  }
-};
-
-const connectionIds = (room: {
-  readonly players: readonly { readonly connectionId: string }[];
-  readonly spectators: readonly { readonly connectionId: string }[];
-}): readonly string[] => [...room.players.map((player) => player.connectionId), ...room.spectators.map((player) => player.connectionId)];
-
-const roomListGameIds = (result: {
-  readonly direct?: { readonly gameId: RoomGameId };
-  readonly broadcasts: readonly { readonly gameId: RoomGameId }[];
-  readonly roomClosures?: readonly { readonly gameId: RoomGameId }[];
-  readonly roomList?: { readonly gameId: RoomGameId };
-}): readonly RoomGameId[] => [
-  ...(result.roomList ? [result.roomList.gameId] : []),
-  ...(result.direct ? [result.direct.gameId] : []),
-  ...result.broadcasts.map((room) => room.gameId),
-  ...(result.roomClosures ?? []).map((closure) => closure.gameId),
-];
-
-const createInvitePath = (gameId: string, roomId: string): string => {
-  const publicBaseUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, '');
-  const query = `?game=${encodeURIComponent(gameId)}&room=${encodeURIComponent(roomId)}`;
-  if (!publicBaseUrl) {
-    return `/${query}`;
-  }
-  return `${publicBaseUrl}/${query}&server=${encodeURIComponent(publicBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/ws')}`;
-};
-
-const textPayload = (data: RawData): string => {
-  if (Array.isArray(data)) {
-    return Buffer.concat(data).toString('utf8');
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(new Uint8Array(data)).toString('utf8');
-  }
-  return data.toString('utf8');
-};
-
-const staticPath = (request: IncomingMessage, distRoot: string): string | undefined => {
-  const url = new URL(request.url ?? '/', 'http://localhost');
-  const pathname = normalize(url.pathname === '/' ? '/index.html' : url.pathname).replace(/^(\.\.[/\\])+/, '');
-  const filePath = join(distRoot, pathname);
-  return filePath.startsWith(distRoot) ? filePath : undefined;
-};
-
-const contentType = (filePath: string): string =>
-  ({
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'text/javascript; charset=utf-8',
-    '.css': 'text/css; charset=utf-8',
-    '.png': 'image/png',
-    '.svg': 'image/svg+xml',
-  })[extname(filePath)] ?? 'application/octet-stream';
-
-const cacheHeaders = (filePath: string): Record<string, string> => {
-  const headers = { 'content-type': contentType(filePath) };
-  if (extname(filePath) === '.html') {
-    return { ...headers, 'cache-control': 'no-store' };
-  }
-  return headers;
 };

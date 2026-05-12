@@ -13,25 +13,21 @@ export function topLevelElementErrors(relativePath, source) {
     return [`${relativePath} only re-exports declarations from other modules. Import focused module files directly instead.`];
   }
 
-  const elements = exportedTopLevelElements(sourceFile);
+  const elements = topLevelElements(sourceFile);
   if (elements.length <= 1) {
     return [];
   }
 
   return [
-    `${relativePath} exports ${elements.length} top-level elements (${elements.map((element) => element.name).join(', ')}). Keep one primary exported element per file.`,
+    `${relativePath} declares ${elements.length} top-level elements (${elements.map((element) => element.name).join(', ')}). Keep one module-scope element per file.`,
   ];
 }
 
-function exportedTopLevelElements(sourceFile) {
+function topLevelElements(sourceFile) {
   return sourceFile.statements.flatMap((statement) => {
-    if (!isExported(statement)) {
-      return [];
-    }
-
     if (ts.isVariableStatement(statement)) {
       return statement.declarationList.declarations.map((declaration) => ({
-        kind: 'const',
+        kind: variableDeclarationKind(statement),
         name: declaration.name.getText(sourceFile),
       }));
     }
@@ -56,8 +52,14 @@ function exportedTopLevelElements(sourceFile) {
   });
 }
 
-function isExported(statement) {
-  return statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
+function variableDeclarationKind(statement) {
+  if ((statement.declarationList.flags & ts.NodeFlags.Const) !== 0) {
+    return 'const';
+  }
+  if ((statement.declarationList.flags & ts.NodeFlags.Let) !== 0) {
+    return 'let';
+  }
+  return 'var';
 }
 
 function isReExportOnlyModule(sourceFile) {

@@ -1,10 +1,10 @@
 import type { BankrollTransaction } from './BankrollTransaction';
 import type { CasinoProfile } from './CasinoProfile';
 import { createStateId } from './createStateId';
+import { favouriteGame } from './favouriteGame';
 import type { PerGameStats } from './PerGameStats';
 import type { ProfileStats } from './ProfileStats';
-
-type StateIdGenerator = (prefix: string, now: Date) => string;
+import type { StateIdGenerator } from './StateIdGenerator';
 
 export const recordTransaction = (
   profile: CasinoProfile,
@@ -12,6 +12,13 @@ export const recordTransaction = (
   now = new Date(),
   idGenerator: StateIdGenerator = createStateId,
 ): CasinoProfile => {
+  const emptyPerGameStats = (): PerGameStats => ({
+    gamesPlayed: 0,
+    wagered: 0,
+    won: 0,
+    netProfit: 0,
+  });
+
   const amount = Math.floor(transaction.amount);
   const balanceBefore = profile.bankroll;
   const balanceAfter = Math.max(0, profile.bankroll + amount);
@@ -63,13 +70,3 @@ export const recordTransaction = (
     updatedAt: now.toISOString(),
   };
 };
-
-const emptyPerGameStats = (): PerGameStats => ({
-  gamesPlayed: 0,
-  wagered: 0,
-  won: 0,
-  netProfit: 0,
-});
-
-const favouriteGame = (perGame: Readonly<Record<string, PerGameStats>>): string | undefined =>
-  Object.entries(perGame).sort(([, left], [, right]) => right.gamesPlayed - left.gamesPlayed)[0]?.[0];

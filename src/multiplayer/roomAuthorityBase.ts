@@ -178,7 +178,7 @@ export abstract class RoomAuthorityBase {
 
       if (!room.serverManaged && (!this.roomHasProfile(room, room.hostProfileId) || this.roomMemberCount(room) === 0)) {
         this.rooms.delete(room.roomId);
-        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: unique(beforeConnectionIds), reason });
+        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: RoomAuthorityBase.unique(beforeConnectionIds), reason });
         continue;
       }
 
@@ -187,7 +187,7 @@ export abstract class RoomAuthorityBase {
       }
       this.syncBeatBankroll(room);
       if (removedConnectionIds.length > 0) {
-        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: unique(removedConnectionIds), reason });
+        roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: RoomAuthorityBase.unique(removedConnectionIds), reason });
       }
       broadcasts.push(this.broadcast(room).broadcasts[0]);
     }
@@ -364,7 +364,7 @@ export abstract class RoomAuthorityBase {
   }
 
   private roomProfileIds(room: RoomState): readonly string[] {
-    return unique([
+    return RoomAuthorityBase.unique([
       ...room.players.keys(),
       ...room.spectators.keys(),
       ...[...room.seats.values()].filter((profileId): profileId is string => Boolean(profileId)),
@@ -372,11 +372,14 @@ export abstract class RoomAuthorityBase {
   }
 
   private roomConnectionIds(room: RoomState): readonly string[] {
-    return unique([...room.connectionToMember.keys(), ...[...room.players.values(), ...room.spectators.values()].map((player) => player.connectionId)]);
+    return RoomAuthorityBase.unique([
+      ...room.connectionToMember.keys(),
+      ...[...room.players.values(), ...room.spectators.values()].map((player) => player.connectionId),
+    ]);
   }
 
   private profileConnectionIds(room: RoomState, profileId: string): readonly string[] {
-    return unique(
+    return RoomAuthorityBase.unique(
       [room.players.get(profileId)?.connectionId, room.spectators.get(profileId)?.connectionId].filter((connectionId): connectionId is string =>
         Boolean(connectionId),
       ),
@@ -448,6 +451,8 @@ export abstract class RoomAuthorityBase {
   protected error(message: string): AuthorityResult {
     return { broadcasts: [], settlements: [], error: message };
   }
-}
 
-const unique = <Value>(values: readonly Value[]): Value[] => [...new Set(values)];
+  private static unique<Value>(values: readonly Value[]): Value[] {
+    return [...new Set(values)];
+  }
+}

@@ -82,9 +82,9 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 
 ## Source File Shape
 
-- Keep new source modules focused on one exported top-level element.
-- Classes, React components, exported functions, exported constants, interfaces, types, enums, schemas, and exported variable declarations all count as exported top-level elements.
-- Private helpers may live next to the exported element they support.
+- Keep new source modules focused on one module-scope top-level element.
+- Classes, React components, functions, constants, variables, interfaces, types, enums, and schemas all count as top-level elements whether or not they are exported.
+- File-local implementation details must be nested inside the element they support or extracted into focused module files.
 - Avoid vague filenames such as `utils`, `helpers`, `misc`, and `manager`.
 - Do not add barrel files; import focused module files directly.
 - Respect the architecture checker instead of bypassing it.

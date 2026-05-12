@@ -1,11 +1,7 @@
 import { secureRandomInt } from '../../game/rng/secureRandomInt';
+import { createRandomIdPart } from './createRandomIdPart';
+import type { RandomInt } from './RandomInt';
 import type { RoomState } from './RoomState';
-
-const randomIdPartLength = 6;
-
-const randomIdPartSpace = 36 ** randomIdPartLength;
-
-type RandomInt = (maxExclusive: number) => number;
 
 export const createRoomId = (rooms: ReadonlyMap<string, RoomState>, randomInt: RandomInt = secureRandomInt): string => {
   while (true) {
@@ -15,5 +11,3 @@ export const createRoomId = (rooms: ReadonlyMap<string, RoomState>, randomInt: R
     }
   }
 };
-
-const createRandomIdPart = (randomInt: RandomInt = secureRandomInt): string => randomInt(randomIdPartSpace).toString(36).padStart(randomIdPartLength, '0');

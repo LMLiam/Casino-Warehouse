@@ -4,7 +4,7 @@ import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
 
 describe('topLevelElementErrors', () => {
-  it('accepts a file with one exported top-level element and private helpers', () => {
+  it('rejects a file with one exported top-level element and a private helper', () => {
     expect(
       topLevelElementErrors(
         'src/game/example.ts',
@@ -14,7 +14,7 @@ const privateScale = 2;
 export const scoreTotal = (value: number): number => value * privateScale;
 `,
       ),
-    ).toEqual([]);
+    ).toEqual(['src/game/example.ts declares 2 top-level elements (privateScale, scoreTotal). Keep one module-scope element per file.']);
   });
 
   it('accepts the supported single exported declaration shapes', () => {
@@ -24,7 +24,7 @@ export const scoreTotal = (value: number): number => value * privateScale;
     expect(topLevelElementErrors('src/game/ignored.ts', '')).toEqual([]);
   });
 
-  it('rejects multiple exported top-level elements', () => {
+  it('rejects multiple top-level elements', () => {
     const errors = topLevelElementErrors(
       'src/game/example.ts',
       `
@@ -36,7 +36,27 @@ export const scoreTotal = (input: ScoreInput): number => input.value;
 `,
     );
 
-    expect(errors).toEqual(['src/game/example.ts exports 2 top-level elements (ScoreInput, scoreTotal). Keep one primary exported element per file.']);
+    expect(errors).toEqual(['src/game/example.ts declares 2 top-level elements (ScoreInput, scoreTotal). Keep one module-scope element per file.']);
+  });
+
+  it.each([
+    ['interface', 'interface ScoreInput { readonly value: number; }'],
+    ['type', 'type ScoreInput = { readonly value: number; };'],
+    ['class', 'class ScoreInput { readonly value = 1; }'],
+    ['function', 'function scoreInput(): number { return 1; }'],
+    ['constant', 'const scoreInput = 1;'],
+  ])('rejects an unexported top-level %s with another top-level element', (_, declaration) => {
+    const errors = topLevelElementErrors(
+      'src/game/example.ts',
+      `
+${declaration}
+
+export const scoreTotal = 2;
+`,
+    );
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('src/game/example.ts declares 2 top-level elements');
   });
 
   it('rejects re-export-only files', () => {
@@ -63,7 +83,7 @@ export interface ScoreInput {
 export type ScorePhase = 'idle' | 'settled';
 `,
       ),
-    ).toEqual(['src/game/gameTypes.ts exports 2 top-level elements (ScoreInput, ScorePhase). Keep one primary exported element per file.']);
+    ).toEqual(['src/game/gameTypes.ts declares 2 top-level elements (ScoreInput, ScorePhase). Keep one module-scope element per file.']);
   });
 });
 

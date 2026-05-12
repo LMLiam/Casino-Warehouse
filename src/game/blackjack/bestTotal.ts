@@ -1,4 +1,5 @@
 import type { Card } from '../cards/Card';
+import { blackjackValue } from './blackjackValue';
 
 export const bestTotal = (cards: readonly Card[]): number => {
   let total = cards.reduce((sum, card) => sum + blackjackValue(card), 0);
@@ -8,14 +9,4 @@ export const bestTotal = (cards: readonly Card[]): number => {
     aces -= 1;
   }
   return total;
-};
-
-const blackjackValue = (card: Card): number => {
-  if (card.rank === 'A') {
-    return 1;
-  }
-  if (['K', 'Q', 'J'].includes(card.rank)) {
-    return 10;
-  }
-  return Number(card.rank);
 };

@@ -1,5 +1,8 @@
 import type { PointPercent } from './PointPercent';
 
-const point = (x: number, y: number): PointPercent => ({ x, y });
-
-export const dealerSlots: readonly PointPercent[] = [point(42.25, 24), point(47.7, 24), point(53.15, 24), point(58.6, 24)];
+export const dealerSlots: readonly PointPercent[] = [
+  { x: 42.25, y: 24 },
+  { x: 47.7, y: 24 },
+  { x: 53.15, y: 24 },
+  { x: 58.6, y: 24 },
+];

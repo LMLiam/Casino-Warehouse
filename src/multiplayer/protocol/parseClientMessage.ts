@@ -4,6 +4,8 @@ import type { ParsedMessage } from './ParsedMessage';
 import { protocolVersion } from './protocolVersion';
 
 export const parseClientMessage = (value: unknown): ParsedMessage => {
+  const isRecord = (candidate: unknown): candidate is Record<string, unknown> => typeof candidate === 'object' && candidate !== null;
+
   if (!isRecord(value) || value.version !== protocolVersion || typeof value.type !== 'string') {
     return { ok: false, error: 'Message version or type is invalid.' };
   }
@@ -28,5 +30,3 @@ export const parseClientMessage = (value: unknown): ParsedMessage => {
   }
   return { ok: true, message: parsed.data };
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
