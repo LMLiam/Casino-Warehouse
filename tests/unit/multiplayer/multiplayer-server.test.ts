@@ -1,4 +1,4 @@
-import type { AddressInfo } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import { connect as connectSocket } from 'node:net';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -136,12 +136,116 @@ class SocketProbe {
   }
 }
 
+class RawSocketProbe {
+  private readonly messages: ServerMessage[] = [];
+  private readonly closeCodes: number[] = [];
+  private buffer = Buffer.alloc(0);
+
+  public constructor(
+    private readonly socket: Socket,
+    initialBuffer: Buffer,
+  ) {
+    socket.on('data', (chunk) => this.read(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    socket.on('error', () => {
+      /* Socket errors are asserted through received close frames in the raw protocol tests. */
+    });
+    if (initialBuffer.length > 0) {
+      this.read(initialBuffer);
+    }
+  }
+
+  public send(frame: Buffer): void {
+    this.socket.write(frame);
+  }
+
+  public checkpoint(): number {
+    return this.messages.length;
+  }
+
+  public messagesSince(checkpoint: number): readonly ServerMessage[] {
+    return this.messages.slice(checkpoint);
+  }
+
+  public closeCodesSince(checkpoint: number): readonly number[] {
+    return this.closeCodes.slice(checkpoint);
+  }
+
+  public closeCodeCheckpoint(): number {
+    return this.closeCodes.length;
+  }
+
+  public close(): void {
+    this.socket.destroy();
+  }
+
+  private read(chunk: Buffer): void {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    this.readFrames();
+  }
+
+  private readFrames(): void {
+    let offset = 0;
+    while (offset + 2 <= this.buffer.length) {
+      const first = this.buffer[offset];
+      const second = this.buffer[offset + 1];
+      const opcode = first & 0x0f;
+      const masked = Boolean(second & 0x80);
+      let length = second & 0x7f;
+      let headerLength = 2;
+      if (length === 126) {
+        if (offset + 4 > this.buffer.length) {
+          break;
+        }
+        length = this.buffer.readUInt16BE(offset + 2);
+        headerLength = 4;
+      } else if (length === 127) {
+        if (offset + 10 > this.buffer.length) {
+          break;
+        }
+        const high = this.buffer.readUInt32BE(offset + 2);
+        const low = this.buffer.readUInt32BE(offset + 6);
+        length = high * 2 ** 32 + low;
+        headerLength = 10;
+      }
+      const maskLength = masked ? 4 : 0;
+      const payloadOffset = offset + headerLength + maskLength;
+      const frameLength = headerLength + maskLength + length;
+      if (offset + frameLength > this.buffer.length) {
+        break;
+      }
+      const payload = Buffer.from(this.buffer.subarray(payloadOffset, payloadOffset + length));
+      if (masked) {
+        const mask = this.buffer.subarray(offset + headerLength, offset + headerLength + 4);
+        for (let index = 0; index < payload.length; index += 1) {
+          payload[index] ^= mask[index % 4];
+        }
+      }
+      this.recordFrame(opcode, payload);
+      offset += frameLength;
+    }
+    this.buffer = this.buffer.subarray(offset);
+  }
+
+  private recordFrame(opcode: number, payload: Buffer): void {
+    if (opcode === 0x01) {
+      const message = decodeServerMessage(payload.toString('utf8'));
+      if (message) {
+        this.messages.push(message);
+      }
+    } else if (opcode === 0x08) {
+      this.closeCodes.push(payload.length >= 2 ? payload.readUInt16BE(0) : 1005);
+    }
+  }
+}
+
 let server: CasinoServer | undefined;
 const sockets: SocketProbe[] = [];
+const rawSockets: RawSocketProbe[] = [];
 const tempDirs: string[] = [];
 
 afterEach(async () => {
   sockets.splice(0).forEach((socket) => socket.close());
+  rawSockets.splice(0).forEach((socket) => socket.close());
   await closeCurrentServer();
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -157,6 +261,60 @@ describe('multiplayer WebSocket server', () => {
 
     await expect(sendUpgradeRequest(baseUrl.port, '/not-ws', 'Sec-WebSocket-Key: bad')).resolves.toBeUndefined();
     await expect(sendUpgradeRequest(baseUrl.port, '/ws')).resolves.toBeUndefined();
+  });
+
+  it('handles raw WebSocket frames split across TCP chunks and coalesced into one chunk', async () => {
+    const baseUrl = await startServer();
+    const raw = await connectRawWebSocket(baseUrl.port);
+    await waitForMessageSince(raw, 0, (message) => message.type === 'error' && message.code === 'connected');
+    await waitForMessageSince(raw, 0, (message) => message.type === 'data-state');
+    const splitCheckpoint = raw.checkpoint();
+    const splitFrame = encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' }));
+
+    raw.send(splitFrame.subarray(0, 3));
+    raw.send(splitFrame.subarray(3));
+
+    await waitForMessageSince(raw, splitCheckpoint, (message) => message.type === 'data-state');
+
+    const coalescedCheckpoint = raw.checkpoint();
+    raw.send(
+      Buffer.concat([
+        encodeClientFrame(encodeMessage({ version: 1, type: 'create-profile', profileName: 'Raw Coalesced Player' })),
+        encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' })),
+      ]),
+    );
+
+    await waitForMessageSince(
+      raw,
+      coalescedCheckpoint,
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Raw Coalesced Player'),
+    );
+  });
+
+  it('closes raw WebSocket clients that send malformed, oversized, unsupported, or fragmented messages', async () => {
+    const baseUrl = await startServer();
+
+    const unmasked = await connectRawWebSocket(baseUrl.port);
+    const unmaskedCloseCheckpoint = unmasked.closeCodeCheckpoint();
+    unmasked.send(encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' }), { masked: false }));
+    await waitForCloseCodeSince(unmasked, unmaskedCloseCheckpoint, 1002);
+
+    const oversized = await connectRawWebSocket(baseUrl.port);
+    const oversizedCloseCheckpoint = oversized.closeCodeCheckpoint();
+    oversized.send(encodeClientFrame(Buffer.alloc(64 * 1024 + 1, 0x61)));
+    await waitForCloseCodeSince(oversized, oversizedCloseCheckpoint, 1009);
+
+    const binary = await connectRawWebSocket(baseUrl.port);
+    const binaryCloseCheckpoint = binary.closeCodeCheckpoint();
+    binary.send(encodeClientFrame(Buffer.from([0x01, 0x02, 0x03]), { opcode: 0x02 }));
+    await waitForCloseCodeSince(binary, binaryCloseCheckpoint, 1003);
+
+    const fragmented = await connectRawWebSocket(baseUrl.port);
+    const fragmentedCloseCheckpoint = fragmented.closeCodeCheckpoint();
+    fragmented.send(
+      Buffer.concat([encodeClientFrame(Buffer.from([0x01]), { fin: false, opcode: 0x02 }), encodeClientFrame(Buffer.from([0x02]), { opcode: 0x00 })]),
+    );
+    await waitForCloseCodeSince(fragmented, fragmentedCloseCheckpoint, 1003);
   });
 
   it('syncs two profiles through the actual realtime transport', async () => {
@@ -811,6 +969,56 @@ const sendUpgradeRequest = async (port: number, path: string, extraHeader = ''):
     socket.on('error', reject);
   });
 
+const connectRawWebSocket = async (port: number): Promise<RawSocketProbe> =>
+  new Promise((resolve, reject) => {
+    const socket = connectSocket(port, '127.0.0.1');
+    let buffer = Buffer.alloc(0);
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new Error('Timed out waiting for raw WebSocket handshake.'));
+    }, 1_000);
+    const fail = (error: Error) => {
+      clearTimeout(timer);
+      reject(error);
+    };
+    const onData = (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      const headerEnd = buffer.indexOf('\r\n\r\n');
+      if (headerEnd < 0) {
+        return;
+      }
+      const header = buffer.subarray(0, headerEnd).toString('utf8');
+      const remaining = buffer.subarray(headerEnd + 4);
+      socket.off('data', onData);
+      socket.off('error', fail);
+      clearTimeout(timer);
+      if (!header.startsWith('HTTP/1.1 101 Switching Protocols')) {
+        socket.destroy();
+        reject(new Error(`Expected WebSocket upgrade response, received: ${header.split('\r\n')[0]}`));
+        return;
+      }
+      const probe = new RawSocketProbe(socket, remaining);
+      rawSockets.push(probe);
+      resolve(probe);
+    };
+    socket.on('connect', () => {
+      socket.write(
+        [
+          'GET /ws HTTP/1.1',
+          'Host: 127.0.0.1',
+          'Connection: Upgrade',
+          'Upgrade: websocket',
+          'Sec-WebSocket-Version: 13',
+          'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+          '',
+          '',
+        ].join('\r\n'),
+      );
+    });
+    socket.on('data', onData);
+    socket.on('error', fail);
+  });
+
 const connect = async (url: string, options: { readonly waitForConnected?: boolean } = {}): Promise<SocketProbe> => {
   const socket = new WebSocket(url);
   const probe = new SocketProbe(socket);
@@ -846,7 +1054,11 @@ const waitForReceivedCount = async (probe: SocketProbe, predicate: (message: Ser
 
 const roomMembers = (room: RoomSnapshot) => [...room.players, ...room.spectators];
 
-const waitForMessageSince = async (probe: SocketProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): Promise<ServerMessage> => {
+interface MessageProbe {
+  messagesSince(checkpoint: number): readonly ServerMessage[];
+}
+
+const waitForMessageSince = async (probe: MessageProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): Promise<ServerMessage> => {
   const deadline = Date.now() + 2_000;
   while (Date.now() < deadline) {
     const message = probe.messagesSince(checkpoint).find(predicate);
@@ -858,7 +1070,18 @@ const waitForMessageSince = async (probe: SocketProbe, checkpoint: number, predi
   throw new Error('Timed out waiting for matching WebSocket message.');
 };
 
-const messageIndexSince = (probe: SocketProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): number => {
+const waitForCloseCodeSince = async (probe: RawSocketProbe, checkpoint: number, code: number): Promise<void> => {
+  const deadline = Date.now() + 2_000;
+  while (Date.now() < deadline) {
+    if (probe.closeCodesSince(checkpoint).includes(code)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`Timed out waiting for WebSocket close code ${code}.`);
+};
+
+const messageIndexSince = (probe: MessageProbe, checkpoint: number, predicate: (message: ServerMessage) => boolean): number => {
   const index = probe.messagesSince(checkpoint).findIndex(predicate);
   if (index < 0) {
     throw new Error('Expected message was not received.');
@@ -888,6 +1111,36 @@ const unauthorizedProfileError = (message: ServerMessage): boolean =>
 
 const adminLockedError = (message: ServerMessage): boolean =>
   message.type === 'error' && message.code === 'rejected' && message.message === 'Admin controls are locked for this browser.';
+
+const encodeClientFrame = (payload: string | Buffer, options: { readonly fin?: boolean; readonly masked?: boolean; readonly opcode?: number } = {}): Buffer => {
+  const data = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
+  const masked = options.masked ?? true;
+  const headerLength = data.length < 126 ? 2 : data.length < 65536 ? 4 : 10;
+  const maskLength = masked ? 4 : 0;
+  const frame = Buffer.alloc(headerLength + maskLength + data.length);
+  frame[0] = ((options.fin ?? true) ? 0x80 : 0) | (options.opcode ?? 0x01);
+  if (data.length < 126) {
+    frame[1] = data.length;
+  } else if (data.length < 65536) {
+    frame[1] = 126;
+    frame.writeUInt16BE(data.length, 2);
+  } else {
+    frame[1] = 127;
+    frame.writeUInt32BE(0, 2);
+    frame.writeUInt32BE(data.length, 6);
+  }
+  if (!masked) {
+    data.copy(frame, headerLength);
+    return frame;
+  }
+  frame[1] |= 0x80;
+  const mask = Buffer.from([0x12, 0x34, 0x56, 0x78]);
+  mask.copy(frame, headerLength);
+  for (let index = 0; index < data.length; index += 1) {
+    frame[headerLength + maskLength + index] = data[index] ^ mask[index % 4];
+  }
+  return frame;
+};
 
 const beat = (room: RoomSnapshot) => room.game as ReturnType<BeatTheHouseGame['snapshot']>;
 

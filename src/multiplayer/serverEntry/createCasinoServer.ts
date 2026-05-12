@@ -1,8 +1,8 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
-import type { Socket } from 'node:net';
 import { extname, join, normalize } from 'node:path';
+import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { RoomAuthority } from '../roomAuthority';
 import type { ClientMessage } from '../protocol/ClientMessage';
 import { parseClientMessage } from '../protocol/parseClientMessage';
@@ -18,12 +18,15 @@ import type { CasinoServerOptions } from './CasinoServerOptions';
 
 interface Peer {
   readonly id: string;
-  readonly socket: import('node:net').Socket;
+  readonly socket: WebSocket;
   readonly ownedProfileIds: Set<string>;
   lastPongAt: number;
   browsingGameId?: RoomGameId;
   isAdmin: boolean;
 }
+
+const closeUnsupportedData = 1003;
+const maxClientMessageBytes = 64 * 1024;
 
 export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoServer => {
   const distRoot = options.distRoot ?? process.env.CASINO_STATIC_ROOT ?? 'dist';
@@ -34,6 +37,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const adminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
   const serverInstanceId = options.serverInstanceId ?? randomUUID();
   const peers = new Map<string, Peer>();
+  const websocketServer = new WebSocketServer({
+    clientTracking: false,
+    maxPayload: maxClientMessageBytes,
+    noServer: true,
+    perMessageDeflate: false,
+  });
 
   const server = createServer((request, response) => {
     if (request.url === '/health') {
@@ -355,7 +364,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     const now = Date.now();
     for (const peer of [...peers.values()]) {
       if (now - peer.lastPongAt > heartbeatTimeoutMs) {
-        peer.socket.destroy();
+        peer.socket.terminate();
         peers.delete(peer.id);
         const result = authority.disconnect(peer.id);
         const snapshot = result.broadcasts.at(-1);
@@ -366,65 +375,68 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       send(peer, { version: protocolVersion, type: 'heartbeat', sentAt: now });
     }
   }, heartbeatIntervalMs);
-  server.on('close', () => clearInterval(heartbeat));
+  server.on('close', () => {
+    clearInterval(heartbeat);
+    websocketServer.close();
+  });
+  websocketServer.on('wsClientError', (_error, socket) => {
+    socket.destroy();
+  });
 
-  server.on('upgrade', (request, socket) => {
+  server.on('upgrade', (request, socket, head) => {
     const requestUrl = new URL(request.url ?? '/', 'http://localhost');
     if (requestUrl.pathname !== '/ws') {
       socket.destroy();
       return;
     }
 
-    const key = request.headers['sec-websocket-key'];
-    if (typeof key !== 'string') {
-      socket.destroy();
-      return;
-    }
-
-    socket.write(
-      ['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', `Sec-WebSocket-Accept: ${acceptKey(key)}`, '', ''].join('\r\n'),
-    );
-
-    const peer: Peer = { id: randomUUID(), socket: socket as Socket, ownedProfileIds: new Set(), lastPongAt: Date.now(), isAdmin: false };
-    const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
-    if (clientServerInstanceId && clientServerInstanceId !== serverInstanceId) {
-      send(peer, {
-        version: protocolVersion,
-        type: 'reload-required',
-        reason: 'server-restarted',
-        message: 'The game server restarted. Reload the app to use the latest client.',
-      });
-      peer.socket.end();
-      return;
-    }
-
-    peers.set(peer.id, peer);
-    send(peer, { version: protocolVersion, type: 'server-hello', serverInstanceId });
-    send(peer, { version: protocolVersion, type: 'error', code: 'connected', message: 'Connected to Casino Warehouse game server.' });
-    sendDataState(peer);
-
-    socket.on('data', (chunk) => {
-      for (const payload of decodeFrames(chunk)) {
-        handlePayload(peer, payload);
+    websocketServer.handleUpgrade(request, socket, head, (websocket) => {
+      const peer: Peer = { id: randomUUID(), socket: websocket, ownedProfileIds: new Set(), lastPongAt: Date.now(), isAdmin: false };
+      const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
+      if (clientServerInstanceId && clientServerInstanceId !== serverInstanceId) {
+        send(peer, {
+          version: protocolVersion,
+          type: 'reload-required',
+          reason: 'server-restarted',
+          message: 'The game server restarted. Reload the app to use the latest client.',
+        });
+        websocket.close();
+        return;
       }
-    });
-    socket.on('close', () => {
-      peers.delete(peer.id);
-      const result = authority.disconnect(peer.id);
-      const snapshot = result.broadcasts.at(-1);
-      broadcast(snapshot ? { version: protocolVersion, type: 'room-state', room: snapshot } : undefined, snapshot ? connectionIds(snapshot) : undefined);
-      broadcastRoomLists(roomListGameIds(result));
-    });
-    socket.on('error', () => {
-      /* v8 ignore next -- socket error timing is platform-dependent; close handling covers peer cleanup. */
-      peers.delete(peer.id);
+
+      peers.set(peer.id, peer);
+      send(peer, { version: protocolVersion, type: 'server-hello', serverInstanceId });
+      send(peer, { version: protocolVersion, type: 'error', code: 'connected', message: 'Connected to Casino Warehouse game server.' });
+      sendDataState(peer);
+
+      websocket.on('message', (data, isBinary) => {
+        if (isBinary || Array.isArray(data)) {
+          websocket.close(closeUnsupportedData, 'Only text JSON messages are supported.');
+          return;
+        }
+        handlePayload(peer, textPayload(data));
+      });
+      websocket.on('pong', () => {
+        peer.lastPongAt = Date.now();
+      });
+      websocket.on('close', () => {
+        peers.delete(peer.id);
+        const result = authority.disconnect(peer.id);
+        const snapshot = result.broadcasts.at(-1);
+        broadcast(snapshot ? { version: protocolVersion, type: 'room-state', room: snapshot } : undefined, snapshot ? connectionIds(snapshot) : undefined);
+        broadcastRoomLists(roomListGameIds(result));
+      });
+      websocket.on('error', () => {
+        /* v8 ignore next -- socket error timing is platform-dependent; close handling covers peer cleanup. */
+        peers.delete(peer.id);
+      });
     });
   });
 
   return Object.assign(server, {
     closePeers: () => {
       for (const peer of peers.values()) {
-        peer.socket.destroy();
+        peer.socket.terminate();
       }
       peers.clear();
     },
@@ -432,7 +444,9 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 };
 
 const send = (peer: Peer, message: ServerMessage): void => {
-  peer.socket.write(encodeFrame(JSON.stringify(message)));
+  if (peer.socket.readyState === WebSocket.OPEN) {
+    peer.socket.send(JSON.stringify(message));
+  }
 };
 
 const connectionIds = (room: {
@@ -461,61 +475,14 @@ const createInvitePath = (gameId: string, roomId: string): string => {
   return `${publicBaseUrl}/${query}&server=${encodeURIComponent(publicBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/ws')}`;
 };
 
-const acceptKey = (key: string): string => createHash('sha1').update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64');
-
-const decodeFrames = (buffer: Buffer): string[] => {
-  const messages: string[] = [];
-  let offset = 0;
-  while (offset + 2 <= buffer.length) {
-    const first = buffer[offset];
-    const second = buffer[offset + 1];
-    const opcode = first & 0x0f;
-    if (opcode === 0x8) {
-      return messages;
-    }
-    let length = second & 0x7f;
-    offset += 2;
-    if (length === 126) {
-      length = buffer.readUInt16BE(offset);
-      offset += 2;
-    } else if (length === 127) {
-      /* v8 ignore next 4 -- clients in this app never send payloads large enough to require 64-bit WebSocket lengths. */
-      const high = buffer.readUInt32BE(offset);
-      const low = buffer.readUInt32BE(offset + 4);
-      length = high * 2 ** 32 + low;
-      offset += 8;
-    }
-    const mask = buffer.subarray(offset, offset + 4);
-    offset += 4;
-    const data = buffer.subarray(offset, offset + length);
-    offset += length;
-    const decoded = Buffer.alloc(data.length);
-    for (let index = 0; index < data.length; index += 1) {
-      decoded[index] = data[index] ^ mask[index % 4];
-    }
-    messages.push(decoded.toString('utf8'));
+const textPayload = (data: RawData): string => {
+  if (Array.isArray(data)) {
+    return Buffer.concat(data).toString('utf8');
   }
-  return messages;
-};
-
-const encodeFrame = (payload: string): Buffer => {
-  const data = Buffer.from(payload);
-  const headerLength = data.length < 126 ? 2 : data.length < 65536 ? 4 : 10;
-  const frame = Buffer.alloc(headerLength + data.length);
-  frame[0] = 0x81;
-  if (data.length < 126) {
-    frame[1] = data.length;
-  } else if (data.length < 65536) {
-    frame[1] = 126;
-    frame.writeUInt16BE(data.length, 2);
-  } else {
-    /* v8 ignore next 3 -- server messages are intentionally bounded far below 64-bit WebSocket lengths. */
-    frame[1] = 127;
-    frame.writeUInt32BE(0, 2);
-    frame.writeUInt32BE(data.length, 6);
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(new Uint8Array(data)).toString('utf8');
   }
-  data.copy(frame, headerLength);
-  return frame;
+  return data.toString('utf8');
 };
 
 const staticPath = (request: IncomingMessage, distRoot: string): string | undefined => {
