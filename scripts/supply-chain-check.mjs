@@ -27,8 +27,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 function checkWorkflowActionPins(failures) {
-  for (const file of workflowFiles()) {
-    const lines = readFileSync(file, 'utf8').split('\n');
+  const sources = workflowFiles().map((file) => ({ path: file, source: readFileSync(file, 'utf8') }));
+  failures.push(...workflowActionPinFailures(sources));
+}
+
+export function workflowActionPinFailures(sources) {
+  const failures = [];
+
+  for (const { path, source } of sources) {
+    const lines = source.split('\n');
     lines.forEach((line, index) => {
       const match = line.match(/^\s*uses:\s*([^#\s]+)(?:\s+#\s*(\S.*))?$/);
       if (!match) {
@@ -42,19 +49,21 @@ function checkWorkflowActionPins(failures) {
 
       const [, ref] = target.split('@');
       if (!ref) {
-        failures.push(`${file}:${index + 1} uses ${target} without an explicit ref.`);
+        failures.push(`${path}:${index + 1} uses ${target} without an explicit ref.`);
         return;
       }
 
       if (!fullShaPattern.test(ref)) {
-        failures.push(`${file}:${index + 1} uses ${target}. Pin external actions to a full 40-character commit SHA.`);
+        failures.push(`${path}:${index + 1} uses ${target}. Pin external actions to a full 40-character commit SHA.`);
       }
 
       if (!match[2]) {
-        failures.push(`${file}:${index + 1} must keep a same-line version comment for Dependabot, for example "# v1.2.3".`);
+        failures.push(`${path}:${index + 1} must keep a same-line version comment for Dependabot, for example "# v1.2.3".`);
       }
     });
   }
+
+  return failures;
 }
 
 function checkDependabotActionsUpdates(failures) {
@@ -95,13 +104,20 @@ export function dependabotActionsUpdateFailures(source, path = dependabotPath) {
 
 function checkDependencyReviewPolicy(failures) {
   const source = readFileSync(dependencyReviewPath, 'utf8');
+  failures.push(...dependencyReviewPolicyFailures(source));
+}
+
+export function dependencyReviewPolicyFailures(source, path = dependencyReviewPath) {
+  const failures = [];
   const requiredFragments = ['fail-on-severity: moderate', 'fail-on-scopes: runtime,development,unknown'];
 
   for (const fragment of requiredFragments) {
     if (!source.includes(fragment)) {
-      failures.push(`${dependencyReviewPath} must include "${fragment}".`);
+      failures.push(`${path} must include "${fragment}".`);
     }
   }
+
+  return failures;
 }
 
 function workflowFiles() {
