@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const issueStandardsCommentMarker = '<!-- casino-warehouse:issue-standards -->';
+export const issueStandardsReactionActor = 'github-actions[bot]';
+export const issueStandardsSuccessReaction = '+1';
 
 const titleTypes = ['bug', 'feature', 'maintenance', 'docs', 'test', 'ci', 'security', 'deps', 'question'];
 const titlePattern = new RegExp(`^(${titleTypes.join('|')})\\([a-z0-9][a-z0-9-]*\\): .{5,}$`);
@@ -179,6 +181,52 @@ export async function upsertIssueStandardsComment({ fetchImpl = fetch, repositor
   return { action: 'created', commentId: created.id };
 }
 
+export async function syncIssueStandardsReaction({ fetchImpl = fetch, repository, token, issueNumber, failures }) {
+  if (!repository || !token || !issueNumber) {
+    throw new Error('repository, token, and issueNumber are required to update issue standards reactions.');
+  }
+
+  const reactions = await githubRequest({
+    fetchImpl,
+    repository,
+    token,
+    path: `/issues/${issueNumber}/reactions?content=%2B1&per_page=100`,
+  });
+  const workflowReactions = reactions.filter(
+    (reaction) => reaction.content === issueStandardsSuccessReaction && reaction.user?.login === issueStandardsReactionActor,
+  );
+
+  if (failures.length > 0) {
+    for (const reaction of workflowReactions) {
+      await githubRequest({ fetchImpl, method: 'DELETE', repository, token, path: `/issues/${issueNumber}/reactions/${reaction.id}` });
+    }
+
+    return workflowReactions.length > 0 ? { action: 'deleted', reactionIds: workflowReactions.map((reaction) => reaction.id) } : { action: 'skipped' };
+  }
+
+  const [existingReaction, ...duplicates] = workflowReactions;
+
+  for (const duplicate of duplicates) {
+    await githubRequest({ fetchImpl, method: 'DELETE', repository, token, path: `/issues/${issueNumber}/reactions/${duplicate.id}` });
+  }
+
+  if (existingReaction) {
+    return duplicates.length > 0
+      ? { action: 'kept', reactionId: existingReaction.id, deletedReactionIds: duplicates.map((reaction) => reaction.id) }
+      : { action: 'kept', reactionId: existingReaction.id };
+  }
+
+  const created = await githubRequest({
+    fetchImpl,
+    method: 'POST',
+    repository,
+    token,
+    path: `/issues/${issueNumber}/reactions`,
+    body: { content: issueStandardsSuccessReaction },
+  });
+  return { action: 'created', reactionId: created.id };
+}
+
 function loadIssue(eventPath) {
   const event = JSON.parse(readFileSync(eventPath, 'utf8'));
 
@@ -203,6 +251,12 @@ async function main() {
   try {
     if (process.env.ISSUE_STANDARDS_SKIP_COMMENT !== 'true') {
       await upsertIssueStandardsComment({
+        repository: process.env.GITHUB_REPOSITORY,
+        token: process.env.GITHUB_TOKEN,
+        issueNumber: issue.number,
+        failures,
+      });
+      await syncIssueStandardsReaction({
         repository: process.env.GITHUB_REPOSITORY,
         token: process.env.GITHUB_TOKEN,
         issueNumber: issue.number,

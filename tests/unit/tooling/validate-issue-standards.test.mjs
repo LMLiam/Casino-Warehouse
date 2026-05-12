@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildIssueStandardsComment,
   issueStandardsCommentMarker,
+  issueStandardsReactionActor,
+  issueStandardsSuccessReaction,
+  syncIssueStandardsReaction,
   upsertIssueStandardsComment,
   validateIssue,
 } from '../../../scripts/validate-issue-standards.mjs';
@@ -218,10 +221,161 @@ describe('issue standards comments', () => {
   });
 });
 
-function response(data) {
+describe('issue standards reactions', () => {
+  it('creates a workflow thumbs-up reaction when issue metadata passes', async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push([options.method ?? 'GET', url, options.body ? JSON.parse(options.body) : undefined]);
+      if ((options.method ?? 'GET') === 'GET') {
+        return response([]);
+      }
+      return response({ id: 12, content: issueStandardsSuccessReaction });
+    };
+
+    await expect(
+      syncIssueStandardsReaction({
+        fetchImpl,
+        repository: 'LMLiam/Casino-Warehouse',
+        token: 'token',
+        issueNumber: 18,
+        failures: [],
+      }),
+    ).resolves.toEqual({ action: 'created', reactionId: 12 });
+
+    expect(calls).toEqual([
+      ['GET', 'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/18/reactions?content=%2B1&per_page=100', undefined],
+      ['POST', 'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/18/reactions', { content: issueStandardsSuccessReaction }],
+    ]);
+  });
+
+  it('keeps an existing workflow thumbs-up reaction on repeated passing runs', async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push([options.method ?? 'GET', url, options.body ? JSON.parse(options.body) : undefined]);
+      return response([
+        { id: 12, content: issueStandardsSuccessReaction, user: { login: issueStandardsReactionActor } },
+        { id: 14, content: issueStandardsSuccessReaction, user: { login: 'maintainer' } },
+      ]);
+    };
+
+    await expect(
+      syncIssueStandardsReaction({
+        fetchImpl,
+        repository: 'LMLiam/Casino-Warehouse',
+        token: 'token',
+        issueNumber: 18,
+        failures: [],
+      }),
+    ).resolves.toEqual({ action: 'kept', reactionId: 12 });
+
+    expect(calls).toEqual([['GET', 'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/18/reactions?content=%2B1&per_page=100', undefined]]);
+  });
+
+  it('removes stale workflow thumbs-up reactions when issue metadata fails', async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push([options.method ?? 'GET', url, options.body ? JSON.parse(options.body) : undefined]);
+      if ((options.method ?? 'GET') === 'GET') {
+        return response([
+          { id: 12, content: issueStandardsSuccessReaction, user: { login: issueStandardsReactionActor } },
+          { id: 14, content: issueStandardsSuccessReaction, user: { login: 'maintainer' } },
+        ]);
+      }
+      return response(undefined, 204);
+    };
+
+    await expect(
+      syncIssueStandardsReaction({
+        fetchImpl,
+        repository: 'LMLiam/Casino-Warehouse',
+        token: 'token',
+        issueNumber: 18,
+        failures: ['Add a status label.'],
+      }),
+    ).resolves.toEqual({ action: 'deleted', reactionIds: [12] });
+
+    expect(calls).toEqual([
+      ['GET', 'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/18/reactions?content=%2B1&per_page=100', undefined],
+      ['DELETE', 'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/18/reactions/12', undefined],
+    ]);
+  });
+
+  it('does not delete unrelated reactions when issue metadata fails without a workflow thumbs-up', async () => {
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      calls.push([options.method ?? 'GET', url, options.body ? JSON.parse(options.body) : undefined]);
+      return response([{ id: 14, content: issueStandardsSuccessReaction, user: { login: 'maintainer' } }]);
+    };
+
+    await expect(
+      syncIssueStandardsReaction({
+        fetchImpl,
+        repository: 'LMLiam/Casino-Warehouse',
+        token: 'token',
+        issueNumber: 18,
+        failures: ['Add a status label.'],
+      }),
+    ).resolves.toEqual({ action: 'skipped' });
+
+    expect(calls).toEqual([['GET', 'https://api.github.com/repos/LMLiam/Casino-Warehouse/issues/18/reactions?content=%2B1&per_page=100', undefined]]);
+  });
+
+  it('syncs the workflow thumbs-up across pass, fail, and pass transitions', async () => {
+    let workflowReaction = null;
+    let nextReactionId = 20;
+    const calls = [];
+    const fetchImpl = async (url, options = {}) => {
+      const method = options.method ?? 'GET';
+      calls.push([method, url, options.body ? JSON.parse(options.body) : undefined]);
+
+      if (method === 'GET') {
+        return response(workflowReaction ? [workflowReaction] : []);
+      }
+
+      if (method === 'POST') {
+        workflowReaction = {
+          content: issueStandardsSuccessReaction,
+          id: nextReactionId,
+          user: { login: issueStandardsReactionActor },
+        };
+        nextReactionId += 1;
+        return response(workflowReaction);
+      }
+
+      if (method === 'DELETE') {
+        workflowReaction = null;
+        return response(undefined, 204);
+      }
+
+      throw new Error(`Unexpected ${method} ${url}`);
+    };
+
+    await expect(
+      syncIssueStandardsReaction({ fetchImpl, repository: 'LMLiam/Casino-Warehouse', token: 'token', issueNumber: 18, failures: [] }),
+    ).resolves.toEqual({ action: 'created', reactionId: 20 });
+
+    await expect(
+      syncIssueStandardsReaction({
+        fetchImpl,
+        repository: 'LMLiam/Casino-Warehouse',
+        token: 'token',
+        issueNumber: 18,
+        failures: ['Add a status label.'],
+      }),
+    ).resolves.toEqual({ action: 'deleted', reactionIds: [20] });
+
+    await expect(
+      syncIssueStandardsReaction({ fetchImpl, repository: 'LMLiam/Casino-Warehouse', token: 'token', issueNumber: 18, failures: [] }),
+    ).resolves.toEqual({ action: 'created', reactionId: 21 });
+
+    expect(calls.map(([method]) => method)).toEqual(['GET', 'POST', 'GET', 'DELETE', 'GET', 'POST']);
+  });
+});
+
+function response(data, status = 200) {
   return {
     ok: true,
-    status: 200,
+    status,
     json: async () => data,
   };
 }
