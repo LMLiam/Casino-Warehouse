@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   validate:
-    name: PR Standards
+    name: Validate Pull Request Metadata
     runs-on: ubuntu-latest
 
     steps:
