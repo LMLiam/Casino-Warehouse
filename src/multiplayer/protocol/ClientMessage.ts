@@ -1,3 +1,4 @@
-import type { ClientMessageFromSchema } from '../../schemas/casinoSchemas/ClientMessageFromSchema';
+import type { z } from 'zod';
+import { clientMessageSchema } from '../../schemas/protocol/clientMessageSchema';
 
-export type ClientMessage = ClientMessageFromSchema;
+export type ClientMessage = z.infer<typeof clientMessageSchema>;
