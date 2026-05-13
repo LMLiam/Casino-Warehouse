@@ -7,6 +7,7 @@ import {
   createDraftAutofixPullRequest,
   createGitHubClient,
   findExistingFixPullRequest,
+  normalizeOptions,
   optionsFromEnvironment,
   parseCliArguments,
   planAutofixPullRequests,
@@ -96,6 +97,47 @@ describe('CodeQL Autofix automation planning', () => {
 
     expect(result.candidates.map((item) => item.alert.number)).toEqual([1, 2]);
     expect(result.skipped.map((item) => item.reasons)).toEqual([['max-alerts-reached']]);
+  });
+
+  it('parses valid integer options and preserves max-alerts zero as the disable switch', () => {
+    expect(
+      normalizeOptions({
+        maxAlerts: '0',
+        pollAttempts: '2',
+        pollSeconds: '3',
+      }),
+    ).toMatchObject({
+      maxAlerts: 0,
+      pollAttempts: 2,
+      pollSeconds: 3,
+    });
+
+    const result = planAutofixPullRequests({
+      alerts: [alert({ number: 1 })],
+      defaultBranch: 'main',
+      openPullRequests: [],
+      options: { maxAlerts: '0' },
+    });
+    expect(result.candidates).toEqual([]);
+    expect(result.skipped.map((item) => item.reasons)).toEqual([['max-alerts-reached']]);
+  });
+
+  it('rejects invalid, fractional, negative, and out-of-range numeric options', () => {
+    const invalidOptions = [
+      [{ maxAlerts: 'not-a-number' }, 'max-alerts must be an integer greater than or equal to 0. Received "not-a-number".'],
+      [{ maxAlerts: '1.5' }, 'max-alerts must be an integer greater than or equal to 0. Received "1.5".'],
+      [{ maxAlerts: '-1' }, 'max-alerts must be an integer greater than or equal to 0. Received "-1".'],
+      [{ pollAttempts: 'not-a-number' }, 'poll-attempts must be an integer greater than or equal to 1. Received "not-a-number".'],
+      [{ pollAttempts: '1.5' }, 'poll-attempts must be an integer greater than or equal to 1. Received "1.5".'],
+      [{ pollAttempts: '0' }, 'poll-attempts must be an integer greater than or equal to 1. Received "0".'],
+      [{ pollSeconds: 'not-a-number' }, 'poll-seconds must be an integer greater than or equal to 1. Received "not-a-number".'],
+      [{ pollSeconds: '1.5' }, 'poll-seconds must be an integer greater than or equal to 1. Received "1.5".'],
+      [{ pollSeconds: '0' }, 'poll-seconds must be an integer greater than or equal to 1. Received "0".'],
+    ];
+
+    for (const [options, message] of invalidOptions) {
+      expect(() => normalizeOptions(options)).toThrow(message);
+    }
   });
 
   it('builds draft PR metadata with alert context and affected files', () => {
@@ -315,7 +357,8 @@ describe('CodeQL Autofix automation planning', () => {
       requestAutofix({
         alertNumber: 24,
         client,
-        options: { pollAttempts: 2, pollSeconds: 0 },
+        delayImpl: async () => undefined,
+        options: { pollAttempts: 2, pollSeconds: 1 },
         owner: 'LMLiam',
         repo: 'Casino-Warehouse',
       }),
@@ -338,7 +381,8 @@ describe('CodeQL Autofix automation planning', () => {
       requestAutofix({
         alertNumber: 25,
         client: failedClient,
-        options: { pollAttempts: 1, pollSeconds: 0 },
+        delayImpl: async () => undefined,
+        options: { pollAttempts: 1, pollSeconds: 1 },
         owner: 'LMLiam',
         repo: 'Casino-Warehouse',
       }),
@@ -348,7 +392,8 @@ describe('CodeQL Autofix automation planning', () => {
       requestAutofix({
         alertNumber: 26,
         client: pendingClient,
-        options: { pollAttempts: 1, pollSeconds: 0 },
+        delayImpl: async () => undefined,
+        options: { pollAttempts: 1, pollSeconds: 1 },
         owner: 'LMLiam',
         repo: 'Casino-Warehouse',
       }),
@@ -394,7 +439,7 @@ describe('CodeQL Autofix automation planning', () => {
         candidate,
         client,
         defaultBranch: 'main',
-        options: { pollAttempts: 1, pollSeconds: 0 },
+        options: { pollAttempts: 1, pollSeconds: 1 },
         owner: 'LMLiam',
         repo: 'Casino-Warehouse',
       }),
@@ -441,7 +486,7 @@ describe('CodeQL Autofix automation planning', () => {
         candidate,
         client,
         defaultBranch: 'main',
-        options: { pollAttempts: 1, pollSeconds: 0 },
+        options: { pollAttempts: 1, pollSeconds: 1 },
         owner: 'LMLiam',
         repo: 'Casino-Warehouse',
       }),
@@ -464,12 +509,14 @@ describe('CodeQL Autofix automation planning', () => {
           AUTOFIX_LABELS: 'type:maintenance, area:tooling, security',
           AUTOFIX_MAX_ALERTS: '2',
           AUTOFIX_MIN_SEVERITY: 'medium',
+          AUTOFIX_POLL_ATTEMPTS: '4',
+          AUTOFIX_POLL_SECONDS: '5',
           DEFAULT_BRANCH: 'trunk',
           GITHUB_API_URL: 'https://api.github.test',
           GITHUB_REPOSITORY: 'LMLiam/Casino-Warehouse',
           GITHUB_TOKEN: 'token',
         },
-        ['--mode=create-draft-prs', '--allow-rules=js/xss', '--default-branch=main', '--max-alerts=1'],
+        ['--mode=create-draft-prs', '--allow-rules=js/xss', '--default-branch=main', '--max-alerts=1', '--poll-seconds=6'],
       ),
     ).toMatchObject({
       apiUrl: 'https://api.github.test',
@@ -480,6 +527,8 @@ describe('CodeQL Autofix automation planning', () => {
         labels: ['type:maintenance', 'area:tooling', 'security'],
         maxAlerts: 1,
         minSeverity: 'medium',
+        pollAttempts: 4,
+        pollSeconds: 6,
       },
       owner: 'LMLiam',
       repo: 'Casino-Warehouse',
