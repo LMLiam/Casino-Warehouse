@@ -1,4 +1,4 @@
-name: Build, Test, and Visual Checks
+name: Project Checks
 
 on:
   pull_request:
@@ -40,7 +40,7 @@ jobs:
         run: npm run build:server
 
   playwright:
-    name: Playwright Visual and E2E (${{ matrix.label }})
+    name: Visual and E2E (${{ matrix.label }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
