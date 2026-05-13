@@ -47,7 +47,7 @@ Run the narrowest meaningful checks while iterating, then run the broader checks
 
 - Work through issues and pull requests. Do not commit directly to `main`.
 - Keep changes focused on the issue or user request.
-- Prioritize the complete, correct fix for the requested issue over the smallest possible diff. Security, multiplayer, workflow, and policy issues often need coordinated code, tests, and documentation updates to be correct.
+- Prioritize the complete, correct resolution for the requested issue over the smallest possible diff. Security, multiplayer, workflow, and policy issues often need coordinated code, tests, and documentation updates to be correct.
 - Use branches or worktrees so unrelated user work is not disturbed. If the user asks for a worktree, create a separate worktree for the branch.
 - Name agent-created branches by issue or purpose, for example `issue-71-agents-md`. Do not prefix branch names with `codex/` or other tool-ownership markers.
 - Preserve generated build output out of commits.
@@ -109,22 +109,27 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 
 ## Issue Completion Workflow
 
-This workflow is mandatory for any issue or pull-request completion work, including follow-up chats, resumed goals, stale-branch updates, review-fix requests, and "is this ready?" checks. Do not present an issue or pull request as complete, ready, or ready to merge until the full loop below has been run against the current pull-request head and the latest target branch.
+When asked to complete, finish, fix, review, ready, update, or check an issue or pull request, use the Casino Warehouse issue-completion skill at `.agents/skills/casino-issue-completion/SKILL.md`.
 
-When asked to complete an issue, follow this loop:
+Do not describe an issue or pull request as complete, ready, ready to merge, done, or finished unless the skill's evidence checklist is satisfied on the current PR head.
 
-1. Do the work requested by the issue.
-2. Open a pull request for the completed work when repository permissions allow.
-3. Ensure all repository rules are followed for the issue and pull request, including titles, body content, labels, linked issues, checks, generated-output rules, and any other documented standards.
-4. Conduct a thorough, deep review of the pull request before presenting it as ready.
-5. Leave review comments on the pull request for every issue found during that review.
-6. Fix the issues identified by those review comments.
-7. Push the fixes to the pull request and wait for CI to pass.
-8. Respond to the review comments and resolve the review threads or conversations.
-9. Before presenting the pull request as complete or ready, verify that the pull request branch is up to date with the latest target branch, normally `main`. Do not rely on mergeability alone. If the branch is stale, update it from the target branch, push the updated branch, and wait for the required checks to pass again.
-10. Continue again from step 4, repeating the review, comment, fix, push, CI-wait, base-branch freshness check, respond, and resolve loop until no further issues are found.
+A self-review claim is invalid unless it includes evidence. The agent must name:
 
-After any new commit, rebase, merge from the target branch, force-push, PR body edit that reruns checks, or resolved-comment action, treat the pull request as needing another pass through the loop. The loop ends only when the current PR head is up to date with the target branch, required checks are passing, review threads are resolved or intentionally left open with a clear note, and a fresh self-review finds no further issues. Do not self-merge unless the user or a maintainer explicitly asks for merge handling.
+- the target branch and target branch commit reviewed against
+- the current branch and HEAD commit
+- the changed files inspected
+- the commands run
+- the correctness, security, performance, architecture, maintainability, test, and documentation risks checked
+- any web/current-info verification used for version, deprecation, CVE, security-advisory, best-practice, or feature-availability claims
+- the PR review comments left, or the exact reason comments could not be left
+- the fixes made after review, if any
+- the CI/check status for the latest pushed commit
+
+Saying only "I performed a self-review and found no issues" is non-compliant.
+
+If repository permissions prevent leaving PR review comments, the agent must still produce review findings in the final response using file paths and line-level references where possible. It must not silently skip the review-comment step.
+
+After any new commit, rebase, merge from the target branch, force-push, PR body edit that reruns checks, or resolved-comment action, the pull request must be reviewed again before being called ready.
 
 ## Pull Request Checklist
 
