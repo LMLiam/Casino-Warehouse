@@ -47,9 +47,11 @@ test.describe('ngrok multiplayer smoke', () => {
 
       await tablet.reload();
       await tablet.waitForFunction(() => document.body.dataset.appReady === 'true');
-      await tablet.locator('[data-lobby-game="beat-the-house"]').click();
-      await tablet.getByRole('button', { name: 'Refresh Rooms' }).click();
-      await tablet.locator(`[data-room-join="${roomId}"]`).click();
+      if (!(await tablet.locator('#tableHost').isVisible())) {
+        await tablet.locator('[data-lobby-game="beat-the-house"]').click();
+        await tablet.getByRole('button', { name: 'Refresh Rooms' }).click();
+        await tablet.locator(`[data-room-join="${roomId}"]`).click();
+      }
       await expect(tablet.locator('#roomStatus')).toContainText(`room ${roomId}`);
       await expect(tablet.locator('#onTable')).toContainText('£25');
     } finally {
