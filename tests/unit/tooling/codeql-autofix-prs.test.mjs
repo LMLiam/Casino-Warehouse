@@ -529,8 +529,81 @@ describe('CodeQL Autofix automation planning', () => {
     await expect(client.paginate('/first')).resolves.toEqual([{ id: 1 }, { id: 2 }]);
     await expect(client.request('POST', '/empty', { ok: true })).resolves.toMatchObject({ data: undefined, status: 204 });
     await expect(client.request('GET', '/forbidden')).rejects.toThrow('GET /forbidden failed with 403: Forbidden');
+    expect(fetchCalls.map((call) => call.url)).toEqual([
+      'https://api.github.com/first',
+      'https://api.github.com/second',
+      'https://api.github.com/empty',
+      'https://api.github.com/forbidden',
+    ]);
     expect(fetchCalls[0].init.headers.Authorization).toBe('Bearer token');
     expect(fetchCalls[0].init.headers['X-GitHub-Api-Version']).toBe('2026-03-10');
     expect(fetchCalls[2].init.body).toBe(JSON.stringify({ ok: true }));
+  });
+
+  it('uses the configured API base URL when following custom host pagination links', async () => {
+    const fetchCalls = [];
+    const fetchImpl = async (url) => {
+      fetchCalls.push(url);
+      if (url === 'https://api.github.test/repos/example/project?page=1') {
+        return {
+          headers: new Headers({ link: '<https://api.github.test/repos/example/project?page=2>; rel="next"' }),
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify([{ id: 1 }]),
+        };
+      }
+      if (url === 'https://api.github.test/repos/example/project?page=2') {
+        return {
+          headers: new Headers(),
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify([{ id: 2 }]),
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    };
+    const client = createGitHubClient({
+      apiUrl: 'https://api.github.test',
+      fetchImpl,
+      token: 'token',
+    });
+
+    await expect(client.paginate('/repos/example/project?page=1')).resolves.toEqual([{ id: 1 }, { id: 2 }]);
+    expect(fetchCalls).toEqual(['https://api.github.test/repos/example/project?page=1', 'https://api.github.test/repos/example/project?page=2']);
+  });
+
+  it('keeps pagination requests relative to custom API base paths', async () => {
+    const fetchCalls = [];
+    const fetchImpl = async (url) => {
+      fetchCalls.push(url);
+      if (url === 'https://github.enterprise.test/api/v3/repos/example/project?page=1') {
+        return {
+          headers: new Headers({ link: '<https://github.enterprise.test/api/v3/repos/example/project?page=2>; rel="next"' }),
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify([{ id: 1 }]),
+        };
+      }
+      if (url === 'https://github.enterprise.test/api/v3/repos/example/project?page=2') {
+        return {
+          headers: new Headers(),
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify([{ id: 2 }]),
+        };
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    };
+    const client = createGitHubClient({
+      apiUrl: 'https://github.enterprise.test/api/v3',
+      fetchImpl,
+      token: 'token',
+    });
+
+    await expect(client.paginate('/repos/example/project?page=1')).resolves.toEqual([{ id: 1 }, { id: 2 }]);
+    expect(fetchCalls).toEqual([
+      'https://github.enterprise.test/api/v3/repos/example/project?page=1',
+      'https://github.enterprise.test/api/v3/repos/example/project?page=2',
+    ]);
   });
 });

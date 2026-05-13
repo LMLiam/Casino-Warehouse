@@ -239,7 +239,7 @@ export function createGitHubClient({ token, apiUrl = 'https://api.github.com', f
     while (nextPath) {
       const { data, headers: responseHeaders } = await request('GET', nextPath);
       results.push(...data);
-      nextPath = nextPathFromLink(responseHeaders.get('link'));
+      nextPath = nextPathFromLink(responseHeaders.get('link'), apiUrl);
     }
     return results;
   };
@@ -387,13 +387,36 @@ function normalizeList(value) {
     .filter(Boolean);
 }
 
-function nextPathFromLink(linkHeader) {
+function nextPathFromLink(linkHeader, apiUrl) {
   if (!linkHeader) {
     return undefined;
   }
   const nextLink = linkHeader.split(',').find((part) => part.includes('rel="next"'));
-  const match = nextLink?.match(/<https:\/\/api\.github\.com([^>]+)>/);
-  return match?.[1];
+  const match = nextLink?.match(/<([^>]+)>/);
+  if (!match) {
+    return undefined;
+  }
+
+  try {
+    const base = new URL(apiUrl);
+    const url = new URL(match[1], base);
+    if (url.origin !== base.origin) {
+      return undefined;
+    }
+
+    const basePath = base.pathname.replace(/\/+$/, '');
+    let nextPath = url.pathname;
+    if (basePath) {
+      if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) {
+        return undefined;
+      }
+      nextPath = url.pathname.slice(basePath.length) || '/';
+    }
+
+    return `${nextPath}${url.search}`;
+  } catch {
+    return undefined;
+  }
 }
 
 async function deleteBranchRef({ branchName, client, owner, repo }) {
