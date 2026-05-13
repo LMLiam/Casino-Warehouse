@@ -1,4 +1,4 @@
-import { e2eAdminToken, expect, test, currentRealtimeUrl, resetBrowserStorage, type Locator, type Page } from './fixtures';
+import { e2eAdminToken, expect, test, resetBrowserStorage, type Locator, type Page } from './fixtures';
 
 const consoleFailures = new WeakMap<Page, string[]>();
 
@@ -222,7 +222,7 @@ test('game lobby no longer exposes local-only table play before joining a room',
 });
 
 test('multiplayer invite URLs load hidden direct-join state without manual room controls', async ({ page }) => {
-  const wsUrl = await currentRealtimeUrl(page);
+  const wsUrl = await page.evaluate(() => `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
   await page.goto(`/?game=blackjack&room=abc123&server=${encodeURIComponent(wsUrl)}`);
   await page.evaluate(() => {
     localStorage.clear();

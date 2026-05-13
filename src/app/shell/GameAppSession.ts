@@ -25,6 +25,7 @@ export abstract class GameAppSession extends GameAppRendering {
   protected abstract pendingInviteRoomCode: string;
   protected abstract pendingInviteServerUrl: string;
   protected abstract pendingInviteAttempted: boolean;
+  protected abstract realtimeUrlError: string;
 
   protected get currentPlayer(): CasinoPlayer | undefined {
     return this.players[this.selectedPlayerIndex];
@@ -170,17 +171,27 @@ export abstract class GameAppSession extends GameAppRendering {
   }
 
   protected applyInviteFromUrl(): void {
-    this.realtimeUrl = inviteServerUrl() ?? defaultRealtimeUrl();
+    const inviteUrl = inviteServerUrl();
+    this.realtimeUrlError = inviteUrl.invalid ? 'Invite server URL must use ws:// or wss://.' : '';
+    this.realtimeUrl = inviteUrl.url ?? (this.realtimeUrlError ? '' : defaultRealtimeUrl());
     this.pendingInviteServerUrl = this.realtimeUrl;
     const params = new URLSearchParams(window.location.search);
     const roomId = params.get('room')?.trim().toUpperCase() ?? '';
     const gameId = parseGameId(params.get('game')?.trim());
     if (!roomId) {
+      if (this.realtimeUrlError) {
+        this.elements.roomStatus.textContent = this.realtimeUrlError;
+      }
       return;
     }
     this.pendingInviteRoomCode = roomId;
     if (gameId) {
       this.activeGame = gameId;
+    }
+    if (this.realtimeUrlError) {
+      this.realtimeUrlError = `Invite loaded for room ${roomId}, but the server URL must use ws:// or wss://.`;
+      this.elements.roomStatus.textContent = this.realtimeUrlError;
+      return;
     }
     this.elements.roomStatus.textContent = `Invite loaded for room ${roomId}. Select a profile to join.`;
   }
