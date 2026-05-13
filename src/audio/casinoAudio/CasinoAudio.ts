@@ -20,6 +20,7 @@ export class CasinoAudio {
   private context?: AudioContext;
   private musicOscillator?: OscillatorNode;
   private musicGain?: GainNode;
+  private audioUnavailable = false;
 
   public constructor(private settings: CasinoAudioSettings = defaultAudioSettings()) {}
 
@@ -39,6 +40,10 @@ export class CasinoAudio {
     }
 
     const context = this.ensureContext();
+    if (!context) {
+      return;
+    }
+
     const gain = context.createGain();
     const oscillator = context.createOscillator();
     const now = context.currentTime;
@@ -62,6 +67,10 @@ export class CasinoAudio {
     }
 
     const context = this.ensureContext();
+    if (!context) {
+      return;
+    }
+
     if (this.musicOscillator && this.musicGain) {
       this.musicGain.gain.value = this.musicLevel();
       return;
@@ -84,8 +93,22 @@ export class CasinoAudio {
     this.musicGain = undefined;
   }
 
-  private ensureContext(): AudioContext {
-    this.context ??= new AudioContext();
+  private ensureContext(): AudioContext | undefined {
+    if (this.audioUnavailable) {
+      return undefined;
+    }
+
+    try {
+      const AudioContextConstructor = globalThis.AudioContext as typeof AudioContext | undefined;
+      if (!AudioContextConstructor) {
+        this.audioUnavailable = true;
+        return undefined;
+      }
+      this.context ??= new AudioContextConstructor();
+    } catch {
+      this.audioUnavailable = true;
+      return undefined;
+    }
     return this.context;
   }
 
