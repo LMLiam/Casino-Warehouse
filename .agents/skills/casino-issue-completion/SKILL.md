@@ -1,6 +1,6 @@
 ---
 name: casino-issue-completion
-description: Use for Casino Warehouse issue or PR completion, readiness, review, update, stale-branch, and merge-check work. Enforces evidence-first self-review, PR comments, checks, and base freshness before ready.
+description: Use for Casino Warehouse issue or PR completion, readiness, review, update, stale-branch, and merge-check work. Enforces PR-first evidence review, review comments, checks, and base freshness before ready.
 ---
 
 # Casino Warehouse Issue Completion
@@ -13,9 +13,11 @@ This skill is mandatory for issue completion, PR updates, stale branch updates, 
 
 No evidence, no readiness.
 
-A self-review is invalid unless it names the files inspected, the diff range reviewed, the risks checked, the commands run, and the review findings.
+A self-review is invalid unless it happens against the opened or updated pull request, names the files inspected, the diff range reviewed, the risks checked, the commands run, and the review findings.
 
-The review must be a real code review, not just a checklist pass. It must inspect the changed files and related context for correctness, security, performance, maintainability, architecture, tests, and documentation.
+The review must be a real pull request code review, not just a checklist pass. It must inspect the changed files and related context for correctness, security, performance, maintainability, architecture, tests, and documentation.
+
+Pre-PR diff inspection is useful for implementation hygiene, but it does not satisfy the required review evidence. Readiness review begins only after a pull request exists, because actionable findings must be left as pull request review comments when repository permissions allow.
 
 ## Required Evidence
 
@@ -44,7 +46,8 @@ Before the final response, collect:
 
 Choose the review scope before reviewing:
 
-- branch or PR diff: default for issue completion and readiness checks
+- PR diff: default for issue completion and readiness checks once a pull request exists
+- branch diff: implementation sanity check before opening or updating a pull request
 - staged or unstaged diff: only when reviewing local work before commit
 - specific files: when the user asks about named paths
 - directory or subsystem: when a change spans a cohesive area
@@ -145,47 +148,41 @@ Do not guess or rely on memory for these claims. If no finding depends on curren
 
 5. Run the narrowest meaningful checks while iterating.
 
-6. Before opening or updating the PR, inspect the diff:
+6. Before opening or updating the PR, run an implementation sanity pass:
    - `git diff <target>...HEAD`
    - `git diff --check <target>...HEAD`
    - `git diff --name-only <target>...HEAD`
    - inspect every changed source, test, config, workflow, and documentation file relevant to the work
 
-7. Run `bash .agents/skills/casino-issue-completion/scripts/pr-readiness.sh <target>`.
+7. Open or update the pull request:
+   - fill in every required section of `.github/PULL_REQUEST_TEMPLATE.md`
+   - include the commands run and their pass/fail status
+   - link the issue being completed when applicable
+   - add at least one `type:*` label and one `area:*` label
+   - keep the pull request draft while the required review loop is still in progress
+   - preserve generated build output out of the commit
 
-8. Run `bash .agents/skills/casino-issue-completion/scripts/pr-review-files.sh <target>`.
+8. After the PR exists, run `bash .agents/skills/casino-issue-completion/scripts/pr-readiness.sh <target>`.
 
-9. Self-review the actual changed files with the required review lenses above. Check at least:
-   - purpose and correctness of each changed file
-   - bug and edge-case risks
-   - security risks from the security review list
-   - performance risks from the performance review list
-   - architecture and maintainability risks from the architecture review list
-   - domain ownership
-   - one-exported-top-level-element rule
-   - absence of vague utility modules
-   - game/payout/bankroll authority staying out of UI
-   - multiplayer credential/token leakage
-   - persistence schema/runtime boundary safety
-   - deterministic tests where relevant
-   - generated build output not committed
-   - workflow action pinning if workflows changed
-   - PR template completeness if a PR exists
-   - issue labels, PR labels, milestone, and linked issue when applicable
+9. After the PR exists, run `bash .agents/skills/casino-issue-completion/scripts/pr-review-files.sh <target>`.
 
-10. For every issue found during self-review:
-    - leave a PR review comment when repository permissions allow
+10. Review the opened or updated pull request like a maintainer with the required review lenses above. This PR review is the required self-review evidence; a pre-PR branch inspection cannot replace it. Check purpose and correctness of each changed file; bug and edge-case risks; security, performance, architecture, and maintainability risks; domain ownership; the one-exported-top-level-element rule; absence of vague utility modules; game, payout, and bankroll authority staying out of UI; multiplayer credential and token leakage; persistence schema and runtime-boundary safety; deterministic tests where relevant; generated build output not committed; workflow action pinning if workflows changed; PR template completeness; and issue labels, PR labels, milestone, and linked issue when applicable.
+
+11. For every issue found during PR review:
+    - leave a pull request review comment when repository permissions allow, preferably inline on the affected file and line
     - fix the issue
     - push the fix
     - respond to or resolve the review thread where possible
 
-11. After every new commit, rebase, merge from target, force-push, PR body edit that reruns checks, or resolved-comment action, repeat steps 6 through 10.
+12. After every new commit, rebase, merge from target, force-push, PR body edit that reruns checks, or resolved-comment action, repeat steps 8 through 11 on the current pull request head.
 
-12. Verify the branch is up to date with the target branch. Do not rely on mergeability alone.
+13. Verify the branch is up to date with the target branch. Do not rely on mergeability alone.
 
-13. Verify required checks pass on the latest HEAD.
+14. Verify required checks pass on the latest HEAD.
 
-14. Only then provide a final readiness status.
+15. Mark a draft pull request ready for review only after the PR review loop, base freshness check, and required checks are complete.
+
+16. Only then provide a final readiness status.
 
 ## If PR Comments Cannot Be Created
 
