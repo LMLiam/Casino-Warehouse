@@ -35,7 +35,7 @@ The package is marked `"private": true` in `package.json` intentionally. Casino 
 
 The `main` branch ruleset requires the CodeQL workflow status check `Analyze (javascript-typescript)` before protected refs can update. The native ruleset `code_scanning` rule for CodeQL is not enabled right now because, on May 12, 2026, GitHub generated a `CodeQL` check that stayed queued even after the CodeQL workflow completed successfully and code scanning analyses were uploaded. Keep the required workflow status check in place while that native ruleset behavior is unresolved, and re-enable the native code scanning gate only after a pull request proves that the generated `CodeQL` check completes reliably.
 
-The required CI aggregate status remains `CI / test` for branch-protection stability. Its prerequisite checks use descriptive names such as `CI / Quality, Coverage, and Server Build` and `CI / Playwright Visual and E2E (Laptop Visual)`, but the aggregate check name should not change until repository ruleset updates are coordinated with the pull request that changes it.
+The required CI aggregate appears on pull requests as `Build, Test, and Visual Checks / Required Quality Gate`, and the repository ruleset uses the `Required Quality Gate` status context. Its prerequisite checks use descriptive names such as `Build, Test, and Visual Checks / Quality, Coverage, and Server Build` and `Build, Test, and Visual Checks / Playwright Visual and E2E (Laptop Visual)`.
 
 GitHub Code Quality is not enabled for this repository, so the ruleset does not enforce a Code Quality gate. As of May 12, 2026, GitHub documents Code Quality as available for organization-owned repositories on GitHub Team or GitHub Enterprise Cloud plans; `LMLiam/Casino-Warehouse` is a public repository owned by the personal `LMLiam` user account. Repository Actions are enabled and the TypeScript codebase is a supported analysis target, but there is no dynamic `Code Quality` workflow, no `CodeQL - Code Quality / Analyze` pull request check, and no default-branch Code Quality analysis for this repository yet.
 
@@ -71,11 +71,12 @@ npm run visual
 ```
 
 Playwright defaults to two workers so browser tests catch shared-state
-collisions quickly without overloading local laptops. CI runs the same
+collisions quickly without overloading local laptops. The
+`Build, Test, and Visual Checks` workflow runs the same
 `npm run visual` script through a coverage matrix to shorten the e2e
 wall-clock time while keeping visual regression and browser workflow coverage
 on laptop and tablet, plus multiplayer coverage in the required aggregate
-`test` check. The pull request checks page labels those lanes as
+`Required Quality Gate` check. The pull request checks page labels those lanes as
 `Playwright Visual and E2E (Laptop Visual)`,
 `Playwright Visual and E2E (Tablet Visual)`, and
 `Playwright Visual and E2E (Laptop Multiplayer)`. To reproduce a CI lane
