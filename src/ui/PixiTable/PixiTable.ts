@@ -1,3 +1,4 @@
+import 'pixi.js/unsafe-eval';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js';
 import { beatTheHouseChipsUrl } from '../../assets/tableAssets/beatTheHouseChipsUrl';
 import { beatTheHouseTableUrl } from '../../assets/tableAssets/beatTheHouseTableUrl';

@@ -255,9 +255,21 @@ describe('multiplayer WebSocket server', () => {
     const distRoot = await createStaticFixture();
     const baseUrl = await startServer(distRoot);
 
-    await expect(fetch(`${baseUrl.http}/health`).then((response) => response.json())).resolves.toEqual({ ok: true, multiplayer: true });
-    await expect(fetch(`${baseUrl.http}/client.js`).then((response) => response.text())).resolves.toBe('console.log("casino");');
-    await expect(fetch(`${baseUrl.http}/missing-route`).then((response) => response.text())).resolves.toContain('<main>Casino Warehouse</main>');
+    const health = await fetch(`${baseUrl.http}/health`);
+    expectBaselineSecurityHeaders(health);
+    expect(health.headers.get('content-type')).toContain('application/json');
+    await expect(health.json()).resolves.toEqual({ ok: true, multiplayer: true });
+
+    const asset = await fetch(`${baseUrl.http}/client.js`);
+    expectBaselineSecurityHeaders(asset);
+    expect(asset.headers.get('content-type')).toContain('text/javascript');
+    await expect(asset.text()).resolves.toBe('console.log("casino");');
+
+    const fallback = await fetch(`${baseUrl.http}/missing-route`);
+    expectBaselineSecurityHeaders(fallback);
+    expect(fallback.headers.get('cache-control')).toBe('no-store');
+    expect(fallback.headers.get('content-type')).toContain('text/html');
+    await expect(fallback.text()).resolves.toContain('<main>Casino Warehouse</main>');
 
     await expect(sendUpgradeRequest(baseUrl.port, '/not-ws', 'Sec-WebSocket-Key: bad')).resolves.toBeUndefined();
     await expect(sendUpgradeRequest(baseUrl.port, '/ws')).resolves.toBeUndefined();
@@ -978,6 +990,37 @@ const sendUpgradeRequest = async (port: number, path: string, extraHeader = ''):
     socket.on('close', () => resolve());
     socket.on('error', reject);
   });
+
+const expectBaselineSecurityHeaders = (response: Response): void => {
+  expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+  expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+  expect(response.headers.get('x-frame-options')).toBe('DENY');
+  expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+  expect(response.headers.get('cross-origin-resource-policy')).toBe('same-origin');
+  expect(response.headers.get('origin-agent-cluster')).toBe('?1');
+  expect(response.headers.get('permissions-policy')).toBe('camera=(), geolocation=(), microphone=(), payment=(), usb=()');
+  expect(response.headers.get('strict-transport-security')).toBeNull();
+  expect(response.headers.get('x-dns-prefetch-control')).toBe('off');
+  expect(response.headers.get('x-download-options')).toBe('noopen');
+  expect(response.headers.get('x-permitted-cross-domain-policies')).toBe('none');
+  expect(response.headers.get('x-xss-protection')).toBe('0');
+  expect(response.headers.get('content-security-policy')).toBe(
+    [
+      "default-src 'self'",
+      "base-uri 'none'",
+      "connect-src 'self' ws: wss:",
+      "font-src 'self' data:",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      "img-src 'self' data: blob:",
+      "manifest-src 'self'",
+      "object-src 'none'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "worker-src 'self' blob:",
+    ].join(';'),
+  );
+};
 
 const connectRawWebSocket = async (port: number): Promise<RawSocketProbe> =>
   new Promise((resolve, reject) => {

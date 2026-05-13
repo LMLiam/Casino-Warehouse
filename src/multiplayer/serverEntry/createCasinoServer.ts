@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { createServer, type IncomingMessage } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
+import helmet, { type HelmetOptions } from 'helmet';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { RoomAuthority } from '../roomAuthority';
 import type { ClientMessage } from '../protocol/ClientMessage';
@@ -20,6 +21,31 @@ import type { Peer } from './Peer';
 export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoServer => {
   const closeUnsupportedData = 1003;
   const maxClientMessageBytes = 64 * 1024;
+  const permissionsPolicy = 'camera=(), geolocation=(), microphone=(), payment=(), usb=()';
+  const securityHeaderOptions = {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'none'"],
+        connectSrc: ["'self'", 'ws:', 'wss:'],
+        fontSrc: ["'self'", 'data:'],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        manifestSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        // Pixi's no-eval runtime module keeps scripts self-only. The current UI writes inline style attributes and CSS custom properties, so styles keep unsafe-inline.
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        workerSrc: ["'self'", 'blob:'],
+      },
+    },
+    referrerPolicy: { policy: 'no-referrer' },
+    strictTransportSecurity: false,
+    xFrameOptions: { action: 'deny' },
+  } satisfies HelmetOptions;
+  const securityHeaders = helmet(securityHeaderOptions);
   const distRoot = options.distRoot ?? process.env.CASINO_STATIC_ROOT ?? 'dist';
   const dataStore = options.dataStore ?? createDefaultServerDataStore();
   const authority = options.authority ?? new RoomAuthority(dataStore);
@@ -36,21 +62,23 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   });
 
   const server = createServer((request, response) => {
-    if (request.url === '/health') {
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ ok: true, multiplayer: true }));
-      return;
-    }
+    applySecurityHeaders(request, response, () => {
+      if (request.url === '/health') {
+        response.writeHead(200, responseHeaders({ 'content-type': 'application/json' }));
+        response.end(JSON.stringify({ ok: true, multiplayer: true }));
+        return;
+      }
 
-    const filePath = staticPath(request, distRoot);
-    if (!filePath || !existsSync(filePath)) {
-      response.writeHead(200, { 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' });
-      response.end(readFileSync(join(distRoot, 'index.html')));
-      return;
-    }
+      const filePath = staticPath(request, distRoot);
+      if (!filePath || !existsSync(filePath)) {
+        response.writeHead(200, responseHeaders({ 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' }));
+        response.end(readFileSync(join(distRoot, 'index.html')));
+        return;
+      }
 
-    response.writeHead(200, cacheHeaders(filePath));
-    response.end(readFileSync(filePath));
+      response.writeHead(200, cacheHeaders(filePath));
+      response.end(readFileSync(filePath));
+    });
   });
 
   const broadcast = (message: ServerMessage | undefined, recipients?: readonly string[]): void => {
@@ -489,12 +517,27 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     );
   }
 
+  function applySecurityHeaders(request: IncomingMessage, response: ServerResponse, next: () => void): void {
+    securityHeaders(request, response, (error) => {
+      if (error) {
+        response.writeHead(500, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ ok: false, error: 'security_headers_failed' }));
+        return;
+      }
+      next();
+    });
+  }
+
+  function responseHeaders(headers: Record<string, string>): Record<string, string> {
+    return { 'permissions-policy': permissionsPolicy, ...headers };
+  }
+
   function cacheHeaders(filePath: string): Record<string, string> {
     const headers = { 'content-type': contentType(filePath) };
     if (extname(filePath) === '.html') {
-      return { ...headers, 'cache-control': 'no-store' };
+      return responseHeaders({ ...headers, 'cache-control': 'no-store' });
     }
-    return headers;
+    return responseHeaders(headers);
   }
 
   return Object.assign(server, {

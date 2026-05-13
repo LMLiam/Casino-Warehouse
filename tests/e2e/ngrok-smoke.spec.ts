@@ -22,6 +22,8 @@ test.describe('ngrok multiplayer smoke', () => {
       await desktop.locator('[data-lobby-game="beat-the-house"]').click();
       await desktop.getByRole('button', { name: 'Create Room' }).click();
       await expect(desktop.locator('#roomStatus')).toContainText(/room [A-Z0-9]+/);
+      await expect(desktop.locator('#tableHost')).toBeVisible();
+      await claimRoomSeat(desktop, 'Left');
       const roomStatus = await desktop.locator('#roomStatus').textContent();
       const roomId = roomStatus?.match(/room ([A-Z0-9]+)/)?.[1];
       if (!roomId) {
@@ -31,6 +33,8 @@ test.describe('ngrok multiplayer smoke', () => {
       await tablet.locator('[data-lobby-game="beat-the-house"]').click();
       await tablet.locator(`[data-room-join="${roomId}"]`).click();
       await expect(tablet.locator('#roomStatus')).toContainText(`room ${roomId}`);
+      await expect(tablet.locator('#tableHost')).toBeVisible();
+      await claimRoomSeat(tablet, 'Centre');
 
       await expect(desktop.locator('#roomSeats')).toContainText('Left: Desktop Smoke', { timeout: 10_000 });
       await expect(tablet.locator('#roomSeats')).toContainText('Left: Desktop Smoke', { timeout: 10_000 });
@@ -43,9 +47,11 @@ test.describe('ngrok multiplayer smoke', () => {
 
       await tablet.reload();
       await tablet.waitForFunction(() => document.body.dataset.appReady === 'true');
-      await tablet.locator('[data-lobby-game="beat-the-house"]').click();
-      await tablet.getByRole('button', { name: 'Refresh Rooms' }).click();
-      await tablet.locator(`[data-room-join="${roomId}"]`).click();
+      if (!(await tablet.locator('#tableHost').isVisible())) {
+        await tablet.locator('[data-lobby-game="beat-the-house"]').click();
+        await tablet.getByRole('button', { name: 'Refresh Rooms' }).click();
+        await tablet.locator(`[data-room-join="${roomId}"]`).click();
+      }
       await expect(tablet.locator('#roomStatus')).toContainText(`room ${roomId}`);
       await expect(tablet.locator('#onTable')).toContainText('£25');
     } finally {
@@ -71,8 +77,14 @@ const openSmokePage = async (browser: Browser, viewport: { readonly width: numbe
 const createSession = async (page: Page, name: string): Promise<void> => {
   await page.getByPlaceholder('Player name').fill(name);
   await page.getByRole('button', { name: 'Create' }).click();
-  await page.locator('[data-profile-select]').check();
+  await page.locator('[data-profile-select]:not(:disabled)').last().check();
   await page.getByRole('button', { name: 'Start Selected Session' }).click();
+};
+
+const claimRoomSeat = async (page: Page, seatLabel: string): Promise<void> => {
+  const seatButton = page.getByRole('button', { name: `Claim ${seatLabel} seat` });
+  await expect(seatButton).toBeVisible();
+  await seatButton.click();
 };
 
 const dropChipOnTable = async (page: Page, options: { readonly amount: number; readonly zone: { readonly x: number; readonly y: number } }): Promise<void> => {
