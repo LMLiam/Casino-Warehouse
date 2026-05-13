@@ -1,6 +1,7 @@
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
+import { currentProfileStoreVersion } from '../../state/profiles/currentProfileStoreVersion';
 import type { ServerDatabaseChoice } from '../../state/serverDataStore/ServerDatabaseChoice';
-import { protocolVersion } from './protocolVersion';
+import { currentProtocolVersion } from './currentProtocolVersion';
 import type { RoomGameId } from './RoomGameId';
 import type { RoomGameSnapshot } from './RoomGameSnapshot';
 import type { RoomPlayer } from './RoomPlayer';
@@ -15,7 +16,7 @@ import type { ServerMessage } from './ServerMessage';
 
 export class ServerMessageValidator {
   public static isServerMessage(value: unknown): value is ServerMessage {
-    if (!ServerMessageValidator.isRecord(value) || value.version !== protocolVersion || typeof value.type !== 'string') {
+    if (!ServerMessageValidator.isRecord(value) || value.version !== currentProtocolVersion || typeof value.type !== 'string') {
       return false;
     }
 
@@ -97,7 +98,7 @@ export class ServerMessageValidator {
   }
 
   private static isCasinoSaveState(value: unknown): value is CasinoSaveState {
-    return ServerMessageValidator.isRecord(value) && value.version === protocolVersion && Array.isArray(value.profiles);
+    return ServerMessageValidator.isRecord(value) && value.version === currentProfileStoreVersion && Array.isArray(value.profiles);
   }
 
   private static isRoomGameSnapshot(value: unknown): value is RoomGameSnapshot {

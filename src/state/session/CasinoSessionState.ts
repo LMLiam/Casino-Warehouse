@@ -1,9 +1,10 @@
 import type { CasinoGameId } from '../../game/ids';
 import type { CasinoSessionRoomState } from './CasinoSessionRoomState';
+import type { currentSessionStateVersion } from './currentSessionStateVersion';
 import type { PlayerGameSnapshots } from './PlayerGameSnapshots';
 
 export interface CasinoSessionState {
-  readonly version: 1;
+  readonly version: typeof currentSessionStateVersion;
   readonly profileIds: readonly string[];
   readonly selectedPlayerIndex: number;
   readonly activeGame: CasinoGameId;

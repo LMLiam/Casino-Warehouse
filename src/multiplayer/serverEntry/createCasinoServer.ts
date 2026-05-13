@@ -8,7 +8,7 @@ import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { RoomAuthority } from '../roomAuthority';
 import type { ClientMessage } from '../protocol/ClientMessage';
 import { parseClientMessage } from '../protocol/parseClientMessage';
-import { protocolVersion } from '../protocol/protocolVersion';
+import { currentProtocolVersion } from '../protocol/currentProtocolVersion';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { ServerMessage } from '../protocol/ServerMessage';
 import { createSessionState } from '../../state/session/createSessionState';
@@ -108,22 +108,28 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     for (const gameId of uniqueGameIds) {
       const recipients = [...peers.values()].filter((candidate) => candidate.browsingGameId === gameId).map((candidate) => candidate.id);
       if (recipients.length > 0) {
-        broadcast({ version: protocolVersion, type: 'room-list', gameId, rooms: authority.listRoomSummaries(gameId) }, recipients);
+        broadcast({ version: currentProtocolVersion, type: 'room-list', gameId, rooms: authority.listRoomSummaries(gameId) }, recipients);
       }
     }
   };
 
   const sendDataState = (peer: Peer): void => {
     const snapshot = dataStore.snapshot();
-    send(peer, { version: protocolVersion, type: 'data-state', database: snapshot.database, profileState: snapshot.profileState, session: snapshot.session });
+    send(peer, {
+      version: currentProtocolVersion,
+      type: 'data-state',
+      database: snapshot.database,
+      profileState: snapshot.profileState,
+      session: snapshot.session,
+    });
   };
 
   const sendProfileAccess = (peer: Peer): void => {
-    send(peer, { version: protocolVersion, type: 'profile-access', ownedProfileIds: [...peer.ownedProfileIds] });
+    send(peer, { version: currentProtocolVersion, type: 'profile-access', ownedProfileIds: [...peer.ownedProfileIds] });
   };
 
   const sendAdminAccess = (peer: Peer): void => {
-    send(peer, { version: protocolVersion, type: 'admin-access', authorized: peer.isAdmin });
+    send(peer, { version: currentProtocolVersion, type: 'admin-access', authorized: peer.isAdmin });
   };
 
   const broadcastDataState = (): void => {
@@ -134,14 +140,14 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
   const emitAuthorityResult = (peer: Peer, result: ReturnType<CasinoRoomAuthority['handle']>, options: { readonly forceDataState?: boolean } = {}): void => {
     if (result.error) {
-      send(peer, { version: protocolVersion, type: 'error', code: 'rejected', message: result.error });
+      send(peer, { version: currentProtocolVersion, type: 'error', code: 'rejected', message: result.error });
     }
     if (result.roomList) {
-      send(peer, { version: protocolVersion, type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
+      send(peer, { version: currentProtocolVersion, type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
     }
     if (result.direct) {
       send(peer, {
-        version: protocolVersion,
+        version: currentProtocolVersion,
         type: 'room-created',
         room: result.direct,
         invitePath: createInvitePath(result.direct.gameId, result.direct.roomId),
@@ -149,20 +155,20 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
     for (const closure of result.roomClosures ?? []) {
       broadcast(
-        { version: protocolVersion, type: 'room-closed', roomId: closure.roomId, gameId: closure.gameId, reason: closure.reason },
+        { version: currentProtocolVersion, type: 'room-closed', roomId: closure.roomId, gameId: closure.gameId, reason: closure.reason },
         closure.connectionIds,
       );
     }
     const broadcastRecipients = new Map((result.broadcastRecipients ?? []).map((entry) => [entry.roomId, entry.connectionIds]));
     for (const snapshot of result.broadcasts) {
-      broadcast({ version: protocolVersion, type: 'room-state', room: snapshot }, broadcastRecipients.get(snapshot.roomId) ?? connectionIds(snapshot));
+      broadcast({ version: currentProtocolVersion, type: 'room-state', room: snapshot }, broadcastRecipients.get(snapshot.roomId) ?? connectionIds(snapshot));
     }
     broadcastRoomLists(roomListGameIds(result));
     if (result.settlements.length > 0) {
       const room = result.broadcasts.at(-1);
       if (room) {
         broadcast(
-          { version: protocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements },
+          { version: currentProtocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements },
           connectionIds(room),
         );
       }
@@ -237,7 +243,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
           return false;
       }
     } catch (error) {
-      send(peer, { version: protocolVersion, type: 'error', code: 'rejected', message: error instanceof Error ? error.message : 'Server data action failed.' });
+      send(peer, {
+        version: currentProtocolVersion,
+        type: 'error',
+        code: 'rejected',
+        message: error instanceof Error ? error.message : 'Server data action failed.',
+      });
       return true;
     }
   };
@@ -251,7 +262,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     const profileToken = profileTokenAuth.createToken();
     dataStore.setProfileTokenHash(profile.id, profileTokenAuth.hash(profile.id, profileToken));
     peer.ownedProfileIds.add(profile.id);
-    send(peer, { version: protocolVersion, type: 'profile-credentials', profileId: profile.id, profileToken });
+    send(peer, { version: currentProtocolVersion, type: 'profile-credentials', profileId: profile.id, profileToken });
     sendProfileAccess(peer);
   };
 
@@ -355,13 +366,13 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     try {
       parsedJson = JSON.parse(payload);
     } catch {
-      send(peer, { version: protocolVersion, type: 'error', code: 'bad-json', message: 'Message was not valid JSON.' });
+      send(peer, { version: currentProtocolVersion, type: 'error', code: 'bad-json', message: 'Message was not valid JSON.' });
       return;
     }
 
     const parsed = parseClientMessage(parsedJson);
     if (!parsed.ok || !parsed.message) {
-      send(peer, { version: protocolVersion, type: 'error', code: 'bad-message', message: parsed.error ?? 'Message was invalid.' });
+      send(peer, { version: currentProtocolVersion, type: 'error', code: 'bad-message', message: parsed.error ?? 'Message was invalid.' });
       return;
     }
     if (handleDataMessage(peer, parsed.message)) {
@@ -373,7 +384,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       serverOwnedMessage = useServerProfile(peer, parsed.message);
     } catch (error) {
       send(peer, {
-        version: protocolVersion,
+        version: currentProtocolVersion,
         type: 'error',
         code: 'rejected',
         message: error instanceof Error ? error.message : 'Server rejected the player action.',
@@ -396,11 +407,14 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         peers.delete(peer.id);
         const result = authority.disconnect(peer.id);
         const snapshot = result.broadcasts.at(-1);
-        broadcast(snapshot ? { version: protocolVersion, type: 'room-state', room: snapshot } : undefined, snapshot ? connectionIds(snapshot) : undefined);
+        broadcast(
+          snapshot ? { version: currentProtocolVersion, type: 'room-state', room: snapshot } : undefined,
+          snapshot ? connectionIds(snapshot) : undefined,
+        );
         broadcastRoomLists(roomListGameIds(result));
         continue;
       }
-      send(peer, { version: protocolVersion, type: 'heartbeat', sentAt: now });
+      send(peer, { version: currentProtocolVersion, type: 'heartbeat', sentAt: now });
     }
   }, heartbeatIntervalMs);
   server.on('close', () => {
@@ -428,7 +442,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
       if (clientServerInstanceId && clientServerInstanceId !== serverInstanceId) {
         send(peer, {
-          version: protocolVersion,
+          version: currentProtocolVersion,
           type: 'reload-required',
           reason: 'server-restarted',
           message: 'The game server restarted. Reload the app to use the latest client.',
@@ -438,8 +452,8 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       }
 
       peers.set(peer.id, peer);
-      send(peer, { version: protocolVersion, type: 'server-hello', serverInstanceId });
-      send(peer, { version: protocolVersion, type: 'error', code: 'connected', message: 'Connected to Casino Warehouse game server.' });
+      send(peer, { version: currentProtocolVersion, type: 'server-hello', serverInstanceId });
+      send(peer, { version: currentProtocolVersion, type: 'error', code: 'connected', message: 'Connected to Casino Warehouse game server.' });
       sendDataState(peer);
 
       websocket.on('message', (data, isBinary) => {
@@ -456,7 +470,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         peers.delete(peer.id);
         const result = authority.disconnect(peer.id);
         const snapshot = result.broadcasts.at(-1);
-        broadcast(snapshot ? { version: protocolVersion, type: 'room-state', room: snapshot } : undefined, snapshot ? connectionIds(snapshot) : undefined);
+        broadcast(
+          snapshot ? { version: currentProtocolVersion, type: 'room-state', room: snapshot } : undefined,
+          snapshot ? connectionIds(snapshot) : undefined,
+        );
         broadcastRoomLists(roomListGameIds(result));
       });
       websocket.on('error', () => {

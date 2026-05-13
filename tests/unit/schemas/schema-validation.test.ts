@@ -7,6 +7,7 @@ import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
 import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
+import { parseSessionState } from '../../../src/state/session/parseSessionState';
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -111,6 +112,12 @@ describe('Zod-backed runtime validation', () => {
     expect(loaded.error).toContain('Profile record is invalid');
 
     expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow(/Save data is not a casino profile store/);
+  });
+
+  it('rejects wrong versions independently for protocol, profile store, and session state boundaries', () => {
+    expect(parseClientMessage({ version: 2, type: 'request-data' })).toEqual({ ok: false, error: 'Message version or type is invalid.' });
+    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow(/Save data is not a casino profile store/);
+    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data is not valid.');
   });
 
   it('validates settings and game/slot configuration at runtime boundaries', () => {

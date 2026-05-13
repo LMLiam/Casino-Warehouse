@@ -1,6 +1,7 @@
 import type { CasinoSaveState } from './CasinoSaveState';
+import { currentProfileStoreVersion } from './currentProfileStoreVersion';
 
 export const emptySaveState = (): CasinoSaveState => ({
-  version: 1,
+  version: currentProfileStoreVersion,
   profiles: [],
 });

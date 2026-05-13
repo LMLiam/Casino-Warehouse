@@ -1,5 +1,6 @@
 import { gameCatalog } from '../../game/catalog/gameCatalog';
 import type { CasinoSessionState } from './CasinoSessionState';
+import { currentSessionStateVersion } from './currentSessionStateVersion';
 import { SessionStateParser } from './SessionStateParser';
 
 export const createSessionState = (
@@ -7,7 +8,7 @@ export const createSessionState = (
   options: Partial<Omit<CasinoSessionState, 'version' | 'profileIds' | 'updatedAt'>> = {},
   now = new Date(),
 ): CasinoSessionState => ({
-  version: 1,
+  version: currentSessionStateVersion,
   profileIds: [...new Set(profileIds)].filter(Boolean),
   selectedPlayerIndex: Math.max(0, Math.floor(options.selectedPlayerIndex ?? 0)),
   activeGame: SessionStateParser.isGameId(options.activeGame) ? options.activeGame : gameCatalog[0].id,

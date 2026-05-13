@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { creditSchema } from './creditSchema';
-import { protocolVersionSchema } from './protocolVersionSchema';
+import { currentSessionStateVersionSchema } from './currentSessionStateVersionSchema';
 import { roomGameIdSchema } from './roomGameIdSchema';
 
 export const sessionStateSchema = z.object({
-  version: protocolVersionSchema,
+  version: currentSessionStateVersionSchema,
   profileIds: z.array(z.string()).default([]),
   selectedPlayerIndex: creditSchema.default(0),
   activeGame: roomGameIdSchema.default('beat-the-house'),
