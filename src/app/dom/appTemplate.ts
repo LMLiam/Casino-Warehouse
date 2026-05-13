@@ -53,7 +53,7 @@ export const renderTemplate = (): string => `
       </div>
       <div id="blackjackView" class="blackjack-table-view hidden">
         <div class="blackjack-table-felt">
-          <div class="blackjack-rail">Blackjack pays 3:2 • Dealer hits soft 17</div>
+          <div class="blackjack-rail">Blackjack pays 3:2 • Dealer stands on soft 17</div>
           <div class="blackjack-seat dealer-seat">
             <span>Dealer</span>
             <strong id="blackjackDealerCards" class="playing-cards"></strong>
