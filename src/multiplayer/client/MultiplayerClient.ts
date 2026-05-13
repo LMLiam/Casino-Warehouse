@@ -1,7 +1,7 @@
 import type { ClientMessage } from '../protocol/ClientMessage';
 import { decodeServerMessage } from '../protocol/decodeServerMessage';
 import { encodeMessage } from '../protocol/encodeMessage';
-import { protocolVersion } from '../protocol/protocolVersion';
+import { currentProtocolVersion } from '../protocol/currentProtocolVersion';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { RoomRole } from '../protocol/RoomRole';
 import type { RoomSeatId } from '../protocol/RoomSeatId';
@@ -60,19 +60,19 @@ export class MultiplayerClient {
   }
 
   public requestData(): void {
-    this.send({ version: protocolVersion, type: 'request-data' });
+    this.send({ version: currentProtocolVersion, type: 'request-data' });
   }
 
   public createProfile(profileName: string): void {
-    this.send({ version: protocolVersion, type: 'create-profile', profileName });
+    this.send({ version: currentProtocolVersion, type: 'create-profile', profileName });
   }
 
   public renameProfile(profileId: string, profileName: string): void {
-    this.sendOwnedProfileMessage(profileId, { version: protocolVersion, type: 'rename-profile', profileId, profileName });
+    this.sendOwnedProfileMessage(profileId, { version: currentProtocolVersion, type: 'rename-profile', profileId, profileName });
   }
 
   public deleteProfile(profileId: string): void {
-    if (this.sendOwnedProfileMessage(profileId, { version: protocolVersion, type: 'delete-profile', profileId })) {
+    if (this.sendOwnedProfileMessage(profileId, { version: currentProtocolVersion, type: 'delete-profile', profileId })) {
       this.forgetProfileToken(profileId);
     }
   }
@@ -84,7 +84,7 @@ export class MultiplayerClient {
       return;
     }
     this.send({
-      version: protocolVersion,
+      version: currentProtocolVersion,
       type: 'save-session',
       session: {
         ...session,
@@ -95,15 +95,15 @@ export class MultiplayerClient {
   }
 
   public adjustBankroll(profileId: string, action: 'add' | 'subtract' | 'reset', amount?: number): void {
-    this.sendAdminMessage({ version: protocolVersion, type: 'admin-bankroll', profileId, action, amount });
+    this.sendAdminMessage({ version: currentProtocolVersion, type: 'admin-bankroll', profileId, action, amount });
   }
 
   public resetAllBankrolls(): void {
-    this.sendAdminMessage({ version: protocolVersion, type: 'admin-reset-all' });
+    this.sendAdminMessage({ version: currentProtocolVersion, type: 'admin-reset-all' });
   }
 
   public clearServerData(): void {
-    if (this.sendAdminMessage({ version: protocolVersion, type: 'clear-server-data' })) {
+    if (this.sendAdminMessage({ version: currentProtocolVersion, type: 'clear-server-data' })) {
       this.clearProfileTokens();
     }
   }
@@ -115,7 +115,7 @@ export class MultiplayerClient {
       return;
     }
     MultiplayerClient.writeStorageValue(adminTokenStorageKey, token);
-    this.send({ version: protocolVersion, type: 'authorize-admin', adminToken: token });
+    this.send({ version: currentProtocolVersion, type: 'authorize-admin', adminToken: token });
   }
 
   private openSocket(url: string, state: RealtimeConnectionState): void {
@@ -157,12 +157,12 @@ export class MultiplayerClient {
   }
 
   public listRooms(gameId: RoomGameId): void {
-    this.send({ version: protocolVersion, type: 'list-rooms', gameId });
+    this.send({ version: currentProtocolVersion, type: 'list-rooms', gameId });
   }
 
   public createRoom(gameId: RoomGameId, roomName: string, maxPlayers: number, profileId: string, profileName: string, bankroll: number): void {
     this.sendOwnedProfileMessage(profileId, {
-      version: protocolVersion,
+      version: currentProtocolVersion,
       type: 'create-room',
       gameId,
       roomName,
@@ -175,11 +175,21 @@ export class MultiplayerClient {
   }
 
   public joinRoom(gameId: RoomGameId, roomId: string, role: RoomRole, profileId: string, profileName: string, bankroll: number, seatId?: RoomSeatId): void {
-    this.sendOwnedProfileMessage(profileId, { version: protocolVersion, type: 'join-room', gameId, roomId, role, profileId, profileName, bankroll, seatId });
+    this.sendOwnedProfileMessage(profileId, {
+      version: currentProtocolVersion,
+      type: 'join-room',
+      gameId,
+      roomId,
+      role,
+      profileId,
+      profileName,
+      bankroll,
+      seatId,
+    });
   }
 
   public leaveRoom(): void {
-    this.send({ version: protocolVersion, type: 'leave-room' });
+    this.send({ version: currentProtocolVersion, type: 'leave-room' });
     this.lastRoom = undefined;
   }
 
@@ -258,7 +268,7 @@ export class MultiplayerClient {
     }
     if (message.type === 'heartbeat') {
       this.lastHeartbeatAt = Date.now();
-      this.send({ version: protocolVersion, type: 'heartbeat-ack', sentAt: message.sentAt });
+      this.send({ version: currentProtocolVersion, type: 'heartbeat-ack', sentAt: message.sentAt });
       return;
     }
     if (message.type === 'server-hello') {
@@ -335,7 +345,7 @@ export class MultiplayerClient {
 
   private authorizeStoredProfiles(): void {
     this.send({
-      version: protocolVersion,
+      version: currentProtocolVersion,
       type: 'authorize-profiles',
       profileTokens: MultiplayerClient.profileTokenEntries(MultiplayerClient.readProfileTokens()),
     });
@@ -344,7 +354,7 @@ export class MultiplayerClient {
   private authorizeStoredAdminToken(): void {
     const adminToken = MultiplayerClient.readStorageValue(adminTokenStorageKey);
     if (adminToken) {
-      this.send({ version: protocolVersion, type: 'authorize-admin', adminToken });
+      this.send({ version: currentProtocolVersion, type: 'authorize-admin', adminToken });
     }
   }
 

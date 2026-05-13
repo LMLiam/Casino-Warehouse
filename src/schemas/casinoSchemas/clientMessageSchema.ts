@@ -5,7 +5,7 @@ import { networkCreditSchema } from './networkCreditSchema';
 import { positiveNetworkCreditSchema } from './positiveNetworkCreditSchema';
 import { profileIdSchema } from './profileIdSchema';
 import { profileNameSchema } from './profileNameSchema';
-import { protocolVersionSchema } from './protocolVersionSchema';
+import { currentProtocolVersionSchema } from './currentProtocolVersionSchema';
 import { roomGameIdSchema } from './roomGameIdSchema';
 import { roomNameSchema } from './roomNameSchema';
 import { roomRoleSchema } from './roomRoleSchema';
@@ -13,7 +13,7 @@ import { roomSeatIdSchema } from './roomSeatIdSchema';
 
 export const clientMessageSchema = (() => {
   const baseClientMessageSchema = z.object({
-    version: protocolVersionSchema,
+    version: currentProtocolVersionSchema,
     type: z.string(),
   });
 

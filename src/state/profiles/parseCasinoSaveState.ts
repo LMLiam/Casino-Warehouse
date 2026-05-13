@@ -1,6 +1,7 @@
 import { casinoSaveStateEnvelopeSchema } from '../../schemas/casinoSchemas/casinoSaveStateEnvelopeSchema';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSaveState } from './CasinoSaveState';
+import { currentProfileStoreVersion } from './currentProfileStoreVersion';
 import { parseCasinoProfile } from './parseCasinoProfile';
 
 export const parseCasinoSaveState = (value: unknown): CasinoSaveState => {
@@ -10,7 +11,7 @@ export const parseCasinoSaveState = (value: unknown): CasinoSaveState => {
   }
 
   return {
-    version: 1,
+    version: currentProfileStoreVersion,
     profiles: parsed.data.profiles.map(parseCasinoProfile),
   };
 };

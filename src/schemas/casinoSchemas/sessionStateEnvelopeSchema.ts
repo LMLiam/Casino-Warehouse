@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { protocolVersionSchema } from './protocolVersionSchema';
+import { currentSessionStateVersionSchema } from './currentSessionStateVersionSchema';
 
 export const sessionStateEnvelopeSchema = z.object({
-  version: protocolVersionSchema,
+  version: currentSessionStateVersionSchema,
   profileIds: z.array(z.unknown()),
 });

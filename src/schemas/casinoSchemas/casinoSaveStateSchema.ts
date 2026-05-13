@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { casinoProfileSchema } from './casinoProfileSchema';
-import { protocolVersionSchema } from './protocolVersionSchema';
+import { currentProfileStoreVersionSchema } from './currentProfileStoreVersionSchema';
 
 export const casinoSaveStateSchema = z.object({
-  version: protocolVersionSchema,
+  version: currentProfileStoreVersionSchema,
   profiles: z.array(casinoProfileSchema),
 });
