@@ -3,6 +3,7 @@ import { connect as connectSocket } from 'node:net';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { WebSocket as NodeWebSocket, type RawData as WebSocketRawData } from 'ws';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer, type CasinoServerOptions } from '../../../src/multiplayer/serverEntry';
@@ -24,15 +25,15 @@ class SocketProbe {
     readonly timer: ReturnType<typeof setTimeout>;
   }> = [];
 
-  public constructor(private readonly socket: WebSocket) {
-    socket.addEventListener('message', (event) => {
-      const message = decodeServerMessage(String(event.data));
+  public constructor(private readonly socket: NodeWebSocket) {
+    socket.on('message', (data) => {
+      const message = decodeServerMessage(webSocketText(data));
       if (message) {
         this.messages.push(message);
         this.flushWaiters(message);
       }
     });
-    socket.addEventListener('error', () => {
+    socket.on('error', () => {
       this.rejectWaiters(new Error('WebSocket emitted an error.'));
     });
   }
@@ -82,31 +83,29 @@ class SocketProbe {
   }
 
   public closeAndWait(): Promise<void> {
-    if (this.socket.readyState === WebSocket.CLOSED) {
+    if (this.socket.readyState === NodeWebSocket.CLOSED) {
       return Promise.resolve();
     }
     return new Promise((resolve) => {
       const timer = setTimeout(() => resolve(), 250);
-      this.socket.addEventListener('close', () => resolve(), { once: true });
-      this.socket.addEventListener('close', () => clearTimeout(timer), { once: true });
+      this.socket.once('close', () => {
+        clearTimeout(timer);
+        resolve();
+      });
       this.socket.close();
     });
   }
 
   public waitForClose(timeoutMs = 1_000): Promise<void> {
-    if (this.socket.readyState === WebSocket.CLOSED) {
+    if (this.socket.readyState === NodeWebSocket.CLOSED) {
       return Promise.resolve();
     }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('Timed out waiting for WebSocket close.')), timeoutMs);
-      this.socket.addEventListener(
-        'close',
-        () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        { once: true },
-      );
+      this.socket.once('close', () => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
   }
 
@@ -273,6 +272,37 @@ describe('multiplayer WebSocket server', () => {
 
     await expect(sendUpgradeRequest(baseUrl.port, '/not-ws', 'Sec-WebSocket-Key: bad')).resolves.toBeUndefined();
     await expect(sendUpgradeRequest(baseUrl.port, '/ws')).resolves.toBeUndefined();
+  });
+
+  it('accepts local development WebSocket origins', async () => {
+    const baseUrl = await startServer();
+
+    for (const origin of ['http://127.0.0.1:5173', 'http://localhost:5173']) {
+      const client = await connect(baseUrl.ws, { origin });
+      await expect(client.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({ type: 'server-hello' });
+      await client.closeAndWait();
+    }
+  });
+
+  it('accepts the configured public WebSocket origin', async () => {
+    const baseUrl = await startServer('.', undefined, { publicBaseUrl: 'https://casino-public.example.test/' });
+
+    const publicClient = await connect(baseUrl.ws, { origin: 'https://casino-public.example.test' });
+
+    await expect(publicClient.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({ type: 'server-hello' });
+  });
+
+  it('rejects missing and unexpected WebSocket origins', async () => {
+    const baseUrl = await startServer('.', undefined, { publicBaseUrl: 'https://casino-public.example.test/' });
+    const validWebSocketHeaders = ['Sec-WebSocket-Version: 13', 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=='];
+
+    await expect(sendUpgradeResponse(baseUrl.port, '/ws', validWebSocketHeaders)).resolves.toContain('HTTP/1.1 403 Forbidden');
+    await expect(sendUpgradeResponse(baseUrl.port, '/ws', [...validWebSocketHeaders, 'Origin: https://attacker.example'])).resolves.toContain(
+      'HTTP/1.1 403 Forbidden',
+    );
+    await expect(sendUpgradeResponse(baseUrl.port, '/ws', [...validWebSocketHeaders, 'Origin: http://192.168.1.55:5173'])).resolves.toContain(
+      'HTTP/1.1 403 Forbidden',
+    );
   });
 
   it('handles raw WebSocket frames split across TCP chunks and coalesced into one chunk', async () => {
@@ -979,15 +1009,26 @@ const closeCurrentServer = async (): Promise<void> => {
   server = undefined;
 };
 
-const sendUpgradeRequest = async (port: number, path: string, extraHeader = ''): Promise<void> =>
+const sendUpgradeRequest = async (port: number, path: string, extraHeader = ''): Promise<void> => {
+  await sendUpgradeResponse(port, path, extraHeader ? [extraHeader] : []);
+};
+
+const sendUpgradeResponse = async (port: number, path: string, extraHeaders: readonly string[] = []): Promise<string> =>
   new Promise((resolve, reject) => {
     const socket = connectSocket(port, '127.0.0.1');
+    let buffer = Buffer.alloc(0);
     socket.on('connect', () => {
       socket.write(
-        `${[`GET ${path} HTTP/1.1`, 'Host: 127.0.0.1', 'Connection: Upgrade', 'Upgrade: websocket', extraHeader].filter(Boolean).join('\r\n')}\r\n\r\n`,
+        `${[`GET ${path} HTTP/1.1`, 'Host: 127.0.0.1', 'Connection: Upgrade', 'Upgrade: websocket', ...extraHeaders].filter(Boolean).join('\r\n')}\r\n\r\n`,
       );
     });
-    socket.on('close', () => resolve());
+    socket.on('data', (chunk) => {
+      buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+      if (buffer.includes('\r\n\r\n')) {
+        socket.destroy();
+      }
+    });
+    socket.on('close', () => resolve(buffer.toString('utf8')));
     socket.on('error', reject);
   });
 
@@ -1022,7 +1063,7 @@ const expectBaselineSecurityHeaders = (response: Response): void => {
   );
 };
 
-const connectRawWebSocket = async (port: number): Promise<RawSocketProbe> =>
+const connectRawWebSocket = async (port: number, origin = `http://127.0.0.1:${port}`): Promise<RawSocketProbe> =>
   new Promise((resolve, reject) => {
     const socket = connectSocket(port, '127.0.0.1');
     let buffer = Buffer.alloc(0);
@@ -1061,6 +1102,7 @@ const connectRawWebSocket = async (port: number): Promise<RawSocketProbe> =>
           'Host: 127.0.0.1',
           'Connection: Upgrade',
           'Upgrade: websocket',
+          `Origin: ${origin}`,
           'Sec-WebSocket-Version: 13',
           'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
           '',
@@ -1072,18 +1114,33 @@ const connectRawWebSocket = async (port: number): Promise<RawSocketProbe> =>
     socket.on('error', fail);
   });
 
-const connect = async (url: string, options: { readonly waitForConnected?: boolean } = {}): Promise<SocketProbe> => {
-  const socket = new WebSocket(url);
+const connect = async (url: string, options: { readonly waitForConnected?: boolean; readonly origin?: string } = {}): Promise<SocketProbe> => {
+  const socket = new NodeWebSocket(url, { headers: { Origin: options.origin ?? webSocketOrigin(url) } });
   const probe = new SocketProbe(socket);
   await new Promise<void>((resolve, reject) => {
-    socket.addEventListener('open', () => resolve(), { once: true });
-    socket.addEventListener('error', () => reject(new Error('WebSocket failed to connect.')), { once: true });
+    socket.once('open', () => resolve());
+    socket.once('error', () => reject(new Error('WebSocket failed to connect.')));
   });
   sockets.push(probe);
   if (options.waitForConnected ?? true) {
     await probe.waitFor((message) => message.type === 'error' && message.code === 'connected');
   }
   return probe;
+};
+
+const webSocketOrigin = (url: string): string => {
+  const parsed = new URL(url);
+  return `${parsed.protocol === 'wss:' ? 'https:' : 'http:'}//${parsed.host}`;
+};
+
+const webSocketText = (data: WebSocketRawData): string => {
+  if (Array.isArray(data)) {
+    return Buffer.concat(data).toString('utf8');
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(new Uint8Array(data)).toString('utf8');
+  }
+  return data.toString('utf8');
 };
 
 const waitForRoom = async (probe: SocketProbe, predicate: (room: RoomSnapshot) => boolean): Promise<RoomSnapshot> => {

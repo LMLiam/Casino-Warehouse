@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
+import type { Duplex } from 'node:stream';
 import helmet, { type HelmetOptions } from 'helmet';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import { RoomAuthority } from '../roomAuthority';
@@ -17,6 +18,7 @@ import type { CasinoRoomAuthority } from './CasinoRoomAuthority';
 import type { CasinoServer } from './CasinoServer';
 import type { CasinoServerOptions } from './CasinoServerOptions';
 import type { Peer } from './Peer';
+import { WebSocketOriginPolicy } from './WebSocketOriginPolicy';
 
 export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoServer => {
   const closeUnsupportedData = 1003;
@@ -53,6 +55,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 30_000;
   const adminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
   const serverInstanceId = options.serverInstanceId ?? randomUUID();
+  const publicBaseUrl = (options.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
   const peers = new Map<string, Peer>();
   const websocketServer = new WebSocketServer({
     clientTracking: false,
@@ -409,6 +412,11 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       return;
     }
 
+    if (!WebSocketOriginPolicy.allows(request, publicBaseUrl)) {
+      rejectUpgrade(socket, 403, 'Forbidden');
+      return;
+    }
+
     websocketServer.handleUpgrade(request, socket, head, (websocket) => {
       const peer: Peer = { id: randomUUID(), socket: websocket, ownedProfileIds: new Set(), lastPongAt: Date.now(), isAdmin: false };
       const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
@@ -480,7 +488,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   }
 
   function createInvitePath(gameId: string, roomId: string): string {
-    const publicBaseUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, '');
     const query = `?game=${encodeURIComponent(gameId)}&room=${encodeURIComponent(roomId)}`;
     if (!publicBaseUrl) {
       return `/${query}`;
@@ -496,6 +503,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       return Buffer.from(new Uint8Array(data)).toString('utf8');
     }
     return data.toString('utf8');
+  }
+
+  function rejectUpgrade(socket: Duplex, statusCode: number, reason: string): void {
+    socket.end(`HTTP/1.1 ${statusCode} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
   }
 
   function staticPath(request: IncomingMessage, distRoot: string): string | undefined {
