@@ -45,7 +45,7 @@ Malware alerts are not a complete malware scanner. GitHub documents that alerts 
 
 ## Dependency Review Policy
 
-The Dependency Review workflow is required on pull requests to `main`. It fails when a pull request introduces a known vulnerable dependency at `moderate` severity or higher in `runtime`, `development`, or `unknown` scopes.
+The `Dependency Security Review / Review Dependency Changes` check is required on pull requests to `main`. It fails when a pull request introduces a known vulnerable dependency at `moderate` severity or higher in `runtime`, `development`, or `unknown` scopes.
 
 This keeps the policy stricter than runtime-only scanning while avoiding low-severity noise. License blocking is intentionally not configured yet because the project uses the PolyForm Noncommercial license and does not currently have a reviewed third-party license denylist. If maintainers add license enforcement later, prefer a small denylist over a broad allowlist.
 

@@ -1,4 +1,4 @@
-name: PR Standards
+name: Pull Request Standards
 
 on:
   pull_request_target:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   validate:
-    name: PR Standards
+    name: Validate Pull Request Metadata
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate PR metadata
+      - name: Validate pull request metadata
         env:
           PR_STANDARDS_EVENT_PATH: ${{ github.event_path }}
         run: node scripts/validate-pr-standards.mjs

@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Issue Standards
+    name: Validate Issue Metadata
     runs-on: ubuntu-latest
 
     steps:
