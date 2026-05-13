@@ -1,4 +1,4 @@
-name: Pull Request Standards
+name: Pull Request Checks
 
 on:
   pull_request_target:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate Pull Request Metadata
+    name: PR Standards
     runs-on: ubuntu-latest
 
     steps:
