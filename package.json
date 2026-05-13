@@ -14,16 +14,17 @@
     "build:server": "vite build --ssr src/multiplayer/serverEntry.ts --outDir dist-server",
     "dev:server": "npm run build:server && node dist-server/serverEntry.js",
     "dev:full": "npm run build && npm run build:server && node dist-server/serverEntry.js",
-    "dev:public": "node scripts/dev-public.mjs",
-    "dev:ngrok": "npm run dev:public",
+    "dev:public": "npm run dev:ngrok",
+    "dev:ngrok": "node scripts/dev-public.mjs",
+    "dev:localtunnel": "node scripts/dev-localtunnel.mjs",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && npm run typecheck && npm run architecture:check && npm run supply-chain:check",
     "architecture:check": "node scripts/architecture-check.mjs",
     "supply-chain:check": "node scripts/supply-chain-check.mjs",
     "editorconfig:check": "node scripts/check-editorconfig.mjs",
-    "format": "npm run editorconfig:check && prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/math-random-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\"",
-    "format:write": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/math-random-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\" && npm run editorconfig:check",
+    "format": "npm run editorconfig:check && prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/dev-localtunnel.mjs\" \"scripts/math-random-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\"",
+    "format:write": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/dev-localtunnel.mjs\" \"scripts/math-random-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\" && npm run editorconfig:check",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --coverage.thresholds.statements=85 --coverage.thresholds.branches=80 --coverage.thresholds.functions=85 --coverage.thresholds.lines=85",
     "check": "npm run lint && npm run format && npm run test:coverage && npm run build:server && npm run visual",
@@ -57,11 +58,17 @@
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.6",
     "eslint": "^10.3.0",
+    "localtunnel": "^2.0.2",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.3",
     "vite": "^8.0.12",
     "vitest": "^4.0.14"
+  },
+  "overrides": {
+    "localtunnel": {
+      "axios": "^1.16.1"
+    }
   }
 }

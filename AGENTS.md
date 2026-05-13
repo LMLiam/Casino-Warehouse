@@ -12,7 +12,7 @@ Credits have no cash value. Do not introduce deposits, withdrawals, payments, cr
 
 Primary references:
 
-- `README.md`: setup, runtime, ngrok demo flow, local data, license, and project status.
+- `README.md`: setup, runtime, public tunnel demo flows, local data, license, and project status.
 - `CONTRIBUTING.md`: PR rules, issue triage, local checks, and security/quality gates.
 - `GOVERNANCE.md`: maintainer decisions, milestone order, issue triage, and review expectations.
 - `docs/code-quality.md`: domain boundaries, architecture rules, and source file shape.
@@ -33,6 +33,8 @@ Primary references:
 - `npm run dev:server`: build the server and serve the built app at `http://127.0.0.1:8787` by default.
 - `npm run dev:full`: build the app and server, then start the realtime server.
 - `npm run dev:public`: run the ngrok-backed public demo flow.
+- `npm run dev:ngrok`: run the provider-specific ngrok public demo flow.
+- `npm run dev:localtunnel`: run the provider-specific localtunnel public demo flow.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.

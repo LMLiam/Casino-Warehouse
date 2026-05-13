@@ -84,13 +84,13 @@ of:
 ```bash
 npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts
 npm run visual -- --project=tablet tests/e2e/casino-visual.spec.ts
-npm run visual -- --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/ngrok-smoke.spec.ts
+npm run visual -- --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 ```
 
 Serial execution is reserved for debugging with `npm run visual:serial`.
 The committed e2e config does not force any spec file into serial mode;
 the multi-context specs in `tests/e2e/multiplayer-flow.spec.ts` and
-`tests/e2e/ngrok-smoke.spec.ts` skip tablet project duplication inside the
+`tests/e2e/public-tunnel-smoke.spec.ts` skip tablet project duplication inside the
 test files. For debugging a flaky browser test serially, use:
 
 ```bash

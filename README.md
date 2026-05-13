@@ -68,18 +68,26 @@ Enter the same token in the app's admin panel to unlock bankroll edits, reset-al
 
 ## Play on Another Device
 
-To share a temporary public URL for another desktop or tablet, use the integrated ngrok flow:
+To share a temporary public URL for another desktop or tablet, use one of the integrated public tunnel flows.
+
+For localtunnel:
+
+```bash
+npm run dev:localtunnel
+```
+
+For ngrok:
 
 ```bash
 export NGROK_AUTHTOKEN=YOUR_TOKEN
-npm run dev:public
+npm run dev:ngrok
 ```
 
-Share the printed app URL with the other device. The public tunnel stays open only while the command is running.
+`npm run dev:public` remains an alias for the ngrok-backed flow. Both provider commands build the app and server, open a public tunnel to the integrated server port, print the app URL and WebSocket URL, set `PUBLIC_BASE_URL`, and start the server with invite links routed through the public URL. Share the printed app URL with the other device. The public tunnel stays open only while the command is running.
 
-ngrok exposes your local development server to the internet while it is running. Use it only for trusted demo sessions.
+Public tunnels expose your local development server to the internet while they are running. Use them only for trusted demo sessions. localtunnel is convenient because it does not require an ngrok account token, but public service reliability can vary, requested custom subdomains are not guaranteed, browser users may see a localtunnel reminder page before the app, and self-hosting localtunnel or using a paid/stable tunnel provider may be better for recurring sessions. You can request a localtunnel subdomain with `LOCALTUNNEL_SUBDOMAIN=your-name npm run dev:localtunnel`; use `LOCALTUNNEL_HOST` only when you intentionally target a compatible self-hosted localtunnel server.
 
-Public tunnel sessions use three separate trust checks. WebSocket upgrades require an `Origin` header from a local development origin or from `PUBLIC_BASE_URL`; the integrated `npm run dev:public` flow sets `PUBLIC_BASE_URL` to the ngrok app URL before starting the server. If you expose the server through another public tunnel, set `PUBLIC_BASE_URL` to that app URL before starting `npm run dev:server`. There is no development bypass for missing or unexpected WebSocket origins.
+Public tunnel sessions use three separate trust checks. WebSocket upgrades require an `Origin` header from a local development origin or from `PUBLIC_BASE_URL`; the integrated tunnel flows set `PUBLIC_BASE_URL` to the printed app URL before starting the server. If you expose the server through another public tunnel, set `PUBLIC_BASE_URL` to that app URL before starting `npm run dev:server`. There is no development bypass for missing or unexpected WebSocket origins.
 
 Server-created profiles receive browser-local profile credentials, so another browser can see public server profiles but cannot rename, delete, save with, host as, or join rooms as a profile it does not own. Destructive admin actions require `CASINO_ADMIN_TOKEN`; leave it unset for public demos that do not need admin controls, or set a temporary token and share it only with trusted maintainers.
 
@@ -112,7 +120,7 @@ npm run dev:server
 
 - If the app stays on a reconnecting screen, make sure `npm run dev:server` or `npm run dev:full` is running.
 - `npm run dev` starts only the Vite client shell. Use it alongside a running server, or use `npm run dev:server` for the normal local app.
-- If multiplayer devices cannot join each other, create a fresh room after both devices open the same local or ngrok URL.
+- If multiplayer devices cannot join each other, create a fresh room after both devices open the same local, ngrok, or localtunnel URL.
 - If dependencies fail to install, confirm your Node version matches the requirement above.
 - Development tools may emit Node 26 warnings from upstream packages, including `DEP0205` for `module.register()`, Vitest's localStorage warning, or color-environment warnings from Playwright web-server output. These are non-blocking toolchain warnings when the documented checks pass.
 

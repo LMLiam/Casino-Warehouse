@@ -937,7 +937,7 @@ describe('multiplayer WebSocket server', () => {
     await expect(alice.waitForClose()).resolves.toBeUndefined();
   });
 
-  it('uses the public base URL in room invites when the integrated ngrok flow provides one', async () => {
+  it('uses the public base URL in room invites when an integrated public tunnel flow provides one', async () => {
     const originalPublicBaseUrl = process.env.PUBLIC_BASE_URL;
     process.env.PUBLIC_BASE_URL = 'https://casino-public.example.test/';
     try {
