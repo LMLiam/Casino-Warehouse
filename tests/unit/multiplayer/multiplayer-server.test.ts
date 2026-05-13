@@ -260,11 +260,13 @@ describe('multiplayer WebSocket server', () => {
     await expect(health.json()).resolves.toEqual({ ok: true, multiplayer: true });
 
     const asset = await fetch(`${baseUrl.http}/client.js`);
+    expect(asset.status).toBe(200);
     expectBaselineSecurityHeaders(asset);
     expect(asset.headers.get('content-type')).toContain('text/javascript');
     await expect(asset.text()).resolves.toBe('console.log("casino");');
 
-    const fallback = await fetch(`${baseUrl.http}/missing-route`);
+    const fallback = await fetch(`${baseUrl.http}/missing-route`, { headers: { accept: 'text/html' } });
+    expect(fallback.status).toBe(200);
     expectBaselineSecurityHeaders(fallback);
     expect(fallback.headers.get('cache-control')).toBe('no-store');
     expect(fallback.headers.get('content-type')).toContain('text/html');
@@ -272,6 +274,24 @@ describe('multiplayer WebSocket server', () => {
 
     await expect(sendUpgradeRequest(baseUrl.port, '/not-ws', 'Sec-WebSocket-Key: bad')).resolves.toBeUndefined();
     await expect(sendUpgradeRequest(baseUrl.port, '/ws')).resolves.toBeUndefined();
+  });
+
+  it('returns not found for missing assets and suspicious file paths', async () => {
+    const distRoot = await createStaticFixture();
+    const baseUrl = await startServer(distRoot);
+    const missingPaths = ['/missing.js', '/missing.css', '/images/missing.png', '/icons/missing.svg', '/%5cadmin'];
+
+    for (const missingPath of missingPaths) {
+      const response = await fetch(`${baseUrl.http}${missingPath}`, { headers: { accept: 'text/html' } });
+
+      expectBaselineSecurityHeaders(response);
+      expect(response.status, missingPath).toBe(404);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('content-type')).toContain('text/plain');
+      await expect(response.text()).resolves.toBe('Not found');
+    }
+
+    await expect(sendHttpResponse(baseUrl.port, '/%2e%2e/admin', ['Accept: text/html'])).resolves.toContain('HTTP/1.1 404 Not Found');
   });
 
   it('accepts local development WebSocket origins', async () => {
@@ -1012,6 +1032,20 @@ const closeCurrentServer = async (): Promise<void> => {
 const sendUpgradeRequest = async (port: number, path: string, extraHeader = ''): Promise<void> => {
   await sendUpgradeResponse(port, path, extraHeader ? [extraHeader] : []);
 };
+
+const sendHttpResponse = async (port: number, path: string, extraHeaders: readonly string[] = []): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const socket = connectSocket(port, '127.0.0.1');
+    let buffer = Buffer.alloc(0);
+    socket.on('connect', () => {
+      socket.write(`${[`GET ${path} HTTP/1.1`, 'Host: 127.0.0.1', 'Connection: close', ...extraHeaders].filter(Boolean).join('\r\n')}\r\n\r\n`);
+    });
+    socket.on('data', (chunk) => {
+      buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+    });
+    socket.on('close', () => resolve(buffer.toString('utf8')));
+    socket.on('error', reject);
+  });
 
 const sendUpgradeResponse = async (port: number, path: string, extraHeaders: readonly string[] = []): Promise<string> =>
   new Promise((resolve, reject) => {
