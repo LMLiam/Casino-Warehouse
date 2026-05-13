@@ -111,13 +111,13 @@ describe('Zod-backed runtime validation', () => {
     expect(loaded.recovered).toBe(true);
     expect(loaded.error).toContain('Profile record is invalid');
 
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow(/Save data is not a casino profile store/);
+    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
   });
 
   it('rejects wrong versions independently for protocol, profile store, and session state boundaries', () => {
     expect(parseClientMessage({ version: 2, type: 'request-data' })).toEqual({ ok: false, error: 'Message version or type is invalid.' });
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow(/Save data is not a casino profile store/);
-    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data is not valid.');
+    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
+    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data version 2 is not supported.');
   });
 
   it('validates settings and game/slot configuration at runtime boundaries', () => {

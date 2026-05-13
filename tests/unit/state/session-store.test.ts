@@ -150,7 +150,6 @@ describe('session store', () => {
   it('handles missing and invalid session fields without destroying valid saves', () => {
     const storage = new MemoryStorage();
     expect(loadSessionState(storage)).toEqual({ recovered: false });
-    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data is not valid.');
     const session = parseSessionState({
       version: 1,
       profileIds: ['a', 7, 'b'],
@@ -211,5 +210,10 @@ describe('session store', () => {
       }).room,
     ).toBeUndefined();
     expect(session.gameSnapshots.a.slots?.['thai-princess']).toEqual({ themeId: 'thai-princess' });
+  });
+
+  it('rejects malformed and unsupported session-state migration inputs clearly', () => {
+    expect(() => parseSessionState({ version: 1 })).toThrow('Session v1 data is not valid.');
+    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data version 2 is not supported.');
   });
 });

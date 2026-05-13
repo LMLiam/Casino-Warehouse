@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createProfile } from '../../../src/state/profiles/createProfile';
 import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
+import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
 import { parseCasinoProfile } from '../../../src/state/profiles/parseCasinoProfile';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import { recordTransaction } from '../../../src/state/profiles/recordTransaction';
@@ -195,29 +196,33 @@ describe('profile store', () => {
     expect(imported).toEqual(state);
   });
 
-  it('migrates legacy transactions and missing optional profile fields', () => {
-    const imported = parseProfileStoreJson(
-      JSON.stringify({
-        version: 1,
-        profiles: [
-          {
-            id: 'legacy',
-            name: 'Legacy',
-            bankroll: 50,
-            stats: { totalWagered: 10, totalWon: 20, biggestWin: 20, gamesPlayed: 1 },
-            transactions: [
-              { id: 'tx1', gameId: 'blackjack', type: 'push', amount: 10, balanceAfter: 50, note: 'Old push' },
-              { id: 'tx2', gameId: 'admin', type: 'admin', amount: 5, balanceAfter: 40, note: 'Old admin' },
-            ],
-          },
-        ],
-      }),
-    );
+  it('migrates profile-store v1 legacy transactions and missing optional profile fields', () => {
+    const imported = parseCasinoSaveState({
+      version: 1,
+      profiles: [
+        {
+          id: 'legacy',
+          name: 'Legacy',
+          bankroll: 50,
+          stats: { totalWagered: 10, totalWon: 20, biggestWin: 20, gamesPlayed: 1 },
+          transactions: [
+            { id: 'tx1', gameId: 'blackjack', type: 'push', amount: 10, balanceAfter: 50, note: 'Old push' },
+            { id: 'tx2', gameId: 'admin', type: 'admin', amount: 5, balanceAfter: 40, note: 'Old admin' },
+          ],
+        },
+      ],
+    });
 
+    expect(imported.version).toBe(1);
     expect(imported.profiles[0].color).toMatch(/^#/);
     expect(imported.profiles[0].stats.netProfit).toBe(10);
     expect(imported.profiles[0].transactions.map((transaction) => transaction.type)).toEqual(['push_refund', 'admin_adjustment']);
     expect(imported.profiles[0].transactions[0].description).toBe('Old push');
+  });
+
+  it('rejects malformed and unsupported profile-store migration inputs clearly', () => {
+    expect(() => parseCasinoSaveState({ version: 1 })).toThrow('Profile store v1 data is not valid');
+    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
   });
 
   it('normalizes partial profile records that bypass save-state schema defaults', () => {
