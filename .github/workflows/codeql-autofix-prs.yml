@@ -42,7 +42,7 @@ on:
         default: ''
         type: string
   schedule:
-    - cron: '41 4 * * 2'
+    - cron: '41 4 * * *'
 
 permissions:
   contents: read
