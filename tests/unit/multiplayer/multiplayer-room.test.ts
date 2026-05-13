@@ -7,6 +7,7 @@ import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClien
 import type { RoomGameId } from '../../../src/multiplayer/protocol/RoomGameId';
 import type { RoomSeatId } from '../../../src/multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import { serverMessageSchema } from '../../../src/schemas/protocol/serverMessageSchema';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable/BlackjackTableSnapshot';
 import type { SlotSnapshot } from '../../../src/game/slots/SlotSnapshot';
@@ -128,6 +129,16 @@ describe('per-game multiplayer protocol', () => {
     expect(decodeServerMessage(JSON.stringify({ version: 1, type: 'room-state', room }))?.type).toBe('room-state');
     expect(decodeServerMessage('{"version":1,"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();
+
+    const invalidSettlement = {
+      version: 1,
+      type: 'settlement',
+      roomId: 'ROOM42',
+      sessionId: 'SESSION42',
+      settlements: [{ id: 'settlement-1', profileId: 'alice', seatId: 'middle', wagered: 25, returned: 0, profit: -25 }],
+    };
+    expect(serverMessageSchema.safeParse(invalidSettlement).success).toBe(false);
+    expect(decodeServerMessage(JSON.stringify(invalidSettlement))).toBeUndefined();
   });
 });
 
