@@ -74,6 +74,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
       const filePath = staticPath(request, distRoot);
       if (!filePath || !existsSync(filePath)) {
+        if (!shouldServeAppFallback(request, filePath)) {
+          response.writeHead(404, responseHeaders({ 'cache-control': 'no-store', 'content-type': 'text/plain; charset=utf-8' }));
+          response.end('Not found');
+          return;
+        }
+
         response.writeHead(200, responseHeaders({ 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' }));
         response.end(readFileSync(join(distRoot, 'index.html')));
         return;
@@ -514,6 +520,51 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     const pathname = normalize(url.pathname === '/' ? '/index.html' : url.pathname).replace(/^(\.\.[/\\])+/, '');
     const filePath = join(distRoot, pathname);
     return filePath.startsWith(distRoot) ? filePath : undefined;
+  }
+
+  function shouldServeAppFallback(request: IncomingMessage, filePath: string | undefined): boolean {
+    return Boolean(filePath) && acceptsHtml(request) && !isFileLikeOrSuspiciousRequest(request);
+  }
+
+  function acceptsHtml(request: IncomingMessage): boolean {
+    const acceptHeader = request.headers.accept;
+    if (!acceptHeader) {
+      return true;
+    }
+
+    return acceptHeader.split(',').some((entry) => {
+      const [mediaType, ...parameters] = entry.split(';').map((part) => part.trim().toLowerCase());
+      const qValue = parameters.find((parameter) => parameter.startsWith('q='));
+      if (qValue && Number(qValue.slice(2)) === 0) {
+        return false;
+      }
+
+      return mediaType === 'text/html' || mediaType === 'application/xhtml+xml' || mediaType === 'text/*' || mediaType === '*/*';
+    });
+  }
+
+  function isFileLikeOrSuspiciousRequest(request: IncomingMessage): boolean {
+    const decodedPathname = decodedPath(rawRequestPath(request));
+    if (!decodedPathname || decodedPathname.includes('\\') || decodedPathname.includes('\0') || decodedPathname.split('/').includes('..')) {
+      return true;
+    }
+
+    return decodedPathname.split('/').some((segment) => extname(segment) !== '');
+  }
+
+  function rawRequestPath(request: IncomingMessage): string {
+    const rawUrl = request.url ?? '/';
+    const pathEnd = rawUrl.search(/[?#]/);
+    const path = pathEnd === -1 ? rawUrl : rawUrl.slice(0, pathEnd);
+    return path || '/';
+  }
+
+  function decodedPath(pathname: string): string | undefined {
+    try {
+      return decodeURIComponent(pathname);
+    } catch {
+      return undefined;
+    }
   }
 
   function contentType(filePath: string): string {
