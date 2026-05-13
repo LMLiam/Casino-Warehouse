@@ -127,6 +127,8 @@ A self-review claim is invalid unless it includes evidence. The agent must name:
 
 Saying only "I performed a self-review and found no issues" is non-compliant.
 
+After a pull request exists, every self-review finding must be recorded as a pull request review comment before it is fixed. Do not edit, commit, or push a fix for a self-review finding until the pull request review comment exists and the comment URL or ID is recorded, unless comment creation failed and the exact attempted tool or command plus exact failure has already been recorded. Final readiness evidence must list every self-review finding with its PR comment URL or ID, fix commit SHA if fixed, and resolution reply URL or ID when available.
+
 If repository permissions prevent leaving PR review comments, the agent must still produce review findings in the final response using file paths and line-level references where possible. It must not silently skip the review-comment step.
 
 After any new commit, rebase, merge from the target branch, force-push, PR body edit that reruns checks, or resolved-comment action, the pull request must be reviewed again before being called ready.

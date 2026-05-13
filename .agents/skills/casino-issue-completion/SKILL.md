@@ -19,6 +19,8 @@ The review must be a real pull request code review, not just a checklist pass. I
 
 Pre-PR diff inspection is useful for implementation hygiene, but it does not satisfy the required review evidence. Readiness review begins only after a pull request exists, because actionable findings must be left as pull request review comments when repository permissions allow.
 
+After a pull request exists, every self-review finding must be commented before it is fixed. Do not edit, commit, or push a fix for a self-review finding until the PR review comment exists and its URL or comment ID is recorded, unless comment creation failed and the exact attempted tool or command plus exact failure has already been recorded.
+
 ## Required Evidence
 
 Before the final response, collect:
@@ -38,6 +40,7 @@ Before the final response, collect:
 - review verdict: `APPROVE`, `REQUEST_CHANGES`, or `NEEDS_DISCUSSION`
 - web/current-info verification performed, or a statement that no review claim depended on current external facts
 - PR comments created, or exact reason comments could not be created
+- for each review finding: PR comment URL or ID, fix commit SHA if fixed, and resolution reply URL or ID when available
 - fixes pushed after review, if any
 - CI/check status after the latest pushed commit
 - whether the current branch is up to date with the target branch
@@ -169,10 +172,13 @@ Do not guess or rely on memory for these claims. If no finding depends on curren
 10. Review the opened or updated pull request like a maintainer with the required review lenses above. This PR review is the required self-review evidence; a pre-PR branch inspection cannot replace it. Check purpose and correctness of each changed file; bug and edge-case risks; security, performance, architecture, and maintainability risks; domain ownership; the one-exported-top-level-element rule; absence of vague utility modules; game, payout, and bankroll authority staying out of UI; multiplayer credential and token leakage; persistence schema and runtime-boundary safety; deterministic tests where relevant; generated build output not committed; workflow action pinning if workflows changed; PR template completeness; and issue labels, PR labels, milestone, and linked issue when applicable.
 
 11. For every issue found during PR review:
+    - stop before editing any file related to the finding
     - leave a pull request review comment when repository permissions allow, preferably inline on the affected file and line
-    - fix the issue
-    - push the fix
-    - respond to or resolve the review thread where possible
+    - record the review comment URL or ID in your working notes
+    - only after the comment exists, fix the issue
+    - push the fix and record the fix commit SHA
+    - respond to or resolve the review thread where possible, and record the resolution reply URL or ID when available
+    - if comment creation fails, record the attempted tool or command and exact failure before editing; then report the finding locally and proceed only through the documented fallback path
 
 12. After every new commit, rebase, merge from target, force-push, PR body edit that reruns checks, or resolved-comment action, repeat steps 8 through 11 on the current pull request head.
 
@@ -187,6 +193,8 @@ Do not guess or rely on memory for these claims. If no finding depends on curren
 ## If PR Comments Cannot Be Created
 
 Do not skip the review.
+
+Record the attempted tool or command and the exact failure before editing any fix for the finding.
 
 Instead, produce local review findings in the final response using file paths and line-level references where possible.
 
