@@ -1,7 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { DatabaseSync } from 'node:sqlite';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultServerDataStore } from '../../../src/state/serverDataStore/createDefaultServerDataStore';
 import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
@@ -10,6 +11,7 @@ import { createSessionState } from '../../../src/state/session/createSessionStat
 const tempDirs: string[] = [];
 
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
@@ -158,6 +160,43 @@ describe('server data store', () => {
     expect(new SqliteServerDataStore(dbPath).snapshot()).toMatchObject({ profileState: { profiles: [] }, session: undefined });
   });
 
+  it.each([
+    ['profiles', 'profile rows'],
+    ['profile_auth', 'profile auth rows'],
+    ['session', 'session rows'],
+  ])('recovers from corrupt SQLite %s state while preserving the other rows', async (corruptKey) => {
+    const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
+    tempDirs.push(dir);
+    const dbPath = join(dir, 'casino.sqlite');
+    const store = new SqliteServerDataStore(dbPath);
+    const profile = store.createProfile('SQLite Survivor').profileState.profiles[0];
+    store.setProfileTokenHash(profile.id, 'token-hash');
+    store.saveSession(
+      createSessionState([profile.id], {
+        selectedPlayerIndex: 0,
+        activeGame: 'blackjack',
+        showingGameLobby: false,
+        wagerLimit: 300,
+        wagered: 75,
+        gameSnapshots: {},
+      }),
+    );
+    writeStateValue(dbPath, corruptKey, '{ broken json');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const reloaded = new SqliteServerDataStore(dbPath);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`server_state row "${corruptKey}"`), expect.any(SyntaxError));
+    expect(readStateValue(dbPath, corruptKey)).not.toBe('{ broken json');
+    expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toEqual(
+      corruptKey === 'profiles' ? undefined : expect.objectContaining({ name: 'SQLite Survivor' }),
+    );
+    expect(reloaded.profileTokenHash(profile.id)).toBe(corruptKey === 'profile_auth' ? undefined : 'token-hash');
+    expect(reloaded.snapshot().session).toEqual(corruptKey === 'session' ? undefined : expect.objectContaining({ activeGame: 'blackjack' }));
+
+    warn.mockRestore();
+  });
+
   it('uses SQLite outside the test environment when an explicit path is configured', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
     tempDirs.push(dir);
@@ -202,4 +241,22 @@ const restoreEnvValue = (key: string, value: string | undefined): void => {
     return;
   }
   process.env[key] = value;
+};
+
+const writeStateValue = (dbPath: string, key: string, value: string): void => {
+  const db = new DatabaseSync(dbPath);
+  try {
+    db.prepare('INSERT INTO server_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+  } finally {
+    db.close();
+  }
+};
+
+const readStateValue = (dbPath: string, key: string): string | undefined => {
+  const db = new DatabaseSync(dbPath);
+  try {
+    return (db.prepare('SELECT value FROM server_state WHERE key = ?').get(key) as { value: string } | undefined)?.value;
+  } finally {
+    db.close();
+  }
 };
