@@ -106,7 +106,35 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
 
   private readStoredState(): Partial<Pick<ServerDataSnapshot, 'profileState' | 'session'> & { readonly profileAuth: Record<string, string> }> {
     const rows = this.db.prepare('SELECT key, value FROM server_state').all() as Array<{ key: string; value: string }>;
-    return Object.fromEntries(rows.map((row) => [SqliteServerDataStore.storedStateKey(row.key), JSON.parse(row.value)]));
+    const stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] } = {};
+    for (const row of rows) {
+      try {
+        this.assignStoredStateValue(stored, row.key, JSON.parse(row.value));
+      } catch (error) {
+        this.db.prepare('DELETE FROM server_state WHERE key = ?').run(row.key);
+        console.warn(`SQLite server_state row "${row.key}" could not be parsed and was deleted.`, error);
+      }
+    }
+    return stored;
+  }
+
+  private assignStoredStateValue(
+    stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] },
+    key: string,
+    value: unknown,
+  ): void {
+    const storedKey = SqliteServerDataStore.storedStateKey(key);
+    if (storedKey === 'profileState') {
+      stored.profileState = value as ServerDataSnapshot['profileState'];
+      return;
+    }
+    if (storedKey === 'profileAuth') {
+      stored.profileAuth = value as Record<string, string>;
+      return;
+    }
+    if (storedKey === 'session') {
+      stored.session = value as ServerDataSnapshot['session'];
+    }
   }
 
   private writeValue(key: string, value: unknown): void {
