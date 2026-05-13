@@ -19,9 +19,11 @@ Maintainer decision-making, issue triage, and pull request review expectations a
 ## Requirements
 
 - Git
-- Node.js 22.x (`22.12.0` or newer). Use `nvm use` or your version manager's equivalent to read the pinned version from `.nvmrc` or `.node-version`.
+- Node.js 26.x. Use `nvm use` or your version manager's equivalent to read the pinned version from `.nvmrc` or `.node-version`.
 - npm
 - A desktop or tablet browser
+
+Node.js 26 is the supported development/runtime line for this demo. It is a Current release line rather than an LTS recommendation for production applications.
 
 Phone-sized screens are intentionally unsupported.
 
@@ -112,6 +114,7 @@ npm run dev:server
 - `npm run dev` starts only the Vite client shell. Use it alongside a running server, or use `npm run dev:server` for the normal local app.
 - If multiplayer devices cannot join each other, create a fresh room after both devices open the same local or ngrok URL.
 - If dependencies fail to install, confirm your Node version matches the requirement above.
+- Development tools may emit Node 26 warnings from upstream packages, including `DEP0205` for `module.register()`, Vitest's localStorage warning, or color-environment warnings from Playwright web-server output. These are non-blocking toolchain warnings when the documented checks pass.
 
 ## Project Wiki
 

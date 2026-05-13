@@ -20,7 +20,7 @@ Primary references:
 
 ## Environment
 
-- Use Node.js 22.x. The supported range is `>=22.12.0 <23`; read `.nvmrc` or `.node-version` when using a version manager.
+- Use Node.js 26.x. The supported range is `>=26.0.0 <27`; read `.nvmrc` or `.node-version` when using a version manager.
 - Use npm, not another package manager.
 - Install dependencies with `npm install` for local development. CI uses `npm ci`.
 - Phone-sized screens are intentionally unsupported.
