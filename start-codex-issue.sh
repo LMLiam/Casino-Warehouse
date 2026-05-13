@@ -66,7 +66,7 @@ if ! [[ "$issue_number" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-goal="/goal Complete issue #${issue_number} using \$casino-issue-completion + AGENTS.md: complete correct implementation, open/update PR, evidence review, current main, green checks, readiness report."
+goal="/goal Complete issue #${issue_number} in a separate worktree using \$casino-issue-completion + AGENTS.md: complete correct implementation, open/update PR, evidence review, current main, green checks, readiness report."
 
 if [ "$print_only" = "true" ]; then
   printf "%s\n" "$goal"
@@ -92,7 +92,16 @@ fi
 
 export CASINO_ISSUE_GOAL="$goal"
 
-exec expect -f - -- "$codex_bin" "${codex_args[@]}" <<'EXPECT'
+expect_script="$(mktemp "${TMPDIR:-/tmp}/start-codex-issue.XXXXXX")"
+cleanup() {
+  rm -f "$expect_script"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+cat >"$expect_script" <<'EXPECT'
 set timeout 60
 set goal $env(CASINO_ISSUE_GOAL)
 set ready 0
@@ -168,3 +177,5 @@ expect {
 after 750
 interact
 EXPECT
+
+expect "$expect_script" -- "$codex_bin" "${codex_args[@]}"
