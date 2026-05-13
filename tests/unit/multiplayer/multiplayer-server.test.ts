@@ -312,6 +312,16 @@ describe('multiplayer WebSocket server', () => {
     await expect(publicClient.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({ type: 'server-hello' });
   });
 
+  it('accepts a public WebSocket origin that becomes available after the server starts', async () => {
+    let publicBaseUrl = '';
+    const baseUrl = await startServer('.', undefined, { publicBaseUrl: () => publicBaseUrl });
+
+    publicBaseUrl = 'https://casino-public.example.test/';
+    const publicClient = await connect(baseUrl.ws, { origin: 'https://casino-public.example.test' });
+
+    await expect(publicClient.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({ type: 'server-hello' });
+  });
+
   it('rejects missing and unexpected WebSocket origins', async () => {
     const baseUrl = await startServer('.', undefined, { publicBaseUrl: 'https://casino-public.example.test/' });
     const validWebSocketHeaders = ['Sec-WebSocket-Version: 13', 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=='];

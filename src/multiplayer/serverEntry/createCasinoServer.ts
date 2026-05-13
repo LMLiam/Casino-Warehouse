@@ -55,7 +55,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 30_000;
   const adminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
   const serverInstanceId = options.serverInstanceId ?? randomUUID();
-  const publicBaseUrl = (options.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  const publicBaseUrl = (): string => {
+    const configuredBaseUrl = typeof options.publicBaseUrl === 'function' ? options.publicBaseUrl() : options.publicBaseUrl;
+    return (configuredBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  };
   const peers = new Map<string, Peer>();
   const websocketServer = new WebSocketServer({
     clientTracking: false,
@@ -432,7 +435,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       return;
     }
 
-    if (!WebSocketOriginPolicy.allows(request, publicBaseUrl)) {
+    if (!WebSocketOriginPolicy.allows(request, publicBaseUrl())) {
       rejectUpgrade(socket, 403, 'Forbidden');
       return;
     }
@@ -512,10 +515,11 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
   function createInvitePath(gameId: string, roomId: string): string {
     const query = `?game=${encodeURIComponent(gameId)}&room=${encodeURIComponent(roomId)}`;
-    if (!publicBaseUrl) {
+    const currentPublicBaseUrl = publicBaseUrl();
+    if (!currentPublicBaseUrl) {
       return `/${query}`;
     }
-    return `${publicBaseUrl}/${query}&server=${encodeURIComponent(publicBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/ws')}`;
+    return `${currentPublicBaseUrl}/${query}&server=${encodeURIComponent(currentPublicBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/ws')}`;
   }
 
   function textPayload(data: RawData): string {

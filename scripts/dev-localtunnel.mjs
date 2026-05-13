@@ -6,8 +6,10 @@ const host = process.env.HOST ?? '0.0.0.0';
 const localHost = process.env.LOCALTUNNEL_LOCAL_HOST ?? '127.0.0.1';
 const localtunnelHost = process.env.LOCALTUNNEL_HOST ?? 'https://localtunnel.me';
 const requestedSubdomain = process.env.LOCALTUNNEL_SUBDOMAIN?.trim();
-const children = [];
+const healthCheckTimeoutMs = Number(process.env.LOCALTUNNEL_HEALTH_TIMEOUT_MS ?? 5000);
+let server;
 let tunnel;
+let publicUrl = '';
 let shuttingDown = false;
 
 const run = (command, args, options = {}) =>
@@ -23,31 +25,13 @@ const run = (command, args, options = {}) =>
     child.on('error', reject);
   });
 
-const start = (command, args, options = {}) => {
-  const child = spawn(command, args, { stdio: 'inherit', shell: false, ...options });
-  children.push(child);
-  child.on('exit', (code) => {
-    if (!shuttingDown && code !== 0) {
-      console.error(`${command} ${args.join(' ')} exited with ${code ?? 'unknown status'}`);
-      shutdown(1);
-    }
-  });
-  child.on('error', (error) => {
-    console.error(error.message);
-    shutdown(1);
-  });
-  return child;
-};
-
 const shutdown = (code = 0) => {
   if (shuttingDown) {
     return;
   }
   shuttingDown = true;
-  for (const child of children) {
-    child.kill('SIGTERM');
-  }
   closeTunnel();
+  closeServer();
   process.exitCode = code;
 };
 
@@ -58,6 +42,36 @@ const closeTunnel = () => {
   const currentTunnel = tunnel;
   tunnel = undefined;
   currentTunnel?.close();
+};
+
+const closeServer = () => {
+  const currentServer = server;
+  server = undefined;
+  currentServer?.close();
+};
+
+const startServer = async () => {
+  const { createCasinoServer } = await import('../dist-server/serverEntry.js');
+  server = createCasinoServer({ publicBaseUrl: () => publicUrl });
+  server.on('error', (error) => {
+    if (!shuttingDown) {
+      console.error(error instanceof Error ? error.message : String(error));
+      shutdown(1);
+    }
+  });
+  server.on('close', () => {
+    if (!shuttingDown) {
+      console.error('Casino Warehouse server closed unexpectedly.');
+      shutdown(1);
+    }
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, host, () => {
+      server?.off('error', reject);
+      resolve();
+    });
+  });
 };
 
 const startTunnel = async () => {
@@ -95,14 +109,49 @@ const normalizePublicUrl = (url) => {
 
 const websocketUrl = (publicUrl) => `${publicUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:')}/ws`;
 
+const checkPublicHealth = async (publicUrl) => {
+  const timeout = Number.isFinite(healthCheckTimeoutMs) && healthCheckTimeoutMs > 0 ? healthCheckTimeoutMs : 5000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(new URL('/health', publicUrl), {
+      headers: { 'bypass-tunnel-reminder': 'true' },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return `HTTP ${response.status} ${response.statusText || 'response'}`;
+    }
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const warnIfPublicHealthFails = async (publicUrl) => {
+  const healthError = await checkPublicHealth(publicUrl);
+  if (!healthError) {
+    return;
+  }
+  console.warn(`localtunnel warning: public health check failed for ${publicUrl}/health: ${healthError}`);
+  console.warn(
+    'The local server is running, but the public localtunnel service may be rate-limited, congested, or out of forwarding sockets. Try again, use npm run dev:ngrok, or set LOCALTUNNEL_HOST for a compatible self-hosted localtunnel server.',
+  );
+};
+
 try {
   console.log('Building Casino Warehouse client and multiplayer server...');
   await run('npm', ['run', 'build']);
   await run('npm', ['run', 'build:server']);
 
+  console.log(`Starting Casino Warehouse server on http://${host}:${port}...`);
+  await startServer();
+
   console.log(`Starting integrated localtunnel for ${localHost}:${port} through ${localtunnelHost}...`);
-  const publicUrl = await startTunnel();
+  publicUrl = await startTunnel();
   const wsUrl = websocketUrl(publicUrl);
+  await warnIfPublicHealthFails(publicUrl);
 
   console.log('');
   console.log('Casino Warehouse public multiplayer is ready:');
@@ -112,15 +161,6 @@ try {
   console.log('The tunnel is managed by the localtunnel npm package and will close when this script stops.');
   console.log('Warning: localtunnel exposes this local development server publicly until you stop this script.');
   console.log('');
-
-  start('node', ['dist-server/serverEntry.js'], {
-    env: {
-      ...process.env,
-      HOST: host,
-      PORT: String(port),
-      PUBLIC_BASE_URL: publicUrl,
-    },
-  });
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   console.error(

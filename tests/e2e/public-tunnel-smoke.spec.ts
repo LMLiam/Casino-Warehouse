@@ -2,14 +2,15 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 
 const smokeUrl = process.env.PUBLIC_TUNNEL_SMOKE_URL ?? process.env.NGROK_SMOKE_URL;
 const smokeUrlSource = process.env.PUBLIC_TUNNEL_SMOKE_URL ? 'PUBLIC_TUNNEL_SMOKE_URL' : 'NGROK_SMOKE_URL';
-const appReadyTimeoutMs = 15_000;
+const appReadyTimeoutMs = 30_000;
 const navigationAttempts = 3;
+const smokeTestTimeoutMs = 240_000;
 
 test.describe('public tunnel multiplayer smoke', () => {
   test.skip(!smokeUrl, 'Set PUBLIC_TUNNEL_SMOKE_URL to run the public tunnel smoke test.');
 
   test('desktop and tablet browser contexts share a Beat the House room through a public tunnel', async ({ browser }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(smokeTestTimeoutMs);
     test.skip(testInfo.project.name !== 'laptop', 'This smoke test creates its own desktop and tablet contexts.');
     if (!smokeUrl) {
       throw new Error(`${smokeUrlSource} is required.`);
@@ -79,7 +80,7 @@ const waitForSmokePage = async (page: Page): Promise<void> => {
   for (let attempt = 1; attempt <= navigationAttempts; attempt += 1) {
     try {
       await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-      await page.waitForFunction(() => document.body.dataset.appReady === 'true', undefined, { timeout: appReadyTimeoutMs });
+      await waitForSmokeAppReady(page);
       return;
     } catch (error) {
       if (attempt === navigationAttempts) {
@@ -98,7 +99,7 @@ const waitForSmokePageReload = async (page: Page): Promise<void> => {
       } else {
         await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       }
-      await page.waitForFunction(() => document.body.dataset.appReady === 'true', undefined, { timeout: appReadyTimeoutMs });
+      await waitForSmokeAppReady(page);
       return;
     } catch (error) {
       if (attempt === navigationAttempts) {
@@ -107,6 +108,16 @@ const waitForSmokePageReload = async (page: Page): Promise<void> => {
       await page.waitForTimeout(1_000);
     }
   }
+};
+
+const waitForSmokeAppReady = async (page: Page): Promise<void> => {
+  await page.waitForFunction(
+    () =>
+      document.body.dataset.appReady === 'true' ||
+      Boolean(document.querySelector('#tableHost, [data-lobby-game="beat-the-house"], input[placeholder="Player name"]')),
+    undefined,
+    { timeout: appReadyTimeoutMs },
+  );
 };
 
 const publicTunnelSmokeHeaders = (url: string | undefined): Record<string, string> | undefined => {

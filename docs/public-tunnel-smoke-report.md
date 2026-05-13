@@ -40,3 +40,4 @@ Final acceptance evidence for the public tunnel multiplayer run. The recorded ru
 - Screenshots/recordings: Playwright retained traces only for failed intermediary runs; final command passed.
 - Follow-up fixes needed: None from the final smoke run.
 - To run the same smoke through localtunnel, start `npm run dev:localtunnel`, then run `PUBLIC_TUNNEL_SMOKE_URL=<printed app URL> npx playwright test tests/e2e/public-tunnel-smoke.spec.ts`.
+- The public `loca.lt` service is best-effort. On 2026-05-13, its tunnel assignment endpoint reported `max_conn_count: 2`, and the live public health probe returned `408 Request Timeout` while the local `/health` endpoint returned `200 OK`; use ngrok or a compatible self-hosted localtunnel server when public localtunnel cannot sustain the multiplayer smoke.
