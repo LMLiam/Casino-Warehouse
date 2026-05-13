@@ -50,7 +50,7 @@ permissions:
 jobs:
   dry-run:
     if: github.event_name == 'schedule' || github.event.inputs.mode == 'dry-run'
-    name: Plan draft Autofix PRs
+    name: Plan CodeQL Autofix Draft PRs
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,7 +83,7 @@ jobs:
 
   create-draft-prs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'create-draft-prs'
-    name: Create draft Autofix PRs
+    name: Create CodeQL Autofix Draft PRs
     runs-on: ubuntu-latest
     permissions:
       contents: write

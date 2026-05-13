@@ -35,6 +35,8 @@ The package is marked `"private": true` in `package.json` intentionally. Casino 
 
 The `main` branch ruleset requires the CodeQL workflow status check `Analyze (javascript-typescript)` before protected refs can update. The native ruleset `code_scanning` rule for CodeQL is not enabled right now because, on May 12, 2026, GitHub generated a `CodeQL` check that stayed queued even after the CodeQL workflow completed successfully and code scanning analyses were uploaded. Keep the required workflow status check in place while that native ruleset behavior is unresolved, and re-enable the native code scanning gate only after a pull request proves that the generated `CodeQL` check completes reliably.
 
+The required CI aggregate status remains `CI / test` for branch-protection stability. Its prerequisite checks use descriptive names such as `CI / Quality, Coverage, and Server Build` and `CI / Playwright Visual and E2E (Laptop Visual)`, but the aggregate check name should not change until repository ruleset updates are coordinated with the pull request that changes it.
+
 GitHub Code Quality is not enabled for this repository, so the ruleset does not enforce a Code Quality gate. As of May 12, 2026, GitHub documents Code Quality as available for organization-owned repositories on GitHub Team or GitHub Enterprise Cloud plans; `LMLiam/Casino-Warehouse` is a public repository owned by the personal `LMLiam` user account. Repository Actions are enabled and the TypeScript codebase is a supported analysis target, but there is no dynamic `Code Quality` workflow, no `CodeQL - Code Quality / Analyze` pull request check, and no default-branch Code Quality analysis for this repository yet.
 
 Maintainers must not enable the native Code Quality ruleset gate until the repository is eligible for GitHub Code Quality and a pull request has a passing `CodeQL - Code Quality / Analyze` check. Once the repository is organization-owned on an eligible plan, enable Code Quality from `Settings` > `Security` > `Code quality`, verify both a default-branch analysis and a pull request analysis, then update the `main protection with owner bypass` ruleset with a native Code Quality requirement using an `Errors` threshold first. Keep the existing required status checks in place unless maintainers intentionally change them. Contributors blocked by either gate should inspect the pull request checks and code scanning or Code Quality annotations, fix the reported finding, and push an updated commit.
@@ -73,7 +75,11 @@ collisions quickly without overloading local laptops. CI runs the same
 `npm run visual` script through a coverage matrix to shorten the e2e
 wall-clock time while keeping visual regression and browser workflow coverage
 on laptop and tablet, plus multiplayer coverage in the required aggregate
-`test` check. To reproduce a CI lane locally, use one of:
+`test` check. The pull request checks page labels those lanes as
+`Playwright Visual and E2E (Laptop Visual)`,
+`Playwright Visual and E2E (Tablet Visual)`, and
+`Playwright Visual and E2E (Laptop Multiplayer)`. To reproduce a CI lane
+locally, use one of:
 
 ```bash
 npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts

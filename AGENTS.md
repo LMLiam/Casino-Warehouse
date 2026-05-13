@@ -41,7 +41,7 @@ Primary references:
 - `npm run visual:serial`: run Playwright with one worker for debugging shared-state issues.
 - `npm run check`: run lint, format, coverage, server build, and visual tests.
 
-Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual` or `npm run visual:serial`. CI runs `npm run visual` through laptop visual, tablet visual, and laptop multiplayer matrix lanes while preserving the aggregate `test` check; reproduce one lane locally with `npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts`.
+Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual` or `npm run visual:serial`. CI displays those lanes as `Playwright Visual and E2E (Laptop Visual)`, `Playwright Visual and E2E (Tablet Visual)`, and `Playwright Visual and E2E (Laptop Multiplayer)` while preserving the protected aggregate `test` check; reproduce one lane locally with `npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts`.
 
 ## Repository Rules
 
@@ -105,7 +105,7 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 - Server-created profiles use browser-local profile credentials. Do not treat a public `profileId` as permission to mutate or join as that profile.
 - Destructive admin actions require `CASINO_ADMIN_TOKEN`; do not leak admin tokens in docs, logs, or URLs.
 - Keep profile tokens and admin capability out of public `data-state`, room snapshots, room lists, and other broadcast messages.
-- Maintain the required CodeQL workflow status check and other required checks. The native CodeQL `code_scanning` ruleset rule is currently disabled because GitHub left its generated `CodeQL` check queued after successful analyses; re-enable it only after a pull request proves that check completes reliably. GitHub Code Quality is documented as externally blocked for this personal-account repository until eligibility changes.
+- Maintain the required CodeQL workflow status check and other required checks. The CI aggregate status currently remains `CI / test` so branch protection can keep a stable required check while the supporting jobs use descriptive display names. The native CodeQL `code_scanning` ruleset rule is currently disabled because GitHub left its generated `CodeQL` check queued after successful analyses; re-enable it only after a pull request proves that check completes reliably. GitHub Code Quality is documented as externally blocked for this personal-account repository until eligibility changes.
 
 ## Issue Completion Workflow
 
