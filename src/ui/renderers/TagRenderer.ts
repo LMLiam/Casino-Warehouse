@@ -24,7 +24,7 @@ export class TagRenderer {
       return;
     }
 
-    const color = result ? resultColor(result) : COLORS.gold;
+    const color = result ? TagRenderer.resultColor(result) : COLORS.gold;
     const width = Math.max(MARKER_RENDERING.minWidth, text.length * MARKER_RENDERING.textWidthFactor);
     const group = new Container();
     group.position.set(x, y);
@@ -42,7 +42,7 @@ export class TagRenderer {
   }
 
   public drawResultPopup(title: string, subtitle: string, sideLines: readonly string[], x: number, y: number, result: HandResult, jackpot: boolean): void {
-    const color = jackpot ? COLORS.jackpot : resultColor(result);
+    const color = jackpot ? COLORS.jackpot : TagRenderer.resultColor(result);
     const width = 260;
     const height = 92 + sideLines.length * 20;
     const group = new Container();
@@ -71,7 +71,7 @@ export class TagRenderer {
     sideLines.forEach((line, index) => {
       const label = new Text({
         text: line,
-        style: new TextStyle({ fill: popupLineColor(line), fontFamily: 'Arial', fontSize: 13, fontWeight: 'bold' }),
+        style: new TextStyle({ fill: TagRenderer.popupLineColor(line), fontFamily: 'Arial', fontSize: 13, fontWeight: 'bold' }),
       });
       label.anchor.set(0.5);
       label.position.set(0, -height / 2 + 77 + index * 20);
@@ -97,21 +97,22 @@ export class TagRenderer {
     group.addChild(backing, label);
     this.layer.addChild(group);
   }
+
+  private static resultColor(result: HandResult): number {
+    return {
+      win: COLORS.win,
+      lose: COLORS.lose,
+      push: COLORS.push,
+    }[result];
+  }
+
+  private static popupLineColor(line: string): number {
+    if (line.includes('WIN')) {
+      return COLORS.win;
+    }
+    if (line.includes('PUSH') || line.includes('EVEN') || line.includes('NONE')) {
+      return COLORS.push;
+    }
+    return COLORS.lose;
+  }
 }
-
-const resultColor = (result: HandResult): number =>
-  ({
-    win: COLORS.win,
-    lose: COLORS.lose,
-    push: COLORS.push,
-  })[result];
-
-const popupLineColor = (line: string): number => {
-  if (line.includes('WIN')) {
-    return COLORS.win;
-  }
-  if (line.includes('PUSH') || line.includes('EVEN') || line.includes('NONE')) {
-    return COLORS.push;
-  }
-  return COLORS.lose;
-};

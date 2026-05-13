@@ -43,9 +43,9 @@ Supply-chain controls are documented in [docs/supply-chain-security.md](docs/sup
 
 ## Source File Shape
 
-Keep new `src/` modules focused on one exported top-level element. Classes, React components, exported functions, exported constants, interfaces, types, enums, schemas, and exported variable declarations all count as top-level elements. Private helpers may live next to the one exported element they support.
+Keep new `src/` modules focused on one module-scope top-level element. Classes, React components, functions, constants, variables, interfaces, types, enums, and schemas all count as top-level elements whether or not they are exported. File-local implementation details must be nested inside the element they support or extracted into focused module files.
 
-`npm run architecture:check` enforces this convention. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each exported declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
+`npm run architecture:check` enforces this convention. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
 
 ## Local Checks
 

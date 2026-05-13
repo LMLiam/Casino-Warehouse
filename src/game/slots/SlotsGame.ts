@@ -11,6 +11,8 @@ import type { SlotSymbol } from './SlotSymbol';
 import type { SlotTheme } from './SlotTheme';
 
 export class SlotsGame {
+  private static readonly slotSymbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
+
   private readonly rng?: Rng;
   private readonly theme: SlotTheme;
   private phase: SlotPhase = 'idle';
@@ -57,7 +59,7 @@ export class SlotsGame {
 
     this.phase = snapshot.phase;
     this.wager = Math.max(0, Math.floor(snapshot.wager));
-    this.reels = normalizeReels(snapshot.reels.filter(isSlotSymbol), this.theme);
+    this.reels = SlotsGame.normalizeReels(snapshot.reels.filter(SlotsGame.isSlotSymbol), this.theme);
     this.lineWin = Math.max(0, Math.floor(snapshot.lineWin));
     this.jackpotWin = snapshot.jackpotWin;
     this.bonusPicksRemaining = Math.max(0, Math.floor(snapshot.bonusPicksRemaining));
@@ -79,9 +81,11 @@ export class SlotsGame {
     }
 
     this.wager = Math.floor(wager);
-    this.reels = forcedReels ? normalizeReels([...forcedReels], this.theme) : Array.from({ length: gridSize(this.theme) }, () => this.randomSymbol());
-    this.jackpotWin = jackpotPayout(this.theme, this.reels, this.wager);
-    this.lineWin = this.jackpotWin?.amount ?? linePayout(this.theme, this.reels, this.wager);
+    this.reels = forcedReels
+      ? SlotsGame.normalizeReels([...forcedReels], this.theme)
+      : Array.from({ length: SlotsGame.gridSize(this.theme) }, () => this.randomSymbol());
+    this.jackpotWin = SlotsGame.jackpotPayout(this.theme, this.reels, this.wager);
+    this.lineWin = this.jackpotWin?.amount ?? SlotsGame.linePayout(this.theme, this.reels, this.wager);
     this.bonusBank = 0;
     this.returned = this.lineWin;
 
@@ -130,91 +134,95 @@ export class SlotsGame {
   }
 
   private initialGrid(): SlotSymbol[] {
-    return Array.from({ length: gridSize(this.theme) }, (_, index) => this.theme.reelStrip[index % this.theme.reelStrip.length]);
+    return Array.from({ length: SlotsGame.gridSize(this.theme) }, (_, index) => this.theme.reelStrip[index % this.theme.reelStrip.length]);
   }
 
   private randomIndex(length: number): number {
     const value = this.rng ? this.rng() : secureRandomUnit();
     return Math.max(0, Math.min(length - 1, Math.floor(value * length)));
   }
-}
 
-const linePayout = (theme: SlotTheme, reels: readonly SlotSymbol[], wager: number): number =>
-  winningRows(theme, reels).reduce((total, row) => total + rowPayout(theme, row, wager), 0);
-
-const rowPayout = (theme: SlotTheme, row: readonly SlotSymbol[], wager: number): number => {
-  const wildPayout = wildLinePayout(theme, row, wager);
-  if (wildPayout > 0) {
-    return wildPayout;
+  private static linePayout(theme: SlotTheme, reels: readonly SlotSymbol[], wager: number): number {
+    return SlotsGame.winningRows(theme, reels).reduce((total, row) => total + SlotsGame.rowPayout(theme, row, wager), 0);
   }
 
-  const [first, second, third] = row;
-  if (first === second && second === third && first !== theme.bonus.triggerSymbol) {
-    return wager * (theme.payouts[first] ?? 0);
-  }
-
-  return 0;
-};
-
-const wildLinePayout = (theme: SlotTheme, row: readonly SlotSymbol[], wager: number): number => {
-  const wildSymbol = theme.wildSymbol;
-  if (!wildSymbol) {
-    return 0;
-  }
-
-  const firstPayingSymbol = row.find((symbol) => symbol !== wildSymbol && symbol !== theme.bonus.triggerSymbol);
-  const lineSymbol = row[0] === wildSymbol ? (firstPayingSymbol ?? wildSymbol) : row[0];
-  if (lineSymbol === theme.bonus.triggerSymbol) {
-    return 0;
-  }
-
-  let matches = 0;
-  for (const symbol of row) {
-    if (symbol === lineSymbol || symbol === wildSymbol) {
-      matches += 1;
-      continue;
+  private static rowPayout(theme: SlotTheme, row: readonly SlotSymbol[], wager: number): number {
+    const wildPayout = SlotsGame.wildLinePayout(theme, row, wager);
+    if (wildPayout > 0) {
+      return wildPayout;
     }
-    break;
-  }
 
-  if (matches < 3) {
-    return 0;
-  }
-
-  const baseMultiplier = theme.payouts[lineSymbol] ?? 0;
-  return wager * baseMultiplier * Math.max(1, matches - 2);
-};
-
-const jackpotPayout = (theme: SlotTheme, reels: readonly SlotSymbol[], wager: number): JackpotWin | undefined => {
-  const wins = winningRows(theme, reels).flatMap((row) => {
     const [first, second, third] = row;
-    if (first !== second || second !== third) {
-      return [];
+    if (first === second && second === third && first !== theme.bonus.triggerSymbol) {
+      return wager * (theme.payouts[first] ?? 0);
     }
-    const win = (Object.entries(theme.jackpots) as [JackpotTier, NonNullable<SlotTheme['jackpots'][JackpotTier]>][]).find(
-      ([, jackpot]) => jackpot.symbol === first,
+
+    return 0;
+  }
+
+  private static wildLinePayout(theme: SlotTheme, row: readonly SlotSymbol[], wager: number): number {
+    const wildSymbol = theme.wildSymbol;
+    if (!wildSymbol) {
+      return 0;
+    }
+
+    const firstPayingSymbol = row.find((symbol) => symbol !== wildSymbol && symbol !== theme.bonus.triggerSymbol);
+    const lineSymbol = row[0] === wildSymbol ? (firstPayingSymbol ?? wildSymbol) : row[0];
+    if (lineSymbol === theme.bonus.triggerSymbol) {
+      return 0;
+    }
+
+    let matches = 0;
+    for (const symbol of row) {
+      if (symbol === lineSymbol || symbol === wildSymbol) {
+        matches += 1;
+        continue;
+      }
+      break;
+    }
+
+    if (matches < 3) {
+      return 0;
+    }
+
+    const baseMultiplier = theme.payouts[lineSymbol] ?? 0;
+    return wager * baseMultiplier * Math.max(1, matches - 2);
+  }
+
+  private static jackpotPayout(theme: SlotTheme, reels: readonly SlotSymbol[], wager: number): JackpotWin | undefined {
+    const wins = SlotsGame.winningRows(theme, reels).flatMap((row) => {
+      const [first, second, third] = row;
+      if (first !== second || second !== third) {
+        return [];
+      }
+      const win = (Object.entries(theme.jackpots) as [JackpotTier, NonNullable<SlotTheme['jackpots'][JackpotTier]>][]).find(
+        ([, jackpot]) => jackpot.symbol === first,
+      );
+      if (!win) {
+        return [];
+      }
+      const [tier, jackpot] = win;
+      return [{ tier, label: `${jackpot.label} Jackpot`, amount: wager * jackpot.multiplier }];
+    });
+    return wins.sort((left, right) => right.amount - left.amount)[0];
+  }
+
+  private static winningRows(theme: SlotTheme, reels: readonly SlotSymbol[]): readonly SlotSymbol[][] {
+    return Array.from({ length: theme.rows }, (_, rowIndex) => reels.slice(rowIndex * theme.columns, rowIndex * theme.columns + theme.columns)).filter(
+      (row) => row.length === theme.columns,
     );
-    if (!win) {
-      return [];
-    }
-    const [tier, jackpot] = win;
-    return [{ tier, label: `${jackpot.label} Jackpot`, amount: wager * jackpot.multiplier }];
-  });
-  return wins.sort((left, right) => right.amount - left.amount)[0];
-};
+  }
 
-const winningRows = (theme: SlotTheme, reels: readonly SlotSymbol[]): readonly SlotSymbol[][] =>
-  Array.from({ length: theme.rows }, (_, rowIndex) => reels.slice(rowIndex * theme.columns, rowIndex * theme.columns + theme.columns)).filter(
-    (row) => row.length === theme.columns,
-  );
+  private static gridSize(theme: SlotTheme): number {
+    return theme.columns * theme.rows;
+  }
 
-const gridSize = (theme: SlotTheme): number => theme.columns * theme.rows;
+  private static normalizeReels(reels: readonly SlotSymbol[], theme: SlotTheme): SlotSymbol[] {
+    const fallback = theme.reelStrip[0] ?? 'lotus';
+    return Array.from({ length: SlotsGame.gridSize(theme) }, (_, index) => reels[index] ?? fallback);
+  }
 
-const normalizeReels = (reels: readonly SlotSymbol[], theme: SlotTheme): SlotSymbol[] => {
-  const fallback = theme.reelStrip[0] ?? 'lotus';
-  return Array.from({ length: gridSize(theme) }, (_, index) => reels[index] ?? fallback);
-};
-
-const slotSymbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
-
-const isSlotSymbol = (symbol: SlotSymbol): symbol is SlotSymbol => slotSymbols.includes(symbol);
+  private static isSlotSymbol(symbol: SlotSymbol): symbol is SlotSymbol {
+    return SlotsGame.slotSymbols.includes(symbol);
+  }
+}

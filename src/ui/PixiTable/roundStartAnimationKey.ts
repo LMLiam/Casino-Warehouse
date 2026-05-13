@@ -3,6 +3,8 @@ import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import { handLayouts } from '../layout/handLayouts';
 
 export const roundStartAnimationKey = (snapshot: GameSnapshot): string => {
+  const cardSignature = (card: GameEvent['card']): string => (card ? `${card.rank}-${card.suit}` : '');
+
   if (!snapshot.lastEvents.some((event) => event.type === 'round-started')) {
     return '';
   }
@@ -29,5 +31,3 @@ export const roundStartAnimationKey = (snapshot: GameSnapshot): string => {
     ]),
   });
 };
-
-const cardSignature = (card: GameEvent['card']): string => (card ? `${card.rank}-${card.suit}` : '');

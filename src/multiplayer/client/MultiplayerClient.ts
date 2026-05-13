@@ -104,7 +104,7 @@ export class MultiplayerClient {
       this.events.onError('Enter an admin token first.');
       return;
     }
-    writeStorageValue(adminTokenStorageKey, token);
+    MultiplayerClient.writeStorageValue(adminTokenStorageKey, token);
     this.send({ version: protocolVersion, type: 'authorize-admin', adminToken: token });
   }
 
@@ -260,7 +260,7 @@ export class MultiplayerClient {
     if (message.type === 'admin-access') {
       this.adminAuthorized = message.authorized;
       if (!message.authorized) {
-        removeStorageValue(adminTokenStorageKey);
+        MultiplayerClient.removeStorageValue(adminTokenStorageKey);
       }
       this.events.onAdminAccess(message.authorized);
       return;
@@ -315,11 +315,15 @@ export class MultiplayerClient {
   }
 
   private authorizeStoredProfiles(): void {
-    this.send({ version: protocolVersion, type: 'authorize-profiles', profileTokens: profileTokenEntries(readProfileTokens()) });
+    this.send({
+      version: protocolVersion,
+      type: 'authorize-profiles',
+      profileTokens: MultiplayerClient.profileTokenEntries(MultiplayerClient.readProfileTokens()),
+    });
   }
 
   private authorizeStoredAdminToken(): void {
-    const adminToken = readStorageValue(adminTokenStorageKey);
+    const adminToken = MultiplayerClient.readStorageValue(adminTokenStorageKey);
     if (adminToken) {
       this.send({ version: protocolVersion, type: 'authorize-admin', adminToken });
     }
@@ -330,95 +334,95 @@ export class MultiplayerClient {
   }
 
   private storeProfileToken(profileId: string, profileToken: string): void {
-    const profileTokens = readProfileTokens();
+    const profileTokens = MultiplayerClient.readProfileTokens();
     profileTokens.set(profileId, profileToken);
-    writeProfileTokens(profileTokens);
+    MultiplayerClient.writeProfileTokens(profileTokens);
   }
 
   private forgetProfileToken(profileId: string): void {
-    const profileTokens = readProfileTokens();
+    const profileTokens = MultiplayerClient.readProfileTokens();
     profileTokens.delete(profileId);
-    writeProfileTokens(profileTokens);
+    MultiplayerClient.writeProfileTokens(profileTokens);
     this.ownedProfileIds.delete(profileId);
   }
 
   private clearProfileTokens(): void {
-    removeStorageValue(profileTokensStorageKey);
+    MultiplayerClient.removeStorageValue(profileTokensStorageKey);
     this.ownedProfileIds.clear();
     this.events.onProfileAccess([]);
   }
 
   private pruneStoredProfileTokens(ownedProfileIds: readonly string[]): void {
     const owned = new Set(ownedProfileIds);
-    const profileTokens = readProfileTokens();
+    const profileTokens = MultiplayerClient.readProfileTokens();
     for (const profileId of profileTokens.keys()) {
       if (!owned.has(profileId)) {
         profileTokens.delete(profileId);
       }
     }
-    writeProfileTokens(profileTokens);
+    MultiplayerClient.writeProfileTokens(profileTokens);
+  }
+
+  private static readProfileTokens(): Map<string, string> {
+    const value = MultiplayerClient.readStorageValue(profileTokensStorageKey);
+    if (!value) {
+      return new Map();
+    }
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return new Map(parsed.filter(MultiplayerClient.isStoredProfileToken).map((entry) => [entry.profileId, entry.profileToken]));
+      }
+      return MultiplayerClient.isStringRecord(parsed) ? new Map(Object.entries(parsed)) : new Map();
+    } catch {
+      return new Map();
+    }
+  }
+
+  private static writeProfileTokens(profileTokens: ReadonlyMap<string, string>): void {
+    MultiplayerClient.writeStorageValue(profileTokensStorageKey, JSON.stringify(MultiplayerClient.profileTokenEntries(profileTokens)));
+  }
+
+  private static profileTokenEntries(profileTokens: ReadonlyMap<string, string>): { readonly profileId: string; readonly profileToken: string }[] {
+    return [...profileTokens.entries()].map(([profileId, profileToken]) => ({ profileId, profileToken }));
+  }
+
+  private static readStorageValue(key: string): string {
+    try {
+      return globalThis.localStorage?.getItem(key) ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  private static writeStorageValue(key: string, value: string): void {
+    try {
+      globalThis.localStorage?.setItem(key, value);
+    } catch {
+      // Browser storage can be unavailable in private contexts; the server remains authoritative.
+    }
+  }
+
+  private static removeStorageValue(key: string): void {
+    try {
+      globalThis.localStorage?.removeItem(key);
+    } catch {
+      // Browser storage can be unavailable in private contexts; the server remains authoritative.
+    }
+  }
+
+  private static isStringRecord(value: unknown): value is Record<string, string> {
+    return typeof value === 'object' && value !== null && Object.values(value).every((recordValue) => typeof recordValue === 'string');
+  }
+
+  private static isStoredProfileToken(value: unknown): value is { readonly profileId: string; readonly profileToken: string } {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'profileId' in value &&
+      'profileToken' in value &&
+      typeof value.profileId === 'string' &&
+      typeof value.profileToken === 'string'
+    );
   }
 }
-
-type StoredProfileToken = {
-  readonly profileId: string;
-  readonly profileToken: string;
-};
-
-const readProfileTokens = (): Map<string, string> => {
-  const value = readStorageValue(profileTokensStorageKey);
-  if (!value) {
-    return new Map();
-  }
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (Array.isArray(parsed)) {
-      return new Map(parsed.filter(isStoredProfileToken).map((entry) => [entry.profileId, entry.profileToken]));
-    }
-    return isStringRecord(parsed) ? new Map(Object.entries(parsed)) : new Map();
-  } catch {
-    return new Map();
-  }
-};
-
-const writeProfileTokens = (profileTokens: ReadonlyMap<string, string>): void => {
-  writeStorageValue(profileTokensStorageKey, JSON.stringify(profileTokenEntries(profileTokens)));
-};
-
-const profileTokenEntries = (profileTokens: ReadonlyMap<string, string>): StoredProfileToken[] =>
-  [...profileTokens.entries()].map(([profileId, profileToken]) => ({ profileId, profileToken }));
-
-const readStorageValue = (key: string): string => {
-  try {
-    return globalThis.localStorage?.getItem(key) ?? '';
-  } catch {
-    return '';
-  }
-};
-
-const writeStorageValue = (key: string, value: string): void => {
-  try {
-    globalThis.localStorage?.setItem(key, value);
-  } catch {
-    // Browser storage can be unavailable in private contexts; the server remains authoritative.
-  }
-};
-
-const removeStorageValue = (key: string): void => {
-  try {
-    globalThis.localStorage?.removeItem(key);
-  } catch {
-    // Browser storage can be unavailable in private contexts; the server remains authoritative.
-  }
-};
-
-const isStringRecord = (value: unknown): value is Record<string, string> =>
-  typeof value === 'object' && value !== null && Object.values(value).every((recordValue) => typeof recordValue === 'string');
-
-const isStoredProfileToken = (value: unknown): value is StoredProfileToken =>
-  typeof value === 'object' &&
-  value !== null &&
-  'profileId' in value &&
-  'profileToken' in value &&
-  typeof value.profileId === 'string' &&
-  typeof value.profileToken === 'string';

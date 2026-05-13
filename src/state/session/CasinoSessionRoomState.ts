@@ -1,6 +1,5 @@
 import type { CasinoGameId } from '../../game/ids';
-
-type SessionRoomSeatId = 'left' | 'centre' | 'right' | `seat-${number}`;
+import type { SessionRoomSeatId } from './SessionRoomSeatId';
 
 export interface CasinoSessionRoomState {
   readonly roomId: string;

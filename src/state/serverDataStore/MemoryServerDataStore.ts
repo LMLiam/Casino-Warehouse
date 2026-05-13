@@ -76,7 +76,7 @@ export class MemoryServerDataStore implements ServerDataStore {
       id: profileId,
       name: profileName.trim().replace(/\s+/g, ' ').slice(0, 32) || 'Player',
       color: '#7dd3fc',
-      bankroll: safeMoney(bankroll),
+      bankroll: MemoryServerDataStore.safeMoney(bankroll),
       stats: emptyStats(),
       transactions: [],
       createdAt: at,
@@ -104,7 +104,7 @@ export class MemoryServerDataStore implements ServerDataStore {
 
   protected loadProfileTokenHashesFromJson(profileAuthJson: string): void {
     const parsed: unknown = JSON.parse(profileAuthJson);
-    if (!isProfileTokenHashRecord(parsed)) {
+    if (!MemoryServerDataStore.isProfileTokenHashRecord(parsed)) {
       this.profileTokenHashes.clear();
       return;
     }
@@ -120,7 +120,7 @@ export class MemoryServerDataStore implements ServerDataStore {
     if (!profile) {
       return undefined;
     }
-    const updated = { ...profile, bankroll: safeMoney(bankroll), updatedAt: new Date().toISOString() };
+    const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(bankroll), updatedAt: new Date().toISOString() };
     this.profileState = replaceProfile(this.profileState, updated);
     return updated;
   }
@@ -141,9 +141,12 @@ export class MemoryServerDataStore implements ServerDataStore {
   private findProfile(profileId: string): CasinoProfile | undefined {
     return this.profileState.profiles.find((profile) => profile.id === profileId);
   }
+
+  private static safeMoney(value: number): number {
+    return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  }
+
+  private static isProfileTokenHashRecord(value: unknown): value is Record<string, string> {
+    return typeof value === 'object' && value !== null && Object.values(value).every((tokenHash) => typeof tokenHash === 'string');
+  }
 }
-
-const safeMoney = (value: number): number => (Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0);
-
-const isProfileTokenHashRecord = (value: unknown): value is Record<string, string> =>
-  typeof value === 'object' && value !== null && Object.values(value).every((tokenHash) => typeof tokenHash === 'string');

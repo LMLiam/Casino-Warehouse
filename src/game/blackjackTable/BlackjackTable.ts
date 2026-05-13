@@ -1,29 +1,18 @@
 import type { Card } from '../cards/Card';
-import { cardLabel } from '../cards/cardLabel';
 import { createDeck } from '../cards/createDeck';
 import type { Rng } from '../rng/Rng';
 import { bestTotal } from '../blackjack/bestTotal';
 import type { BlackjackResult } from '../blackjack/BlackjackResult';
-import { isSoft } from '../blackjack/isSoft';
-import type { BlackjackSeatPhase } from './BlackjackSeatPhase';
+import { dealerMustHit } from '../blackjack/dealerMustHit';
+import { handText } from '../blackjack/handText';
+import { isBlackjack } from '../blackjack/isBlackjack';
+import type { BlackjackSeatState } from './BlackjackSeatState';
 import type { BlackjackTableActionResult } from './BlackjackTableActionResult';
 import type { BlackjackTableOccupant } from './BlackjackTableOccupant';
 import type { BlackjackTableOptions } from './BlackjackTableOptions';
 import type { BlackjackTablePhase } from './BlackjackTablePhase';
 import type { BlackjackTableSettlement } from './BlackjackTableSettlement';
 import type { BlackjackTableSnapshot } from './BlackjackTableSnapshot';
-
-interface BlackjackSeatState {
-  phase: BlackjackSeatPhase;
-  wager: number;
-  playerCards: Card[];
-  insuranceWager: number;
-  splitHands: Card[][];
-  result?: BlackjackResult;
-  returned: number;
-  status: string;
-  settled: boolean;
-}
 
 export class BlackjackTable {
   private deck: Card[] = [];
@@ -49,7 +38,7 @@ export class BlackjackTable {
       dealerHoleHidden: this.dealerHoleHidden,
       activeSeatId: this.activeSeatId,
       seats: occupants.map((occupant) => {
-        const seat = this.seats.get(occupant.seatId) ?? emptySeat();
+        const seat = this.seats.get(occupant.seatId) ?? BlackjackTable.emptySeat();
         return {
           seatId: occupant.seatId,
           profileId: occupant.profileId,
@@ -79,7 +68,7 @@ export class BlackjackTable {
     this.seats.clear();
     for (const occupant of occupants) {
       if (occupant.profileId) {
-        this.seats.set(occupant.seatId, emptySeat());
+        this.seats.set(occupant.seatId, BlackjackTable.emptySeat());
       }
     }
     return { snapshot: this.snapshot(occupants), debit: 0, settlements: [] };
@@ -95,7 +84,7 @@ export class BlackjackTable {
     if (wager <= 0) {
       return { snapshot: this.snapshot(occupants), debit: 0, settlements: [], error: 'Blackjack wager is invalid.' };
     }
-    const seat = this.seats.get(seatId) ?? emptySeat();
+    const seat = this.seats.get(seatId) ?? BlackjackTable.emptySeat();
     if (seat.phase !== 'empty' && seat.phase !== 'betting') {
       return { snapshot: this.snapshot(occupants), debit: 0, settlements: [], error: 'This Blackjack seat already has a wager.' };
     }
@@ -279,7 +268,7 @@ export class BlackjackTable {
   private resolveSeatAgainstDealer(seatId: string, seat: BlackjackSeatState): BlackjackTableSettlement {
     const dealerTotal = bestTotal(this.dealerCards);
     if (seat.splitHands.length > 0) {
-      const returned = seat.splitHands.reduce((sum, hand) => sum + settleHandReturn(hand, dealerTotal, seat.wager / 2), 0);
+      const returned = seat.splitHands.reduce((sum, hand) => sum + BlackjackTable.settleHandReturn(hand, dealerTotal, seat.wager / 2), 0);
       const result: BlackjackResult = returned > seat.wager ? 'win' : returned === seat.wager ? 'push' : 'lose';
       return this.settleSeat(seatId, seat, result, Math.floor(returned), `Split hands settle against dealer ${dealerTotal}.`);
     }
@@ -330,35 +319,28 @@ export class BlackjackTable {
     }
     return card;
   }
+
+  private static emptySeat(): BlackjackSeatState {
+    return {
+      phase: 'empty',
+      wager: 0,
+      playerCards: [],
+      insuranceWager: 0,
+      splitHands: [],
+      returned: 0,
+      status: 'Open seat.',
+      settled: false,
+    };
+  }
+
+  private static settleHandReturn(cards: readonly Card[], dealerTotal: number, wager: number): number {
+    const total = bestTotal(cards);
+    if (total > 21) {
+      return 0;
+    }
+    if (dealerTotal > 21 || total > dealerTotal) {
+      return wager * 2;
+    }
+    return total === dealerTotal ? wager : 0;
+  }
 }
-
-const emptySeat = (): BlackjackSeatState => ({
-  phase: 'empty',
-  wager: 0,
-  playerCards: [],
-  insuranceWager: 0,
-  splitHands: [],
-  returned: 0,
-  status: 'Open seat.',
-  settled: false,
-});
-
-const isBlackjack = (cards: readonly Card[]): boolean => cards.length === 2 && bestTotal(cards) === 21;
-
-const dealerMustHit = (cards: readonly Card[]): boolean => {
-  const total = bestTotal(cards);
-  return total < 17 || (total === 17 && isSoft(cards));
-};
-
-const settleHandReturn = (cards: readonly Card[], dealerTotal: number, wager: number): number => {
-  const total = bestTotal(cards);
-  if (total > 21) {
-    return 0;
-  }
-  if (dealerTotal > 21 || total > dealerTotal) {
-    return wager * 2;
-  }
-  return total === dealerTotal ? wager : 0;
-};
-
-const handText = (cards: readonly Card[]): string => `${cards.map(cardLabel).join(' ')} (${bestTotal(cards)})`;

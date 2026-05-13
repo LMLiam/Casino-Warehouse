@@ -1,5 +1,5 @@
-import { resolve } from 'node:path';
 import { createMemoryServerDataStore } from './createMemoryServerDataStore';
+import { defaultSqlitePath } from './defaultSqlitePath';
 import type { ServerDataStore } from './ServerDataStore';
 import { SqliteServerDataStore } from './SqliteServerDataStore';
 
@@ -9,5 +9,3 @@ export const createDefaultServerDataStore = (): ServerDataStore => {
   }
   return new SqliteServerDataStore(process.env.CASINO_DB_PATH || defaultSqlitePath());
 };
-
-const defaultSqlitePath = (): string => resolve(process.cwd(), '.casino', 'casino.sqlite');

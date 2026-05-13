@@ -1,5 +1,3 @@
 import type { PointPercent } from './PointPercent';
 
-const point = (x: number, y: number): PointPercent => ({ x, y });
-
-export const dealerChipBank: PointPercent = point(50, 8.7);
+export const dealerChipBank: PointPercent = { x: 50, y: 8.7 };

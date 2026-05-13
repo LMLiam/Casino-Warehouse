@@ -32,7 +32,7 @@ The app is organised by domain first. New modules should go into the narrowest f
 - No direct `Math.random()` inside `src/game/`; use `src/game/rng.ts` and inject deterministic RNG in tests.
 - No direct bankroll property mutation outside `src/game/engine.ts`, `src/multiplayer/roomAuthority.ts`, and `src/state/profiles.ts`.
 - No obvious payout or settlement logic duplicated in `src/ui/`.
-- One exported class per file.
+- One module-scope top-level element per file.
 - No vague `utils`, `helpers`, `misc`, or `manager` filenames.
 - Files over 700 lines must either be split or listed with a documented exception.
 - App modules must live in an approved `src/app/<role>/` folder instead of directly under `src/app/`.

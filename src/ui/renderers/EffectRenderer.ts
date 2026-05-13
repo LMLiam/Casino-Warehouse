@@ -27,7 +27,7 @@ export class EffectRenderer {
     shine.addChild(halo, ring, innerRing);
     this.layer.addChild(shine);
 
-    if (prefersReducedMotion()) {
+    if (EffectRenderer.prefersReducedMotion()) {
       return;
     }
 
@@ -53,7 +53,7 @@ export class EffectRenderer {
       return;
     }
 
-    if (prefersReducedMotion()) {
+    if (EffectRenderer.prefersReducedMotion()) {
       const banner = new Graphics().roundRect(tableSize.width / 2 - 240, 58, 480, 24, 12).fill({ color: COLORS.gold, alpha: 0.22 });
       this.layer.addChild(banner);
       return;
@@ -73,6 +73,8 @@ export class EffectRenderer {
       });
     }
   }
-}
 
-const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private static prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+}

@@ -134,7 +134,7 @@ export class CardRenderer {
 
     this.animatedCards.add(animationKey);
 
-    if (prefersReducedMotion()) {
+    if (CardRenderer.prefersReducedMotion()) {
       displayObject.position.set(targetX, targetY);
       displayObject.alpha = 1;
       displayObject.rotation = 0;
@@ -191,7 +191,7 @@ export class CardRenderer {
 
     this.animatedCards.add(animationKey);
 
-    if (prefersReducedMotion()) {
+    if (CardRenderer.prefersReducedMotion()) {
       displayObject.position.set(targetX, targetY);
       displayObject.alpha = 1;
       displayObject.rotation = 0;
@@ -219,6 +219,8 @@ export class CardRenderer {
       },
     });
   }
-}
 
-const prefersReducedMotion = (): boolean => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private static prefersReducedMotion(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+}

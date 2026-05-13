@@ -1,5 +1,5 @@
 import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
@@ -7,6 +7,7 @@ import type { CasinoSessionState } from '../session/CasinoSessionState';
 import { MemoryServerDataStore } from './MemoryServerDataStore';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
+import { defaultSqlitePath } from './defaultSqlitePath';
 
 export class SqliteServerDataStore extends MemoryServerDataStore {
   public override readonly database: ServerDatabaseChoice = 'sqlite';
@@ -105,7 +106,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
 
   private readStoredState(): Partial<Pick<ServerDataSnapshot, 'profileState' | 'session'> & { readonly profileAuth: Record<string, string> }> {
     const rows = this.db.prepare('SELECT key, value FROM server_state').all() as Array<{ key: string; value: string }>;
-    return Object.fromEntries(rows.map((row) => [storedStateKey(row.key), JSON.parse(row.value)]));
+    return Object.fromEntries(rows.map((row) => [SqliteServerDataStore.storedStateKey(row.key), JSON.parse(row.value)]));
   }
 
   private writeValue(key: string, value: unknown): void {
@@ -113,8 +114,8 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
       .prepare('INSERT INTO server_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run(key, JSON.stringify(value));
   }
+
+  private static storedStateKey(key: string): string {
+    return key === 'profiles' ? 'profileState' : key === 'profile_auth' ? 'profileAuth' : key;
+  }
 }
-
-const defaultSqlitePath = (): string => resolve(process.cwd(), '.casino', 'casino.sqlite');
-
-const storedStateKey = (key: string): string => (key === 'profiles' ? 'profileState' : key === 'profile_auth' ? 'profileAuth' : key);
