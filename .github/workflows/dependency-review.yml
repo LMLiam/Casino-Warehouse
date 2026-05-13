@@ -1,4 +1,4 @@
-name: Dependency Review
+name: Dependency Security Review
 
 on:
   pull_request:
@@ -10,14 +10,14 @@ permissions:
 
 jobs:
   dependency-review:
-    name: Dependency Review
+    name: Review Dependency Changes
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Dependency Review
+      - name: Run dependency review
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
