@@ -84,6 +84,7 @@ export class GameApp extends GameAppSession {
   protected pendingInviteAttempted = false;
   protected multiplayerRooms: readonly RoomSummary[] = [];
   protected realtimeUrl = '';
+  protected realtimeUrlError = '';
   protected connectionState: RealtimeConnectionState = 'disconnected';
   protected returnHomeOnServerResync = false;
   protected restoringRoomAfterReconnect = false;
@@ -399,6 +400,12 @@ export class GameApp extends GameAppSession {
 
   private ensureRealtimeConnected(): void {
     if (this.multiplayer.connected || this.connectionState === 'connecting' || this.connectionState === 'reconnecting') {
+      return;
+    }
+    if (this.realtimeUrlError) {
+      this.connectionState = 'disconnected';
+      this.elements.roomStatus.textContent = this.realtimeUrlError;
+      this.renderConnectionState();
       return;
     }
     this.multiplayer.connect(this.realtimeUrl || defaultRealtimeUrl());

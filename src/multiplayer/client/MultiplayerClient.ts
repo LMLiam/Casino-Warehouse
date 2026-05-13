@@ -10,6 +10,7 @@ import type { CasinoSessionState } from '../../state/session/CasinoSessionState'
 import { adminTokenStorageKey } from './adminTokenStorageKey';
 import { defaultRealtimeUrl } from './defaultRealtimeUrl';
 import type { MultiplayerClientEvents } from './MultiplayerClientEvents';
+import { normalizeRealtimeUrl } from './normalizeRealtimeUrl';
 import { profileTokensStorageKey } from './profileTokensStorageKey';
 import type { RealtimeConnectionState } from './RealtimeConnectionState';
 
@@ -43,10 +44,19 @@ export class MultiplayerClient {
   }
 
   public connect(url = defaultRealtimeUrl()): void {
-    this.reconnectUrl = url;
+    const normalizedUrl = normalizeRealtimeUrl(url);
     window.clearTimeout(this.reconnectTimer);
-    this.socket?.close();
-    this.openSocket(url, 'connecting');
+    const previousSocket = this.socket;
+    this.socket = undefined;
+    previousSocket?.close();
+    if (!normalizedUrl) {
+      this.reconnectUrl = '';
+      this.events.onConnectionState('disconnected');
+      this.events.onError('Game server URL must use ws:// or wss://.');
+      return;
+    }
+    this.reconnectUrl = normalizedUrl;
+    this.openSocket(normalizedUrl, 'connecting');
   }
 
   public requestData(): void {
@@ -111,7 +121,16 @@ export class MultiplayerClient {
   private openSocket(url: string, state: RealtimeConnectionState): void {
     this.events.onConnectionState(state);
     this.events.onStatus(`Connecting to ${url}`);
-    const socket = new WebSocket(this.socketUrl(url, state));
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(this.socketUrl(url, state));
+    } catch {
+      this.socket = undefined;
+      this.reconnectUrl = '';
+      this.events.onConnectionState('disconnected');
+      this.events.onError('Game server connection failed. Check the realtime server URL.');
+      return;
+    }
     this.socket = socket;
     socket.addEventListener('open', () => {
       if (this.socket !== socket) {

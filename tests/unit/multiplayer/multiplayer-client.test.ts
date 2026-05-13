@@ -11,11 +11,15 @@ import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMess
 class FakeWebSocket {
   public static readonly OPEN = 1;
   public static instances: FakeWebSocket[] = [];
+  public static throwOnConstruct = false;
   public readyState = 0;
   public readonly sent: string[] = [];
   private readonly listeners = new Map<string, Array<(event: { readonly data?: string }) => void>>();
 
   public constructor(public readonly url: string) {
+    if (FakeWebSocket.throwOnConstruct) {
+      throw new Error('Blocked socket constructor.');
+    }
     FakeWebSocket.instances.push(this);
   }
 
@@ -60,6 +64,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   FakeWebSocket.instances = [];
+  FakeWebSocket.throwOnConstruct = false;
 });
 
 describe('multiplayer realtime client reconnect reloads', () => {
@@ -239,6 +244,72 @@ describe('multiplayer realtime client reconnect reloads', () => {
         'leave-room',
       ]),
     );
+  });
+
+  it('clears invalid saved realtime URLs before falling back to the current host', () => {
+    const localStorage = createMemoryStorage();
+    localStorage.setItem('casino_realtime_url', 'https://saved.example/ws');
+    vi.stubGlobal('localStorage', localStorage);
+    vi.stubGlobal('window', {
+      location: { href: 'https://casino.test/play', host: 'casino.test', protocol: 'https:' },
+    });
+
+    expect(defaultRealtimeUrl()).toBe('wss://casino.test/ws');
+    expect(localStorage.getItem('casino_realtime_url')).toBeNull();
+
+    localStorage.setItem('casino_realtime_url', 'not-a-url');
+
+    expect(defaultRealtimeUrl()).toBe('wss://casino.test/ws');
+    expect(localStorage.getItem('casino_realtime_url')).toBeNull();
+  });
+
+  it('rejects unsupported realtime URLs without constructing a WebSocket', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'http://casino.test/', host: 'casino.test', protocol: 'http:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+
+    client.connect('https://casino.test/ws');
+
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(events.onConnectionState).toHaveBeenCalledWith('disconnected');
+    expect(events.onError).toHaveBeenCalledWith('Game server URL must use ws:// or wss://.');
+
+    client.connect('not-a-url');
+
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(events.onError).toHaveBeenCalledWith('Game server URL must use ws:// or wss://.');
+  });
+
+  it('reports WebSocket constructor failures as recoverable connection errors', () => {
+    vi.useFakeTimers();
+    FakeWebSocket.throwOnConstruct = true;
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'http://casino.test/', host: 'casino.test', protocol: 'http:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+
+    client.connect('ws://casino.test/ws');
+
+    expect(FakeWebSocket.instances).toHaveLength(0);
+    expect(events.onConnectionState).toHaveBeenCalledWith('connecting');
+    expect(events.onConnectionState).toHaveBeenCalledWith('disconnected');
+    expect(events.onError).toHaveBeenCalledWith('Game server connection failed. Check the realtime server URL.');
   });
 
   it('clears active room state when the server closes that room', () => {
