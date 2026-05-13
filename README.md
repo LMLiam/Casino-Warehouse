@@ -77,7 +77,9 @@ Share the printed app URL with the other device. The public tunnel stays open on
 
 ngrok exposes your local development server to the internet while it is running. Use it only for trusted demo sessions.
 
-Public tunnel sessions use two separate trust checks. Server-created profiles receive browser-local profile credentials, so another browser can see public server profiles but cannot rename, delete, save with, host as, or join rooms as a profile it does not own. Destructive admin actions require `CASINO_ADMIN_TOKEN`; leave it unset for public demos that do not need admin controls, or set a temporary token and share it only with trusted maintainers.
+Public tunnel sessions use three separate trust checks. WebSocket upgrades require an `Origin` header from a local development origin or from `PUBLIC_BASE_URL`; the integrated `npm run dev:public` flow sets `PUBLIC_BASE_URL` to the ngrok app URL before starting the server. If you expose the server through another public tunnel, set `PUBLIC_BASE_URL` to that app URL before starting `npm run dev:server`. There is no development bypass for missing or unexpected WebSocket origins.
+
+Server-created profiles receive browser-local profile credentials, so another browser can see public server profiles but cannot rename, delete, save with, host as, or join rooms as a profile it does not own. Destructive admin actions require `CASINO_ADMIN_TOKEN`; leave it unset for public demos that do not need admin controls, or set a temporary token and share it only with trusted maintainers.
 
 ## Local Data
 
