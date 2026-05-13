@@ -1,17 +1,18 @@
-import { casinoSaveStateEnvelopeSchema } from '../../schemas/casinoSchemas/casinoSaveStateEnvelopeSchema';
+import { z } from 'zod';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSaveState } from './CasinoSaveState';
-import { currentProfileStoreVersion } from './currentProfileStoreVersion';
-import { parseCasinoProfile } from './parseCasinoProfile';
+import { parseProfileStoreV1 } from './parseProfileStoreV1';
 
 export const parseCasinoSaveState = (value: unknown): CasinoSaveState => {
-  const parsed = casinoSaveStateEnvelopeSchema.safeParse(value);
+  const parsed = z.object({ version: z.number().int() }).safeParse(value);
   if (!parsed.success) {
     throw new Error(`Save data is not a casino profile store: ${zodErrorSummary(parsed.error)}`);
   }
 
-  return {
-    version: currentProfileStoreVersion,
-    profiles: parsed.data.profiles.map(parseCasinoProfile),
-  };
+  switch (parsed.data.version) {
+    case 1:
+      return parseProfileStoreV1(value);
+    default:
+      throw new Error(`Profile store data version ${parsed.data.version} is not supported.`);
+  }
 };
