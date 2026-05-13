@@ -35,6 +35,17 @@ describe('BlackjackGame', () => {
     expect(snapshot.dealerCards.map(cardLabel)).toEqual(['6♣', '8♦', '10♣']);
   });
 
+  it('stands on dealer soft 17', () => {
+    const game = new BlackjackGame();
+    game.deal(10, rigDeck([card('10', 'spades'), card('7', 'hearts'), card('A', 'clubs'), card('6', 'diamonds'), card('5', 'clubs')]));
+
+    const snapshot = game.stand();
+
+    expect(snapshot.result).toBe('push');
+    expect(snapshot.dealerCards.map(cardLabel)).toEqual(['A♣', '6♦']);
+    expect(snapshot.status).toBe('17 pushes dealer 17.');
+  });
+
   it('handles hit busts, push returns, dealer blackjack, and reset', () => {
     let game = new BlackjackGame();
     const dealtBustHand = game.deal(20, rigDeck([card('10', 'clubs'), card('9', 'clubs'), card('7', 'hearts'), card('8', 'spades'), card('K', 'diamonds')]));
@@ -117,6 +128,20 @@ describe('BlackjackTable', () => {
     expect(ready.snapshot.dealerCards.map(cardLabel)).toEqual(['9♣', '7♦']);
     expect(ready.snapshot.seats.map((seat) => seat.wager)).toEqual([10, 20]);
     expect(table.deal('seat-1', 10, seats).error).toBe('This Blackjack seat already has a wager.');
+  });
+
+  it('stands on shared-table dealer soft 17', () => {
+    const table = new BlackjackTable({
+      deck: rigDeck([card('A', 'clubs'), card('6', 'diamonds'), card('10', 'spades'), card('7', 'hearts'), card('5', 'clubs')]),
+    });
+    const oneSeat = [seats[0]];
+    table.deal('seat-1', 10, oneSeat);
+
+    const stood = table.act('stand', 'seat-1', oneSeat);
+
+    expect(stood.settlements[0]).toMatchObject({ seatId: 'seat-1', returned: 10, profit: 0 });
+    expect(stood.snapshot.dealerCards.map(cardLabel)).toEqual(['A♣', '6♦']);
+    expect(stood.snapshot.seats[0].status).toBe('17 pushes dealer 17.');
   });
 
   it('covers hit bust, wrong turn, double, reset, and settled-state deal rejection', () => {

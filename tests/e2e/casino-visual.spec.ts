@@ -149,7 +149,7 @@ test('blackjack has its own table rendering', async ({ page }) => {
   await expect(page.locator('.blackjack-table-felt')).toBeHidden();
   await expect(page.locator('.table-host')).toBeHidden();
   await expect(page.locator('#roomGameTitle')).toContainText('Blackjack');
-  await expect(page.locator('#blackjackRules')).toContainText('Dealer hits soft 17');
+  await expect(page.locator('#blackjackRules')).toContainText('Dealer stands on soft 17');
 
   await expectNoHorizontalOverflow(page.locator('#roomLobby'));
   expectConsoleClean(page);
