@@ -1,15 +1,15 @@
 import { z } from 'zod';
-import { betTypeSchema } from './betTypeSchema';
-import { handIdSchema } from './handIdSchema';
-import { networkCreditSchema } from './networkCreditSchema';
-import { positiveNetworkCreditSchema } from './positiveNetworkCreditSchema';
-import { profileIdSchema } from './profileIdSchema';
-import { profileNameSchema } from './profileNameSchema';
-import { currentProtocolVersionSchema } from './currentProtocolVersionSchema';
-import { roomGameIdSchema } from './roomGameIdSchema';
-import { roomNameSchema } from './roomNameSchema';
-import { roomRoleSchema } from './roomRoleSchema';
-import { roomSeatIdSchema } from './roomSeatIdSchema';
+import { betTypeSchema } from '../casinoSchemas/betTypeSchema';
+import { currentProtocolVersionSchema } from '../casinoSchemas/currentProtocolVersionSchema';
+import { handIdSchema } from '../casinoSchemas/handIdSchema';
+import { networkCreditSchema } from '../casinoSchemas/networkCreditSchema';
+import { positiveNetworkCreditSchema } from '../casinoSchemas/positiveNetworkCreditSchema';
+import { profileIdSchema } from '../casinoSchemas/profileIdSchema';
+import { profileNameSchema } from '../casinoSchemas/profileNameSchema';
+import { roomGameIdSchema } from '../casinoSchemas/roomGameIdSchema';
+import { roomNameSchema } from '../casinoSchemas/roomNameSchema';
+import { roomRoleSchema } from '../casinoSchemas/roomRoleSchema';
+import { roomSeatIdSchema } from '../casinoSchemas/roomSeatIdSchema';
 
 export const clientMessageSchema = (() => {
   const baseClientMessageSchema = z.object({

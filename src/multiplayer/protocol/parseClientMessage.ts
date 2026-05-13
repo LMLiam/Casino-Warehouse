@@ -1,5 +1,5 @@
-import { clientMessageSchema } from '../../schemas/casinoSchemas/clientMessageSchema';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
+import { clientMessageSchema } from '../../schemas/protocol/clientMessageSchema';
 import { currentProtocolVersion } from './currentProtocolVersion';
 import type { ParsedMessage } from './ParsedMessage';
 
