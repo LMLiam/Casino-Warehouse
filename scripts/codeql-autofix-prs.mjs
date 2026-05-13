@@ -26,9 +26,9 @@ export function normalizeOptions(options = {}) {
     ...options,
     allowRules: normalizeList(options.allowRules ?? defaultAutofixOptions.allowRules),
     labels: normalizeList(options.labels ?? defaultAutofixOptions.labels),
-    maxAlerts: Math.max(0, Number(options.maxAlerts ?? defaultAutofixOptions.maxAlerts)),
-    pollAttempts: Math.max(1, Number(options.pollAttempts ?? defaultAutofixOptions.pollAttempts)),
-    pollSeconds: Math.max(1, Number(options.pollSeconds ?? defaultAutofixOptions.pollSeconds)),
+    maxAlerts: parseIntegerOption('max-alerts', options.maxAlerts ?? defaultAutofixOptions.maxAlerts, { min: 0 }),
+    pollAttempts: parseIntegerOption('poll-attempts', options.pollAttempts ?? defaultAutofixOptions.pollAttempts, { min: 1 }),
+    pollSeconds: parseIntegerOption('poll-seconds', options.pollSeconds ?? defaultAutofixOptions.pollSeconds, { min: 1 }),
   };
 }
 
@@ -276,7 +276,8 @@ export async function runAutofixAutomation({ client, defaultBranch, owner, repo,
 }
 
 export async function createDraftAutofixPullRequest({ candidate, client, defaultBranch, owner, repo, options }) {
-  const autofix = await requestAutofix({ alertNumber: candidate.alert.number, client, owner, repo, options });
+  const normalized = normalizeOptions(options);
+  const autofix = await requestAutofix({ alertNumber: candidate.alert.number, client, owner, repo, options: normalized });
   const branchRef = `refs/heads/${candidate.branchName}`;
   const defaultRef = await client.request('GET', `/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(defaultBranch)}`);
   const sha = defaultRef.data?.object?.sha;
@@ -323,14 +324,15 @@ export async function createDraftAutofixPullRequest({ candidate, client, default
   }
 }
 
-export async function requestAutofix({ alertNumber, client, owner, repo, options }) {
+export async function requestAutofix({ alertNumber, client, owner, repo, options, delayImpl = delay }) {
+  const normalized = normalizeOptions(options);
   const created = await client.request('POST', `/repos/${owner}/${repo}/code-scanning/alerts/${alertNumber}/autofix`);
   if (created.data?.status === 'success') {
     return created.data;
   }
 
-  for (let attempt = 0; attempt < options.pollAttempts; attempt += 1) {
-    await delay(options.pollSeconds * 1000);
+  for (let attempt = 0; attempt < normalized.pollAttempts; attempt += 1) {
+    await delayImpl(normalized.pollSeconds * 1000);
     const status = await client.request('GET', `/repos/${owner}/${repo}/code-scanning/alerts/${alertNumber}/autofix`);
     if (status.data?.status === 'success') {
       return status.data;
@@ -370,6 +372,8 @@ export function optionsFromEnvironment(env = process.env, argv = process.argv.sl
       labels: args.get('labels') ?? env.AUTOFIX_LABELS,
       maxAlerts: args.get('max-alerts') ?? env.AUTOFIX_MAX_ALERTS,
       minSeverity: args.get('min-severity') ?? env.AUTOFIX_MIN_SEVERITY,
+      pollAttempts: args.get('poll-attempts') ?? env.AUTOFIX_POLL_ATTEMPTS,
+      pollSeconds: args.get('poll-seconds') ?? env.AUTOFIX_POLL_SECONDS,
     }),
     owner,
     repo,
@@ -385,6 +389,21 @@ function normalizeList(value) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseIntegerOption(name, value, { min }) {
+  const normalized = typeof value === 'string' ? value.trim() : value;
+  const integerString = typeof normalized === 'string' && /^-?\d+$/.test(normalized);
+  const parsed = typeof normalized === 'number' || integerString ? Number(normalized) : Number.NaN;
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min) {
+    throw new Error(`${name} must be an integer greater than or equal to ${min}. Received ${formatOptionValue(value)}.`);
+  }
+
+  return parsed;
+}
+
+function formatOptionValue(value) {
+  return typeof value === 'string' ? JSON.stringify(value) : String(value);
 }
 
 function nextPathFromLink(linkHeader, apiUrl) {

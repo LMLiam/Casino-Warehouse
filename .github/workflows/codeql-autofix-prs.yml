@@ -26,6 +26,16 @@ on:
         required: true
         default: '3'
         type: string
+      poll-attempts:
+        description: Number of Autofix status polling attempts before failing
+        required: true
+        default: '18'
+        type: string
+      poll-seconds:
+        description: Seconds to wait between Autofix status polling attempts
+        required: true
+        default: '10'
+        type: string
       allow-rules:
         description: Optional comma-separated CodeQL rule allowlist
         required: false
@@ -65,6 +75,8 @@ jobs:
           AUTOFIX_MAX_ALERTS: ${{ github.event.inputs.max-alerts || '3' }}
           AUTOFIX_MIN_SEVERITY: ${{ github.event.inputs.min-severity || 'high' }}
           AUTOFIX_MODE: dry-run
+          AUTOFIX_POLL_ATTEMPTS: ${{ github.event.inputs.poll-attempts || '18' }}
+          AUTOFIX_POLL_SECONDS: ${{ github.event.inputs.poll-seconds || '10' }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/codeql-autofix-prs.mjs
@@ -97,6 +109,8 @@ jobs:
           AUTOFIX_MAX_ALERTS: ${{ github.event.inputs.max-alerts || '3' }}
           AUTOFIX_MIN_SEVERITY: ${{ github.event.inputs.min-severity || 'high' }}
           AUTOFIX_MODE: create-draft-prs
+          AUTOFIX_POLL_ATTEMPTS: ${{ github.event.inputs.poll-attempts || '18' }}
+          AUTOFIX_POLL_SECONDS: ${{ github.event.inputs.poll-seconds || '10' }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/codeql-autofix-prs.mjs
