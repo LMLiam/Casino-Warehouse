@@ -1,15 +1,24 @@
 import { spawn } from 'node:child_process';
 import localtunnel from 'localtunnel';
+import { WebSocket } from 'ws';
 
 const port = Number(process.env.PORT ?? 8787);
 const host = process.env.HOST ?? '0.0.0.0';
 const localHost = process.env.LOCALTUNNEL_LOCAL_HOST ?? '127.0.0.1';
 const localtunnelHost = process.env.LOCALTUNNEL_HOST ?? 'https://localtunnel.me';
 const requestedSubdomain = process.env.LOCALTUNNEL_SUBDOMAIN?.trim();
+const generatedSubdomain = `casino-${Math.random().toString(36).slice(2, 10)}`;
+const requestedAppSubdomain = process.env.LOCALTUNNEL_APP_SUBDOMAIN?.trim() || requestedSubdomain || generatedSubdomain;
+const requestedWebSocketSubdomain = process.env.LOCALTUNNEL_WS_SUBDOMAIN?.trim() || `${requestedAppSubdomain}-ws`;
 const healthCheckTimeoutMs = Number(process.env.LOCALTUNNEL_HEALTH_TIMEOUT_MS ?? 5000);
+const startupAttempts = Number(process.env.LOCALTUNNEL_STARTUP_ATTEMPTS ?? 5);
 let server;
-let tunnel;
+const tunnels = [];
+const activeTunnels = new Map();
+const restartTimers = new Map();
+const closingTunnels = new WeakSet();
 let publicUrl = '';
+let publicWebSocketUrl = '';
 let shuttingDown = false;
 
 const run = (command, args, options = {}) =>
@@ -30,6 +39,7 @@ const shutdown = (code = 0) => {
     return;
   }
   shuttingDown = true;
+  clearRestartTimers();
   closeTunnel();
   closeServer();
   process.exitCode = code;
@@ -39,9 +49,13 @@ process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
 const closeTunnel = () => {
-  const currentTunnel = tunnel;
-  tunnel = undefined;
-  currentTunnel?.close();
+  while (tunnels.length > 0) {
+    const tunnel = tunnels.pop();
+    if (tunnel) {
+      closingTunnels.add(tunnel);
+      tunnel.close();
+    }
+  }
 };
 
 const closeServer = () => {
@@ -50,9 +64,19 @@ const closeServer = () => {
   currentServer?.close();
 };
 
+const clearRestartTimers = () => {
+  for (const timer of restartTimers.values()) {
+    clearTimeout(timer);
+  }
+  restartTimers.clear();
+};
+
 const startServer = async () => {
   const { createCasinoServer } = await import('../dist-server/serverEntry.js');
-  server = createCasinoServer({ publicBaseUrl: () => publicUrl });
+  server = createCasinoServer({
+    publicBaseUrl: () => publicUrl,
+    publicWebSocketUrl: () => publicWebSocketUrl,
+  });
   server.on('error', (error) => {
     if (!shuttingDown) {
       console.error(error instanceof Error ? error.message : String(error));
@@ -74,17 +98,18 @@ const startServer = async () => {
   });
 };
 
-const startTunnel = async () => {
+const startTunnel = async (subdomain) => {
   const options = {
     port,
     host: localtunnelHost,
     local_host: localHost,
   };
-  if (requestedSubdomain) {
-    options.subdomain = requestedSubdomain;
+  if (subdomain) {
+    options.subdomain = subdomain;
   }
 
-  tunnel = await localtunnel(options);
+  const tunnel = await localtunnel(options);
+  tunnels.push(tunnel);
   const publicUrl = normalizePublicUrl(tunnel.url);
   tunnel.on('error', (error) => {
     if (!shuttingDown) {
@@ -92,12 +117,53 @@ const startTunnel = async () => {
     }
   });
   tunnel.on('close', () => {
-    if (!shuttingDown) {
+    if (!shuttingDown && !closingTunnels.has(tunnel)) {
       console.error('localtunnel closed unexpectedly.');
       shutdown(1);
     }
   });
-  return publicUrl;
+  return { publicUrl, tunnel };
+};
+
+const closeStartedTunnel = (tunnel) => {
+  const index = tunnels.indexOf(tunnel);
+  if (index >= 0) {
+    tunnels.splice(index, 1);
+  }
+  closingTunnels.add(tunnel);
+  tunnel.close();
+};
+
+const scheduleTunnelRestart = (label, subdomain, options = {}) => {
+  if (shuttingDown || restartTimers.has(label)) {
+    return;
+  }
+  const timer = setTimeout(async () => {
+    restartTimers.delete(label);
+    if (shuttingDown) {
+      return;
+    }
+    const currentTunnel = activeTunnels.get(label);
+    if (currentTunnel) {
+      activeTunnels.delete(label);
+      closeStartedTunnel(currentTunnel);
+    }
+    try {
+      console.warn(`Restarting localtunnel ${label} tunnel after a connection error...`);
+      const restartedUrl = await startHealthyTunnel(label, subdomain, { ...options, restartOnError: true });
+      if (label === 'app') {
+        publicUrl = restartedUrl;
+      }
+      if (label === 'websocket') {
+        publicWebSocketUrl = websocketUrl(restartedUrl);
+      }
+      console.warn(`localtunnel ${label} tunnel restarted at ${restartedUrl}.`);
+    } catch (error) {
+      console.error(`localtunnel ${label} restart failed: ${error instanceof Error ? error.message : String(error)}`);
+      scheduleTunnelRestart(label, subdomain, options);
+    }
+  }, 2000);
+  restartTimers.set(label, timer);
 };
 
 const normalizePublicUrl = (url) => {
@@ -129,12 +195,70 @@ const checkPublicHealth = async (publicUrl) => {
   }
 };
 
-const warnIfPublicHealthFails = async (publicUrl) => {
+const checkPublicWebSocket = (url, origin) =>
+  new Promise((resolve) => {
+    const timeout = Number.isFinite(healthCheckTimeoutMs) && healthCheckTimeoutMs > 0 ? healthCheckTimeoutMs : 5000;
+    let settled = false;
+    const websocket = new WebSocket(url, { headers: { Origin: origin } });
+    const timeoutId = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        websocket.close();
+        resolve(`timed out opening ${url}`);
+      }
+    }, timeout);
+
+    websocket.on('open', () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeoutId);
+      websocket.close();
+      resolve(undefined);
+    });
+    websocket.on('error', () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(`failed to open ${url} from ${origin}`);
+    });
+  });
+
+const startHealthyTunnel = async (label, subdomain, options = {}) => {
+  const attempts = Number.isFinite(startupAttempts) && startupAttempts > 0 ? Math.floor(startupAttempts) : 5;
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const started = await startTunnel(subdomain);
+    const healthError = await checkPublicHealth(started.publicUrl);
+    const webSocketError =
+      !healthError && options.webSocketOrigin ? await checkPublicWebSocket(websocketUrl(started.publicUrl), options.webSocketOrigin) : undefined;
+    if (!healthError && !webSocketError) {
+      if (attempt > 1) {
+        console.log(`localtunnel ${label} tunnel succeeded on attempt ${attempt}.`);
+      }
+      activeTunnels.set(label, started.tunnel);
+      if (options.restartOnError) {
+        started.tunnel.on('error', () => scheduleTunnelRestart(label, subdomain, options));
+      }
+      return started.publicUrl;
+    }
+    lastError = healthError ?? webSocketError;
+    console.warn(`localtunnel ${label} tunnel attempt ${attempt}/${attempts} failed: ${lastError}`);
+    closeStartedTunnel(started.tunnel);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(`localtunnel ${label} tunnel did not pass startup probes: ${lastError ?? 'unknown failure'}`);
+};
+
+const warnIfPublicHealthFails = async (label, publicUrl) => {
   const healthError = await checkPublicHealth(publicUrl);
   if (!healthError) {
     return;
   }
-  console.warn(`localtunnel warning: public health check failed for ${publicUrl}/health: ${healthError}`);
+  console.warn(`localtunnel warning: ${label} public health check failed for ${publicUrl}/health: ${healthError}`);
   console.warn(
     'The local server is running, but the public localtunnel service may be rate-limited, congested, or out of forwarding sockets. Try again, use npm run dev:ngrok, or set LOCALTUNNEL_HOST for a compatible self-hosted localtunnel server.',
   );
@@ -148,23 +272,29 @@ try {
   console.log(`Starting Casino Warehouse server on http://${host}:${port}...`);
   await startServer();
 
-  console.log(`Starting integrated localtunnel for ${localHost}:${port} through ${localtunnelHost}...`);
-  publicUrl = await startTunnel();
-  const wsUrl = websocketUrl(publicUrl);
-  await warnIfPublicHealthFails(publicUrl);
+  console.log(`Starting integrated localtunnel app tunnel for ${localHost}:${port} through ${localtunnelHost}...`);
+  publicUrl = await startHealthyTunnel('app', requestedAppSubdomain, { restartOnError: true });
+  publicWebSocketUrl = websocketUrl(publicUrl);
+
+  console.log(`Starting integrated localtunnel WebSocket tunnel for ${localHost}:${port} through ${localtunnelHost}...`);
+  const publicWebSocketBaseUrl = await startHealthyTunnel('websocket', requestedWebSocketSubdomain, { restartOnError: true, webSocketOrigin: publicUrl });
+  publicWebSocketUrl = websocketUrl(publicWebSocketBaseUrl);
+
+  await warnIfPublicHealthFails('app', publicUrl);
+  await warnIfPublicHealthFails('websocket', publicWebSocketBaseUrl);
 
   console.log('');
   console.log('Casino Warehouse public multiplayer is ready:');
   console.log(`  App URL: ${publicUrl}`);
-  console.log(`  WebSocket URL: ${wsUrl}`);
+  console.log(`  WebSocket URL: ${publicWebSocketUrl}`);
   console.log('Share the App URL with another desktop/tablet device, then host or join a room in the Multiplayer Room panel.');
-  console.log('The tunnel is managed by the localtunnel npm package and will close when this script stops.');
+  console.log('Separate app and WebSocket tunnels are managed by the localtunnel npm package and will close when this script stops.');
   console.log('Warning: localtunnel exposes this local development server publicly until you stop this script.');
   console.log('');
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   console.error(
-    'Check network access to localtunnel.me, or set LOCALTUNNEL_HOST for a compatible self-hosted localtunnel server. Optional: LOCALTUNNEL_SUBDOMAIN requests a name, but the public service may assign a different URL.',
+    'Check network access to localtunnel.me, or set LOCALTUNNEL_HOST for a compatible self-hosted localtunnel server. Optional: LOCALTUNNEL_SUBDOMAIN requests an app name, LOCALTUNNEL_APP_SUBDOMAIN requests the app tunnel name, and LOCALTUNNEL_WS_SUBDOMAIN requests the WebSocket tunnel name, but the public service may assign different URLs.',
   );
   shutdown(1);
 }

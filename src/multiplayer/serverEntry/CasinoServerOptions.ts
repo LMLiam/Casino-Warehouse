@@ -10,4 +10,5 @@ export interface CasinoServerOptions {
   readonly adminToken?: string;
   readonly serverInstanceId?: string;
   readonly publicBaseUrl?: string | (() => string);
+  readonly publicWebSocketUrl?: string | (() => string);
 }

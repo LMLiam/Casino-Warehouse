@@ -15,6 +15,7 @@ import { profileTokensStorageKey } from './profileTokensStorageKey';
 import type { RealtimeConnectionState } from './RealtimeConnectionState';
 
 export class MultiplayerClient {
+  private static readonly webSocketConnectTimeoutMs = 10_000;
   private socket?: WebSocket;
   private lastRoom?: RoomSnapshot;
   private readonly ownedProfileIds = new Set<string>();
@@ -132,10 +133,16 @@ export class MultiplayerClient {
       return;
     }
     this.socket = socket;
+    const connectTimeout = window.setTimeout(() => {
+      if (this.socket === socket && socket.readyState === WebSocket.CONNECTING) {
+        socket.close();
+      }
+    }, MultiplayerClient.webSocketConnectTimeoutMs);
     socket.addEventListener('open', () => {
       if (this.socket !== socket) {
         return;
       }
+      window.clearTimeout(connectTimeout);
       this.lastHeartbeatAt = Date.now();
       this.events.onConnectionState('connected');
       this.events.onStatus('Connected to the game server.');
@@ -148,11 +155,15 @@ export class MultiplayerClient {
       if (this.socket !== socket) {
         return;
       }
+      window.clearTimeout(connectTimeout);
       this.events.onConnectionState('reconnecting');
       this.events.onStatus('Connection lost. Reconnecting... Actions are paused.');
       this.scheduleReconnect();
     });
-    socket.addEventListener('error', () => this.events.onError('Game server connection failed.'));
+    socket.addEventListener('error', () => {
+      window.clearTimeout(connectTimeout);
+      this.events.onError('Game server connection failed.');
+    });
     socket.addEventListener('message', (event) => this.receive(String(event.data)));
   }
 

@@ -50,11 +50,7 @@ test.describe('public tunnel multiplayer smoke', () => {
       await expect(desktop.locator('#bankroll')).toContainText('£975');
 
       await waitForSmokePageReload(tablet);
-      if (!(await tablet.locator('#tableHost').isVisible())) {
-        await tablet.locator('[data-lobby-game="beat-the-house"]').click();
-        await tablet.getByRole('button', { name: 'Refresh Rooms' }).click();
-        await tablet.locator(`[data-room-join="${roomId}"]`).click();
-      }
+      await restoreSmokeRoom(tablet, roomId);
       await expect(tablet.locator('#roomStatus')).toContainText(`room ${roomId}`);
       await expect(tablet.locator('#onTable')).toContainText('£25');
     } finally {
@@ -70,7 +66,13 @@ const openSmokePage = async (browser: Browser, viewport: { readonly width: numbe
     viewport,
     ...(extraHTTPHeaders ? { extraHTTPHeaders } : {}),
   });
-  await context.addInitScript(() => localStorage.clear());
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem('publicTunnelSmokeStorageCleared')) {
+      return;
+    }
+    localStorage.clear();
+    sessionStorage.setItem('publicTunnelSmokeStorageCleared', 'true');
+  });
   const page = await context.newPage();
   await waitForSmokePage(page);
   return page;
@@ -118,6 +120,19 @@ const waitForSmokeAppReady = async (page: Page): Promise<void> => {
     undefined,
     { timeout: appReadyTimeoutMs },
   );
+};
+
+const restoreSmokeRoom = async (page: Page, roomId: string): Promise<void> => {
+  try {
+    await expect(page.locator('#roomStatus')).toContainText(`room ${roomId}`, { timeout: 15_000 });
+    return;
+  } catch {
+    await page.locator('[data-lobby-game="beat-the-house"]').click();
+    await page.getByRole('button', { name: 'Refresh Rooms' }).click();
+    const joinButton = page.locator(`[data-room-join="${roomId}"]`).first();
+    await expect(joinButton).toBeVisible({ timeout: 15_000 });
+    await joinButton.click();
+  }
 };
 
 const publicTunnelSmokeHeaders = (url: string | undefined): Record<string, string> | undefined => {
