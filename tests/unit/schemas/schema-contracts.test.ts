@@ -90,4 +90,4 @@ describe('schema contract fixtures', () => {
 const fixtureTypes = (fixtures: readonly { readonly type: string }[]): string[] => [...new Set(fixtures.map((fixture) => fixture.type))].sort();
 
 const schemaTypes = (schema: typeof clientMessageSchema | typeof serverMessageSchema): string[] =>
-  schema.def.options.flatMap((option) => option.shape.type._zod.def.values.map(String)).sort();
+  schema.options.flatMap((option) => [...option.shape.type.values].map(String)).sort();
