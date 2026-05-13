@@ -10,7 +10,7 @@ export class AudioControls {
   public constructor(
     private readonly elements: AppElements,
     private readonly audio: CasinoAudio,
-    private readonly storage: Storage = localStorage,
+    private readonly storage: Storage | undefined = AudioControls.browserStorage(),
   ) {}
 
   public bind(): void {
@@ -47,7 +47,7 @@ export class AudioControls {
 
   public load(): void {
     try {
-      this.settings = sanitizeAudioSettings(JSON.parse(this.storage.getItem('casino_audio_settings_v1') ?? '{}'));
+      this.settings = sanitizeAudioSettings(JSON.parse(this.storage?.getItem('casino_audio_settings_v1') ?? '{}'));
     } catch {
       this.settings = defaultAudioSettings();
     }
@@ -85,7 +85,19 @@ export class AudioControls {
     });
     this.audio.updateSettings(this.settings);
     this.audio.toggleMusic(!this.settings.muted && this.settings.musicVolume > 0);
-    this.storage.setItem('casino_audio_settings_v1', JSON.stringify(this.settings));
+    try {
+      this.storage?.setItem('casino_audio_settings_v1', JSON.stringify(this.settings));
+    } catch {
+      // Persistence can be blocked; the in-memory audio settings already applied.
+    }
+  }
+
+  private static browserStorage(): Storage | undefined {
+    try {
+      return globalThis.localStorage;
+    } catch {
+      return undefined;
+    }
   }
 
   private audioControl(

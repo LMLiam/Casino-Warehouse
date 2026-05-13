@@ -84,4 +84,27 @@ describe('casino audio settings', () => {
       }
     }
   });
+
+  it('treats AudioContext construction failures as no-audio mode', () => {
+    const originalAudioContext = globalThis.AudioContext;
+    class ThrowingAudioContext {
+      public constructor() {
+        throw new Error('audio unavailable');
+      }
+    }
+    Object.defineProperty(globalThis, 'AudioContext', { configurable: true, writable: true, value: ThrowingAudioContext });
+
+    try {
+      const audio = new CasinoAudio();
+
+      expect(() => audio.play('deal')).not.toThrow();
+      expect(() => audio.toggleMusic(true)).not.toThrow();
+    } finally {
+      if (originalAudioContext) {
+        Object.defineProperty(globalThis, 'AudioContext', { configurable: true, writable: true, value: originalAudioContext });
+      } else {
+        Reflect.deleteProperty(globalThis, 'AudioContext');
+      }
+    }
+  });
 });
