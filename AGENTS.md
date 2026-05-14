@@ -37,6 +37,7 @@ Primary references:
 - `npm run dev:localtunnel`: run the provider-specific localtunnel public demo flow.
 - `npm run dev:cloudflare`: run the provider-specific Cloudflare Tunnel quick-tunnel public demo flow.
 - `npm run dev:cloudflared`: alias for `npm run dev:cloudflare`.
+- `./start-codex-create-issue.sh --print "issue topic"`: preview the Codex `/goal` for researching and creating a new GitHub issue.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -136,6 +137,12 @@ After a pull request exists, every self-review finding must be recorded as a pul
 If repository permissions prevent leaving PR review comments, the agent must still produce review findings in the final response using file paths and line-level references where possible. It must not silently skip the review-comment step.
 
 After any new commit, rebase, merge from the target branch, force-push, PR body edit that reruns checks, or resolved-comment action, the pull request must be reviewed again before being called ready.
+
+## Issue Creation Workflow
+
+When asked to create, open, draft, file, or prepare a new GitHub issue from a user request, use the Casino Warehouse issue-creation skill at `.agents/skills/casino-issue-creation/SKILL.md`. For interactive launches, use `start-codex-create-issue.sh`; `start-codex-issue.sh` remains for completing an existing issue number.
+
+The issue-creation workflow must inspect relevant repository context, search existing open and closed issues and pull requests for duplicates or related work, choose repository-compliant title/labels/status/milestone, create the issue through GitHub, then verify the created issue number, URL, metadata, and body before reporting success.
 
 ## Pull Request Checklist
 
