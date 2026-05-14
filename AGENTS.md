@@ -35,6 +35,8 @@ Primary references:
 - `npm run dev:public`: run the ngrok-backed public demo flow.
 - `npm run dev:ngrok`: run the provider-specific ngrok public demo flow.
 - `npm run dev:localtunnel`: run the provider-specific localtunnel public demo flow.
+- `npm run dev:cloudflare`: run the provider-specific Cloudflare Tunnel quick-tunnel public demo flow.
+- `npm run dev:cloudflared`: alias for `npm run dev:cloudflare`.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.

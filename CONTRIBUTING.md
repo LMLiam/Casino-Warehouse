@@ -87,6 +87,15 @@ npm run visual -- --project=tablet tests/e2e/casino-visual.spec.ts
 npm run visual -- --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 ```
 
+The public tunnel smoke test is skipped unless you point it at a live trusted
+tunnel URL. Prefer the provider-neutral variable:
+
+```bash
+PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --project=laptop tests/e2e/public-tunnel-smoke.spec.ts
+```
+
+`NGROK_SMOKE_URL` remains an ngrok-specific alias for existing workflows.
+
 Serial execution is reserved for debugging with `npm run visual:serial`.
 The committed e2e config does not force any spec file into serial mode;
 the multi-context specs in `tests/e2e/multiplayer-flow.spec.ts` and

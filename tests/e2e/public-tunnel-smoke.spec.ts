@@ -150,7 +150,7 @@ const usesNgrokBrowserWarning = (url: string | undefined): boolean => {
   if (!url) {
     return false;
   }
-  if (process.env.NGROK_SMOKE_URL) {
+  if (process.env.NGROK_SMOKE_URL && !process.env.PUBLIC_TUNNEL_SMOKE_URL) {
     return true;
   }
   try {
