@@ -31,7 +31,18 @@ print_only="false"
 topic_parts=()
 
 while [ "$#" -gt 0 ]; do
+  if [ "${#topic_parts[@]}" -gt 0 ]; then
+    topic_parts+=("$1")
+    shift
+    continue
+  fi
+
   case "$1" in
+    --)
+      shift
+      topic_parts+=("$@")
+      break
+      ;;
     --print|--dry-run)
       print_only="true"
       shift
