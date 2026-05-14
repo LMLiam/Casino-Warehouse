@@ -75,6 +75,7 @@ describe('pr-review-files.sh', () => {
       ['start-codex-issue.sh', '[agent launcher/tooling]'],
       ['tests/unit/tooling/pr-review-files.fixture.mjs', '[code/test]'],
       ['vite.config.ts', '[tooling/config]'],
+      ['tools/release-note.mjs', '[JavaScript tooling/script]'],
     ]);
     const repo = createRepository([...expectedClassifications.keys()]);
 

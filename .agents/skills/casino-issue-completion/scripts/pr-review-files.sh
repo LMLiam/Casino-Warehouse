@@ -58,7 +58,7 @@ git diff --name-only "$TARGET"...HEAD | while read -r file; do
       echo "- $file [code/test]"
       ;;
     *.js|*.mjs|*.cjs)
-      echo "- $file [root tooling/script]"
+      echo "- $file [JavaScript tooling/script]"
       ;;
     docs/*|docs/**/*|README.md|CONTRIBUTING.md|GOVERNANCE.md|AGENTS.md|LICENSE|CONTRIBUTORS.md)
       echo "- $file [documentation/process]"
