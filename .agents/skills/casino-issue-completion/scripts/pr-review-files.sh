@@ -18,19 +18,49 @@ git diff --name-only "$TARGET"...HEAD | while read -r file; do
     .agents/skills/*)
       echo "- $file [agent skill/workflow]"
       ;;
-    *.sh)
-      echo "- $file [shell script]"
+    .agents/scripts/*|start-codex-*.sh)
+      echo "- $file [agent launcher/tooling]"
       ;;
-    src/*.ts|src/**/*.ts|tests/*.ts|tests/**/*.ts|server/*.ts|server/**/*.ts)
-      echo "- $file [code/test]"
-      ;;
-    .github/workflows/*)
-      echo "- $file [workflow: check action pinning and required checks]"
+    scripts/*.mjs|scripts/**/*.mjs|scripts/*.js|scripts/**/*.js)
+      echo "- $file [tooling script: check CLI behavior and subprocess/file safety]"
       ;;
     package.json|package-lock.json)
       echo "- $file [dependency/runtime script surface]"
       ;;
-    docs/*|docs/**/*|README.md|CONTRIBUTING.md|GOVERNANCE.md|AGENTS.md)
+    .npmrc|.node-version|.nvmrc|.editorconfig|.prettierrc|.prettierrc.*|.prettierignore|tsconfig.json|tsconfig.*.json|vite.config.*|vitest.config.*|playwright.config.*|eslint.config.*|prettier.config.*|tailwind.config.*|postcss.config.*)
+      echo "- $file [tooling/config]"
+      ;;
+    .github/workflows/*)
+      echo "- $file [workflow: check action pinning and required checks]"
+      ;;
+    .github/ISSUE_TEMPLATE/*)
+      echo "- $file [issue template/triage config]"
+      ;;
+    .github/PULL_REQUEST_TEMPLATE.md)
+      echo "- $file [pull request template/metadata]"
+      ;;
+    .github/dependabot.yml)
+      echo "- $file [dependabot/dependency automation]"
+      ;;
+    .github/*)
+      echo "- $file [GitHub repository config]"
+      ;;
+    src/assets/*|src/assets/**/*|public/assets/*|public/assets/**/*|*.png|*.jpg|*.jpeg|*.webp|*.gif|*.svg|*.ico|*.mp3|*.wav)
+      echo "- $file [asset manifest/static asset: check provenance and paths]"
+      ;;
+    src/styles/*.css|src/styles/**/*.css|*.css)
+      echo "- $file [UI styles: check layout, responsiveness, and accessibility]"
+      ;;
+    *.sh)
+      echo "- $file [shell script]"
+      ;;
+    *.ts|*.tsx|src/*.ts|src/**/*.ts|src/*.tsx|src/**/*.tsx|tests/*.ts|tests/**/*.ts|tests/*.tsx|tests/**/*.tsx|tests/*.mjs|tests/**/*.mjs|server/*.ts|server/**/*.ts|server/*.tsx|server/**/*.tsx)
+      echo "- $file [code/test]"
+      ;;
+    *.js|*.mjs|*.cjs)
+      echo "- $file [root tooling/script]"
+      ;;
+    docs/*|docs/**/*|README.md|CONTRIBUTING.md|GOVERNANCE.md|AGENTS.md|LICENSE|CONTRIBUTORS.md)
       echo "- $file [documentation/process]"
       ;;
     *)
@@ -42,6 +72,7 @@ done
 echo
 echo "== Suggested review command =="
 echo "git diff $TARGET...HEAD -- <file>"
+echo "Classifications are a prioritization aid; inspect every changed file even when a category looks low-risk."
 
 echo
 echo "== Required review lenses =="
