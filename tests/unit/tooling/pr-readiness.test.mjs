@@ -313,4 +313,53 @@ process.exit(1);
     expect(result.stdout).toContain('Review threads: 1 unresolved of 2 fetched');
     expect(result.stdout).toContain('PRRT_kwDOtest .agents/skills/casino-issue-completion/scripts/pr-readiness.sh:42 by reviewer');
   });
+
+  it('reports required check JSON when gh exits nonzero for pending checks', () => {
+    const { head, repo, root } = createRepository();
+    const bin = writeFakeGh(
+      root,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === 'pr' && args[1] === 'view') {
+  console.log(JSON.stringify({
+    number: 246,
+    url: 'https://github.com/LMLiam/Casino-Warehouse/pull/246',
+    title: 'chore(agents): verify live PR readiness evidence',
+    state: 'OPEN',
+    isDraft: false,
+    baseRefName: 'main',
+    baseRefOid: process.env.FAKE_PR_HEAD,
+    headRefName: 'issue-129-pr-readiness-github',
+    headRefOid: process.env.FAKE_PR_HEAD,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'BLOCKED',
+    labels: [{ name: 'type:maintenance' }, { name: 'area:tooling' }],
+    milestone: { title: '06 - Repository/community health' },
+    closingIssuesReferences: [],
+    body: '## Summary\\n\\nThis pull request has enough detail for the metadata validator.\\n\\n## Type\\n\\n- [x] Test or tooling\\n\\n## Checks\\n\\n- [x] I read \`CONTRIBUTING.md\`.\\n- [x] I kept generated build output out of this pull request.\\n- [x] I added or updated tests, or explained why tests are not needed.\\n- [x] I ran the relevant local checks.\\n\\n## Testing\\n\\nCommands run:\\n\\n\`\`\`text\\nnpm run test -- tests/unit/tooling/pr-readiness.test.mjs\\n\`\`\`\\n\\n## Notes\\n\\nN/A',
+  }));
+  process.exit(0);
+}
+if (args[0] === 'pr' && args[1] === 'checks') {
+  console.log(JSON.stringify([
+    { name: 'Required Quality Gate', state: 'PENDING', bucket: 'pending', link: 'https://example.test/checks/1', workflow: 'Project Checks' },
+  ]));
+  process.exit(8);
+}
+if (args[0] === 'api' && args[1] === 'graphql') {
+  console.log(JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { nodes: [] } } } } }));
+  process.exit(0);
+}
+console.error('unexpected gh invocation: ' + args.join(' '));
+process.exit(1);
+`,
+    );
+
+    const result = runReadiness(repo, bin, ['origin/main'], { FAKE_PR_HEAD: head });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('- Required Quality Gate (Project Checks): PENDING https://example.test/checks/1');
+    expect(result.stdout).toContain('gh pr checks exit status: 8');
+    expect(result.stdout).not.toContain('warning: unable to fetch required checks');
+  });
 });

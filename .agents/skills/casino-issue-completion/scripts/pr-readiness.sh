@@ -191,11 +191,11 @@ print_required_checks() {
   local pr_number="$1"
   local pr_head_sha="$2"
   local checks_json=""
-  local error_output=""
+  local checks_status=0
 
   echo "Required checks for PR head $pr_head_sha:"
-  if checks_json="$(gh pr checks "$pr_number" --required --json name,state,bucket,link,workflow 2>&1)"; then
-    CHECKS_JSON="$checks_json" node -e '
+  checks_json="$(gh pr checks "$pr_number" --required --json name,state,bucket,link,workflow 2>&1)" || checks_status=$?
+  if CHECKS_JSON="$checks_json" node -e '
 const checks = JSON.parse(process.env.CHECKS_JSON || "[]");
 if (checks.length === 0) {
   console.log("(none reported by gh pr checks --required)");
@@ -206,10 +206,12 @@ for (const check of checks) {
   const link = check.link ? ` ${check.link}` : "";
   console.log(`- ${check.name ?? "(unnamed check)"}${workflow}: ${state}${link}`);
 }
-'
+'; then
+    if [ "$checks_status" -ne 0 ]; then
+      echo "gh pr checks exit status: $checks_status"
+    fi
   else
-    error_output="$checks_json"
-    echo "warning: unable to fetch required checks with 'gh pr checks $pr_number --required': $error_output"
+    echo "warning: unable to fetch required checks with 'gh pr checks $pr_number --required' (exit status $checks_status): $checks_json"
   fi
 }
 
