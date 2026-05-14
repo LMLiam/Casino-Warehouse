@@ -211,7 +211,7 @@ export const createCloudflarePublicTunnelLauncher = ({
     logger.log('Casino Warehouse public multiplayer is ready:');
     logger.log(`  App URL: ${publicUrl}`);
     logger.log(`  WebSocket URL: ${wsUrl}`);
-    logger.log(`  Local server URL: http://${host}:${port}`);
+    logger.log(`  Local server URL: ${localTunnelUrl}`);
     logger.log('Share the App URL with another desktop/tablet device, then host or join a room in the Multiplayer Room panel.');
     logger.log('The quick tunnel is managed by the cloudflared binary and will close when this script stops.');
     logger.log('Warning: Cloudflare Tunnel exposes this local development server publicly until you stop this script.');
@@ -231,7 +231,8 @@ if (isMain) {
     await launcher.run();
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    console.error(`Install or update cloudflared from ${cloudflaredInstallDocsUrl}. Quick tunnels also need outbound network access to Cloudflare.`);
+    console.error(`Check the command output above. If cloudflared is missing or outdated, install or update it from ${cloudflaredInstallDocsUrl}.`);
+    console.error('Quick tunnels also need outbound network access to Cloudflare.');
     launcher.shutdown(1);
   }
 }
