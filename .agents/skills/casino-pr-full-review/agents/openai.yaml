@@ -1,4 +1,7 @@
 interface:
-  display_name: "Casino PR Full Review"
-  short_description: "Full Casino Warehouse PR reviews"
-  default_prompt: "Use $casino-pr-full-review to review pull request #123 and leave inline comments."
+  display_name: 'Casino PR Full Review'
+  short_description: 'Full Casino Warehouse PR reviews'
+  default_prompt: 'Use $casino-pr-full-review to review pull request #123 and leave inline comments.'
+
+policy:
+  allow_implicit_invocation: true

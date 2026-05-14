@@ -153,6 +153,12 @@ Before opening or updating a PR:
 - Confirm the issue completion review loop has been run on the current PR head, including after any rebase or follow-up fix.
 - Confirm generated build output is not committed.
 
+## Local Skill Metadata
+
+Repo-owned local skills under `.agents/skills/<skill-name>/` must include an `agents/openai.yaml` file with user-facing `interface.display_name`, `interface.short_description`, and `interface.default_prompt` fields. The default prompt should show a realistic invocation for the workflow, including the `$skill-name` reference when the skill is meant to be called directly.
+
+Set `policy.allow_implicit_invocation` intentionally for every local skill. Preserve `false` for workflows that should only run through explicit skill references or AGENTS.md routing instead of generic user wording.
+
 ## Documentation Guidance
 
 - Keep agent-facing instructions in this file concise and operational.
