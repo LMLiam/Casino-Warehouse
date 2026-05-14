@@ -500,6 +500,28 @@ describe('SlotsGame', () => {
       ]),
     ).toEqual(bonus);
   });
+
+  it('keeps a deterministic Thai Princess expected-return guardrail for paid spins', () => {
+    const wager = 10;
+    const sampleSize = 10_000;
+    const rng = createSeededRng(0x17_17_17);
+    let returned = 0;
+
+    for (let spin = 0; spin < sampleSize; spin += 1) {
+      const game = new SlotsGame({ rng });
+      let snapshot = game.spin(wager);
+      while (snapshot.phase === 'bonus') {
+        snapshot = game.pickBonus();
+      }
+      returned += snapshot.returned;
+    }
+
+    const observedReturnMultiple = returned / (sampleSize * wager);
+
+    expect(observedReturnMultiple).toBeGreaterThanOrEqual(81);
+    expect(observedReturnMultiple).toBeLessThanOrEqual(89);
+    expect(Number(observedReturnMultiple.toFixed(3))).toBe(84.239);
+  });
 });
 
 describe('shared casino bankroll', () => {
@@ -524,3 +546,11 @@ describe('shared casino bankroll', () => {
     expect(playerTwo.snapshot().bankroll).toBe(100);
   });
 });
+
+function createSeededRng(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}

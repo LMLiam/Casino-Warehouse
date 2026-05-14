@@ -227,6 +227,7 @@ export async function syncIssueStandardsReaction({ fetchImpl = fetch, repository
   return { action: 'created', reactionId: created.id };
 }
 
+/* v8 ignore start -- CLI wiring is exercised by the issue standards workflow; unit tests cover validators and GitHub API helpers directly. */
 function loadIssue(eventPath) {
   const event = JSON.parse(readFileSync(eventPath, 'utf8'));
 
@@ -283,3 +284,4 @@ async function main() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
+/* v8 ignore stop */

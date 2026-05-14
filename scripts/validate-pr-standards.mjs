@@ -115,6 +115,7 @@ export function validatePullRequest(pullRequest) {
   return failures;
 }
 
+/* v8 ignore start -- CLI wiring is exercised by the pull_request workflow; unit tests cover the validator contract directly. */
 function loadPullRequest(eventPath) {
   const event = JSON.parse(readFileSync(eventPath, 'utf8'));
 
@@ -151,3 +152,4 @@ function main() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
+/* v8 ignore stop */

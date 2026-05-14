@@ -223,6 +223,7 @@ export const createCloudflarePublicTunnelLauncher = ({
   return { run, shutdown };
 };
 
+/* v8 ignore start -- CLI startup is covered by npm run dev:cloudflare/manual tunnel runs; unit tests cover launcher behavior. */
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
@@ -236,3 +237,4 @@ if (isMain) {
     launcher.shutdown(1);
   }
 }
+/* v8 ignore stop */
