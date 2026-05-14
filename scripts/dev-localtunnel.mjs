@@ -14,8 +14,6 @@ const healthCheckTimeoutMs = Number(process.env.LOCALTUNNEL_HEALTH_TIMEOUT_MS ??
 const startupAttempts = Number(process.env.LOCALTUNNEL_STARTUP_ATTEMPTS ?? 5);
 let server;
 const tunnels = [];
-const activeTunnels = new Map();
-const restartTimers = new Map();
 const closingTunnels = new WeakSet();
 let publicUrl = '';
 let publicWebSocketUrl = '';
@@ -39,7 +37,6 @@ const shutdown = (code = 0) => {
     return;
   }
   shuttingDown = true;
-  clearRestartTimers();
   closeTunnel();
   closeServer();
   process.exitCode = code;
@@ -62,13 +59,6 @@ const closeServer = () => {
   const currentServer = server;
   server = undefined;
   currentServer?.close();
-};
-
-const clearRestartTimers = () => {
-  for (const timer of restartTimers.values()) {
-    clearTimeout(timer);
-  }
-  restartTimers.clear();
 };
 
 const startServer = async () => {
@@ -98,7 +88,7 @@ const startServer = async () => {
   });
 };
 
-const startTunnel = async (subdomain) => {
+const startTunnel = async (label, subdomain) => {
   const options = {
     port,
     host: localtunnelHost,
@@ -112,13 +102,20 @@ const startTunnel = async (subdomain) => {
   tunnels.push(tunnel);
   const publicUrl = normalizePublicUrl(tunnel.url);
   tunnel.on('error', (error) => {
-    if (!shuttingDown) {
-      console.error(`localtunnel warning: ${error instanceof Error ? error.message : String(error)}`);
+    if (!shuttingDown && !closingTunnels.has(tunnel)) {
+      console.error(`localtunnel ${label} tunnel error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        'Stopping because existing browser clients cannot automatically learn replacement localtunnel URLs. Rerun npm run dev:localtunnel and reload clients to use the fresh printed URLs.',
+      );
+      shutdown(1);
     }
   });
   tunnel.on('close', () => {
     if (!shuttingDown && !closingTunnels.has(tunnel)) {
-      console.error('localtunnel closed unexpectedly.');
+      console.error(`localtunnel ${label} tunnel closed unexpectedly.`);
+      console.error(
+        'Stopping because existing browser clients cannot automatically learn replacement localtunnel URLs. Rerun npm run dev:localtunnel and reload clients to use the fresh printed URLs.',
+      );
       shutdown(1);
     }
   });
@@ -132,38 +129,6 @@ const closeStartedTunnel = (tunnel) => {
   }
   closingTunnels.add(tunnel);
   tunnel.close();
-};
-
-const scheduleTunnelRestart = (label, subdomain, options = {}) => {
-  if (shuttingDown || restartTimers.has(label)) {
-    return;
-  }
-  const timer = setTimeout(async () => {
-    restartTimers.delete(label);
-    if (shuttingDown) {
-      return;
-    }
-    const currentTunnel = activeTunnels.get(label);
-    if (currentTunnel) {
-      activeTunnels.delete(label);
-      closeStartedTunnel(currentTunnel);
-    }
-    try {
-      console.warn(`Restarting localtunnel ${label} tunnel after a connection error...`);
-      const restartedUrl = await startHealthyTunnel(label, subdomain, { ...options, restartOnError: true });
-      if (label === 'app') {
-        publicUrl = restartedUrl;
-      }
-      if (label === 'websocket') {
-        publicWebSocketUrl = websocketUrl(restartedUrl);
-      }
-      console.warn(`localtunnel ${label} tunnel restarted at ${restartedUrl}.`);
-    } catch (error) {
-      console.error(`localtunnel ${label} restart failed: ${error instanceof Error ? error.message : String(error)}`);
-      scheduleTunnelRestart(label, subdomain, options);
-    }
-  }, 2000);
-  restartTimers.set(label, timer);
 };
 
 const normalizePublicUrl = (url) => {
@@ -231,24 +196,29 @@ const startHealthyTunnel = async (label, subdomain, options = {}) => {
   const attempts = Number.isFinite(startupAttempts) && startupAttempts > 0 ? Math.floor(startupAttempts) : 5;
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const started = await startTunnel(subdomain);
-    const healthError = await checkPublicHealth(started.publicUrl);
-    const webSocketError =
-      !healthError && options.webSocketOrigin ? await checkPublicWebSocket(websocketUrl(started.publicUrl), options.webSocketOrigin) : undefined;
-    if (!healthError && !webSocketError) {
-      if (attempt > 1) {
-        console.log(`localtunnel ${label} tunnel succeeded on attempt ${attempt}.`);
+    let started;
+    try {
+      started = await startTunnel(label, subdomain);
+      const healthError = await checkPublicHealth(started.publicUrl);
+      const webSocketError =
+        !healthError && options.webSocketOrigin ? await checkPublicWebSocket(websocketUrl(started.publicUrl), options.webSocketOrigin) : undefined;
+      if (!healthError && !webSocketError) {
+        if (attempt > 1) {
+          console.log(`localtunnel ${label} tunnel succeeded on attempt ${attempt}.`);
+        }
+        return started.publicUrl;
       }
-      activeTunnels.set(label, started.tunnel);
-      if (options.restartOnError) {
-        started.tunnel.on('error', () => scheduleTunnelRestart(label, subdomain, options));
-      }
-      return started.publicUrl;
+      lastError = healthError ?? webSocketError;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
     }
-    lastError = healthError ?? webSocketError;
+    if (started) {
+      closeStartedTunnel(started.tunnel);
+    }
     console.warn(`localtunnel ${label} tunnel attempt ${attempt}/${attempts} failed: ${lastError}`);
-    closeStartedTunnel(started.tunnel);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
   }
   throw new Error(`localtunnel ${label} tunnel did not pass startup probes: ${lastError ?? 'unknown failure'}`);
 };
@@ -273,11 +243,11 @@ try {
   await startServer();
 
   console.log(`Starting integrated localtunnel app tunnel for ${localHost}:${port} through ${localtunnelHost}...`);
-  publicUrl = await startHealthyTunnel('app', requestedAppSubdomain, { restartOnError: true });
+  publicUrl = await startHealthyTunnel('app', requestedAppSubdomain);
   publicWebSocketUrl = websocketUrl(publicUrl);
 
   console.log(`Starting integrated localtunnel WebSocket tunnel for ${localHost}:${port} through ${localtunnelHost}...`);
-  const publicWebSocketBaseUrl = await startHealthyTunnel('websocket', requestedWebSocketSubdomain, { restartOnError: true, webSocketOrigin: publicUrl });
+  const publicWebSocketBaseUrl = await startHealthyTunnel('websocket', requestedWebSocketSubdomain, { webSocketOrigin: publicUrl });
   publicWebSocketUrl = websocketUrl(publicWebSocketBaseUrl);
 
   await warnIfPublicHealthFails('app', publicUrl);
