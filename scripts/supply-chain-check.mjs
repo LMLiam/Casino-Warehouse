@@ -7,6 +7,7 @@ const workflowDir = '.github/workflows';
 const dependabotPath = '.github/dependabot.yml';
 const dependencyReviewPath = '.github/workflows/dependency-review.yml';
 const fullShaPattern = /^[a-f0-9]{40}$/i;
+/* v8 ignore start -- CLI filesystem wiring is exercised by npm run supply-chain:check; unit tests cover pure policy helpers. */
 function main() {
   const failures = [];
 
@@ -33,6 +34,7 @@ function checkWorkflowActionPins(failures) {
   }));
   failures.push(...workflowActionPinFailures(workflows));
 }
+/* v8 ignore stop */
 
 export function workflowActionPinFailures(workflows) {
   const failures = [];
@@ -69,10 +71,12 @@ export function workflowActionPinFailures(workflows) {
   return failures;
 }
 
+/* v8 ignore start -- CLI filesystem wiring is exercised by npm run supply-chain:check; unit tests cover pure policy helpers. */
 function checkDependabotActionsUpdates(failures) {
   const source = readFileSync(dependabotPath, 'utf8');
   failures.push(...dependabotActionsUpdateFailures(source, dependabotPath));
 }
+/* v8 ignore stop */
 
 export function dependabotActionsUpdateFailures(source, path = dependabotPath) {
   const githubActionsBlock = dependabotUpdateBlocks(source).find((block) => dependabotBlockValue(block, 'package-ecosystem') === 'github-actions');
@@ -105,10 +109,12 @@ export function dependabotActionsUpdateFailures(source, path = dependabotPath) {
   return failures;
 }
 
+/* v8 ignore start -- CLI filesystem wiring is exercised by npm run supply-chain:check; unit tests cover pure policy helpers. */
 function checkDependencyReviewPolicy(failures) {
   const source = readFileSync(dependencyReviewPath, 'utf8');
   failures.push(...dependencyReviewPolicyFailures(source, dependencyReviewPath));
 }
+/* v8 ignore stop */
 
 export function dependencyReviewPolicyFailures(source, path = dependencyReviewPath) {
   const requiredFragments = ['fail-on-severity: moderate', 'fail-on-scopes: runtime,development,unknown'];
@@ -123,11 +129,13 @@ export function dependencyReviewPolicyFailures(source, path = dependencyReviewPa
   return failures;
 }
 
+/* v8 ignore start -- CLI filesystem wiring is exercised by npm run supply-chain:check; unit tests cover pure policy helpers. */
 function workflowFiles() {
   return readdirSync(workflowDir)
     .filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'))
     .map((name) => join(workflowDir, name));
 }
+/* v8 ignore stop */
 
 function dependabotUpdateBlocks(source) {
   const blocks = [];

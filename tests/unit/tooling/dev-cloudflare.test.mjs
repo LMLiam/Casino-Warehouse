@@ -40,11 +40,12 @@ const createHarness = (options = {}) => {
   const errors = [];
   const spawned = [];
   const processApi = { on: vi.fn(), exitCode: undefined };
-  const runCommand =
-    options.runCommand ??
-    vi.fn(async (command, args) => {
-      logs.push(`run:${command} ${args.join(' ')}`);
-    });
+  const runCommand = options.useDefaultRunCommand
+    ? undefined
+    : (options.runCommand ??
+      vi.fn(async (command, args) => {
+        logs.push(`run:${command} ${args.join(' ')}`);
+      }));
   const spawnProcess = vi.fn((command, args, spawnOptions) => {
     const child = new FakeChild(command, args, spawnOptions);
     spawned.push(child);
@@ -59,7 +60,9 @@ const createHarness = (options = {}) => {
     processApi,
     runCommand,
     spawnProcess,
-    tunnelUrlTimeoutMs: options.tunnelUrlTimeoutMs ?? 1000,
+    setTimeoutFn: options.setTimeoutFn,
+    clearTimeoutFn: options.clearTimeoutFn,
+    tunnelUrlTimeoutMs: options.useLauncherDefaultTimeout ? undefined : (options.tunnelUrlTimeoutMs ?? 1000),
   });
 
   return { errors, launcher, logs, processApi, runCommand, spawned, spawnProcess };
@@ -136,6 +139,19 @@ describe('createCloudflarePublicTunnelLauncher', () => {
     expect(harness.errors).toEqual(['cloudflared tunnel exited with 1. Stopping the local server.']);
   });
 
+  it('reports an unknown cloudflared exit status after startup', async () => {
+    const harness = createHarness();
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+    harness.spawned[0].writeStdout('https://casino-demo.trycloudflare.com');
+    await launched;
+
+    harness.spawned[0].emit('exit', null);
+
+    expect(harness.processApi.exitCode).toBe(1);
+    expect(harness.errors).toEqual(['cloudflared tunnel exited with unknown status. Stopping the local server.']);
+  });
+
   it('stops the server when the Cloudflare tunnel closes cleanly after startup', async () => {
     const harness = createHarness();
     const launched = harness.launcher.run();
@@ -164,6 +180,19 @@ describe('createCloudflarePublicTunnelLauncher', () => {
     expect(harness.errors).toEqual(['Casino Warehouse server exited with 1. Stopping the Cloudflare tunnel.']);
   });
 
+  it('reports an unknown server exit status after startup', async () => {
+    const harness = createHarness();
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+    harness.spawned[0].writeStdout('https://casino-demo.trycloudflare.com');
+    await launched;
+
+    harness.spawned[1].emit('exit', null);
+
+    expect(harness.processApi.exitCode).toBe(1);
+    expect(harness.errors).toEqual(['Casino Warehouse server exited with unknown status. Stopping the Cloudflare tunnel.']);
+  });
+
   it('stops cloudflared when the server closes cleanly after startup', async () => {
     const harness = createHarness();
     const launched = harness.launcher.run();
@@ -190,6 +219,40 @@ describe('createCloudflarePublicTunnelLauncher', () => {
       `cloudflared was not found. Install it before running npm run dev:cloudflare: ${cloudflaredInstallDocsUrl}`,
     );
     expect(harness.spawnProcess).not.toHaveBeenCalled();
+  });
+
+  it('reports a cloudflared version-check failure that is not a missing binary', async () => {
+    const runCommand = vi.fn(async (command) => {
+      if (command === 'cloudflared') {
+        throw new Error('permission denied');
+      }
+    });
+    const harness = createHarness({ runCommand });
+
+    await expect(harness.launcher.run()).rejects.toThrow('cloudflared is required but failed its version check: permission denied');
+    expect(harness.spawnProcess).not.toHaveBeenCalled();
+  });
+
+  it('uses the default child-process runner and reports non-zero prerequisite exits', async () => {
+    const harness = createHarness({ useDefaultRunCommand: true });
+    const launched = harness.launcher.run();
+    await Promise.resolve();
+
+    expect(harness.spawned[0].command).toBe('cloudflared');
+    expect(harness.spawned[0].args).toEqual(['--version']);
+    harness.spawned[0].emit('exit', 2);
+
+    await expect(launched).rejects.toThrow('cloudflared is required but failed its version check: cloudflared --version exited with 2');
+  });
+
+  it('uses the default child-process runner and reports spawn errors', async () => {
+    const harness = createHarness({ useDefaultRunCommand: true });
+    const launched = harness.launcher.run();
+    await Promise.resolve();
+
+    harness.spawned[0].emit('error', new Error('spawn denied'));
+
+    await expect(launched).rejects.toThrow('cloudflared is required but failed its version check: spawn denied');
   });
 
   it('fails safely instead of starting the server when cloudflared output has no public URL', async () => {
@@ -221,5 +284,86 @@ describe('createCloudflarePublicTunnelLauncher', () => {
 
     await rejection;
     expect(harness.spawned).toHaveLength(1);
+  });
+
+  it('fails safely when cloudflared errors before printing a public URL', async () => {
+    const harness = createHarness();
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+    const rejection = expect(launched).rejects.toThrow('dns lookup failed');
+
+    harness.spawned[0].emit('error', new Error('dns lookup failed'));
+
+    await rejection;
+    expect(harness.spawned[0].killedSignals).toEqual(['SIGTERM']);
+  });
+
+  it('ignores duplicate cloudflared URL output after startup is settled', async () => {
+    const harness = createHarness();
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+    harness.spawned[0].writeStdout('https://casino-demo.trycloudflare.com');
+    await launched;
+
+    harness.spawned[0].writeStderr('https://casino-demo.trycloudflare.com');
+
+    expect(harness.spawned).toHaveLength(2);
+    expect(harness.processApi.exitCode).toBeUndefined();
+  });
+
+  it('shuts down the launched server when cloudflared errors after startup', async () => {
+    const harness = createHarness();
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+    harness.spawned[0].writeStdout('https://casino-demo.trycloudflare.com');
+    await launched;
+
+    harness.spawned[0].emit('error', new Error('tunnel socket failed'));
+
+    expect(harness.errors).toEqual(['tunnel socket failed']);
+    expect(harness.processApi.exitCode).toBe(1);
+    expect(harness.spawned[1].killedSignals).toEqual(['SIGTERM']);
+  });
+
+  it('shuts down cloudflared when the launched server emits an error after startup', async () => {
+    const harness = createHarness();
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+    harness.spawned[0].writeStdout('https://casino-demo.trycloudflare.com');
+    await launched;
+
+    harness.spawned[1].emit('error', new Error('port already in use'));
+
+    expect(harness.errors).toEqual([
+      'Casino Warehouse server failed to start: port already in use',
+      'Check that npm run build:server succeeds and that HOST/PORT are available.',
+    ]);
+    expect(harness.processApi.exitCode).toBe(1);
+    expect(harness.spawned[0].killedSignals).toEqual(['SIGTERM']);
+  });
+
+  it('uses default host, port, local URL, timeout fallback, and idempotent signal shutdown', async () => {
+    let timeoutCallback;
+    const harness = createHarness({
+      env: { PORT: undefined, HOST: undefined, CLOUDFLARE_TUNNEL_URL_TIMEOUT_MS: '0' },
+      useLauncherDefaultTimeout: true,
+      setTimeoutFn: (callback) => {
+        timeoutCallback = callback;
+        return 'timer';
+      },
+      clearTimeoutFn: vi.fn(),
+    });
+    const launched = harness.launcher.run();
+    await flushLauncherStartup();
+
+    expect(harness.spawned[0].args).toEqual(['tunnel', '--url', 'http://127.0.0.1:8787']);
+    timeoutCallback();
+
+    await expect(launched).rejects.toThrow('cloudflared did not emit a trycloudflare.com HTTPS URL within 30000ms.');
+    harness.processApi.on.mock.calls.filter(([signal]) => signal === 'SIGINT').forEach(([, listener]) => listener());
+    harness.processApi.on.mock.calls.filter(([signal]) => signal === 'SIGTERM').forEach(([, listener]) => listener());
+
+    expect(harness.spawned[0].killedSignals).toEqual(['SIGTERM']);
+    expect(harness.processApi.exitCode).toBe(0);
   });
 });

@@ -174,4 +174,113 @@ describe('BeatTheHouseGame', () => {
     expect(game.rebet().bets.left.main).toBe(10);
     expect(game.snapshot().canRebet).toBe(false);
   });
+
+  it('covers invalid bankroll withdrawals, invalid rebet affordability, and exhausted decks', () => {
+    let game = new BeatTheHouseGame({ initialBankroll: 10 });
+    game.placeBet('left', 'main', 10);
+    game.deal(rigDeck([card('3', 'hearts'), card('K', 'spades')]));
+
+    expect(game.withdrawBankroll(1)).toBe(false);
+    expect(game.withdrawBankroll(0)).toBe(false);
+    expect(game.clearBets().phase).toBe('playing');
+
+    game.stick();
+    expect(game.nextRound().canRebet).toBe(false);
+    expect(game.rebet().status).toBe('Need £10 to rebet.');
+
+    game = new BeatTheHouseGame({ initialBankroll: 10 });
+    game.placeBet('left', 'main', 5);
+    expect(() => game.deal([])).toThrow('Deck exhausted.');
+  });
+
+  it('settles Ace Flash, Match Push, and multi-seven side-bet branches', () => {
+    let game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.placeBet('left', 'main', 10);
+    game.placeBet('left', 'aceFlash', 2);
+    game.deal(rigDeck([card('A', 'spades'), card('Q', 'hearts')]));
+
+    expect(game.snapshot().summaries[0].sideWins).toEqual([{ betType: 'aceFlash', label: 'Ace Flash', profit: 20, returned: 22 }]);
+
+    game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.placeBet('left', 'main', 10);
+    game.placeBet('left', 'dealerSevens', 1);
+    game.deal(rigDeck([card('K', 'hearts'), card('7', 'spades'), card('7', 'clubs'), card('7', 'diamonds'), card('Q', 'hearts')]));
+
+    const threeSevens = game.stick();
+    expect(threeSevens.dealer.cards.map((dealerCard) => dealerCard.rank)).toEqual(['7', '7', '7', 'Q']);
+    expect(threeSevens.summaries[0].sideWins).toEqual([{ betType: 'dealerSevens', label: 'Dealer Sevens (3)', profit: 150, returned: 151 }]);
+  });
+
+  it('covers defensive phase guards and default bankroll paths', () => {
+    const game = new BeatTheHouseGame();
+    const idle = game.snapshot();
+
+    expect(idle.bankroll).toBe(100);
+    expect(game.placeBet('left', 'main', 0)).toEqual(idle);
+    expect(game.hit()).toEqual(idle);
+    expect(game.stick()).toEqual(idle);
+    expect(game.nextRound()).toEqual(idle);
+    expect(game.addBankroll(0).bankroll).toBe(100);
+    expect(game.resetBankroll().bankroll).toBe(100);
+
+    game.placeBet('left', 'main', 10);
+    const playing = game.deal(rigDeck([card('K', 'hearts'), card('Q', 'spades')]));
+    expect(game.deal(rigDeck([card('A', 'clubs')]))).toMatchObject({
+      phase: playing.phase,
+      bets: playing.bets,
+      hands: playing.hands,
+      dealer: playing.dealer,
+    });
+  });
+
+  it('rejects orphaned side bets restored from legacy state', () => {
+    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const state = game.saveState();
+    game.restoreState({
+      ...state,
+      bets: {
+        ...state.bets,
+        left: { ...state.bets.left, aceFlash: 5 },
+      },
+    });
+
+    expect(game.deal().status).toBe('Place a main bet on at least one hand.');
+
+    game.restoreState({
+      ...state,
+      bets: {
+        ...state.bets,
+        left: { ...state.bets.left, main: 10, aceFlash: 5 },
+        centre: { ...state.bets.centre, dealerBust: 5 },
+      },
+    });
+
+    expect(game.deal().status).toBe('Side bets need a main bet on the same hand.');
+  });
+
+  it('covers player hit bust, four-card auto-stand, and dealer black-Ace settlement', () => {
+    let game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.placeBet('left', 'main', 10);
+    game.deal(rigDeck([card('K', 'hearts'), card('Q', 'spades'), card('2', 'clubs')]));
+
+    const bust = game.hit();
+    expect(bust.hands.left.result).toBe('lose');
+    expect(bust.phase).toBe('roundOver');
+
+    game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.placeBet('left', 'main', 10);
+    game.deal(rigDeck([card('3', 'hearts'), card('K', 'spades'), card('4', 'clubs'), card('5', 'diamonds'), card('6', 'hearts')]));
+    game.hit();
+    game.hit();
+    const stoodOnFour = game.hit();
+    expect(stoodOnFour.hands.left.done).toBe(true);
+    expect(stoodOnFour.phase).toBe('roundOver');
+
+    game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.placeBet('left', 'main', 10);
+    game.deal(rigDeck([card('K', 'hearts'), card('A', 'spades')]));
+    const dealerBlackAce = game.stick();
+    expect(dealerBlackAce.dealer.blackAce).toBe(true);
+    expect(dealerBlackAce.hands.left.result).toBe('lose');
+  });
 });
