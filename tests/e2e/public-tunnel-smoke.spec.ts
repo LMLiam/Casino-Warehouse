@@ -1,15 +1,19 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
-const smokeUrl = process.env.NGROK_SMOKE_URL;
+const smokeUrl = process.env.PUBLIC_TUNNEL_SMOKE_URL ?? process.env.NGROK_SMOKE_URL;
+const smokeUrlSource = process.env.PUBLIC_TUNNEL_SMOKE_URL ? 'PUBLIC_TUNNEL_SMOKE_URL' : 'NGROK_SMOKE_URL';
+const appReadyTimeoutMs = 30_000;
+const navigationAttempts = 3;
+const smokeTestTimeoutMs = 240_000;
 
-test.describe('ngrok multiplayer smoke', () => {
-  test.skip(!smokeUrl, 'Set NGROK_SMOKE_URL to run the public tunnel smoke test.');
+test.describe('public tunnel multiplayer smoke', () => {
+  test.skip(!smokeUrl, 'Set PUBLIC_TUNNEL_SMOKE_URL to run the public tunnel smoke test.');
 
-  test('desktop and tablet browser contexts share a Beat the House room through ngrok', async ({ browser }, testInfo) => {
-    test.setTimeout(75_000);
+  test('desktop and tablet browser contexts share a Beat the House room through a public tunnel', async ({ browser }, testInfo) => {
+    test.setTimeout(smokeTestTimeoutMs);
     test.skip(testInfo.project.name !== 'laptop', 'This smoke test creates its own desktop and tablet contexts.');
     if (!smokeUrl) {
-      throw new Error('NGROK_SMOKE_URL is required.');
+      throw new Error(`${smokeUrlSource} is required.`);
     }
 
     const desktop = await openSmokePage(browser, { width: 1366, height: 768 });
@@ -45,13 +49,8 @@ test.describe('ngrok multiplayer smoke', () => {
       await expect(tablet.locator('#onTable')).toContainText('£25');
       await expect(desktop.locator('#bankroll')).toContainText('£975');
 
-      await tablet.reload();
-      await tablet.waitForFunction(() => document.body.dataset.appReady === 'true');
-      if (!(await tablet.locator('#tableHost').isVisible())) {
-        await tablet.locator('[data-lobby-game="beat-the-house"]').click();
-        await tablet.getByRole('button', { name: 'Refresh Rooms' }).click();
-        await tablet.locator(`[data-room-join="${roomId}"]`).click();
-      }
+      await waitForSmokePageReload(tablet);
+      await restoreSmokeRoom(tablet, roomId);
       await expect(tablet.locator('#roomStatus')).toContainText(`room ${roomId}`);
       await expect(tablet.locator('#onTable')).toContainText('£25');
     } finally {
@@ -62,16 +61,116 @@ test.describe('ngrok multiplayer smoke', () => {
 });
 
 const openSmokePage = async (browser: Browser, viewport: { readonly width: number; readonly height: number }): Promise<Page> => {
+  const extraHTTPHeaders = publicTunnelSmokeHeaders(smokeUrl);
   const context = await browser.newContext({
     viewport,
-    extraHTTPHeaders: { 'ngrok-skip-browser-warning': 'true' },
+    ...(extraHTTPHeaders ? { extraHTTPHeaders } : {}),
+  });
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem('publicTunnelSmokeStorageCleared')) {
+      return;
+    }
+    localStorage.clear();
+    sessionStorage.setItem('publicTunnelSmokeStorageCleared', 'true');
   });
   const page = await context.newPage();
-  await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => localStorage.clear());
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.body.dataset.appReady === 'true');
+  await waitForSmokePage(page);
   return page;
+};
+
+const waitForSmokePage = async (page: Page): Promise<void> => {
+  for (let attempt = 1; attempt <= navigationAttempts; attempt += 1) {
+    try {
+      await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      await waitForSmokeAppReady(page);
+      return;
+    } catch (error) {
+      if (attempt === navigationAttempts) {
+        throw error;
+      }
+      await page.waitForTimeout(1_000);
+    }
+  }
+};
+
+const waitForSmokePageReload = async (page: Page): Promise<void> => {
+  for (let attempt = 1; attempt <= navigationAttempts; attempt += 1) {
+    try {
+      if (attempt === 1) {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
+      } else {
+        await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      }
+      await waitForSmokeAppReady(page);
+      return;
+    } catch (error) {
+      if (attempt === navigationAttempts) {
+        throw error;
+      }
+      await page.waitForTimeout(1_000);
+    }
+  }
+};
+
+const waitForSmokeAppReady = async (page: Page): Promise<void> => {
+  await page.waitForFunction(
+    () =>
+      document.body.dataset.appReady === 'true' ||
+      Boolean(document.querySelector('#tableHost, [data-lobby-game="beat-the-house"], input[placeholder="Player name"]')),
+    undefined,
+    { timeout: appReadyTimeoutMs },
+  );
+};
+
+const restoreSmokeRoom = async (page: Page, roomId: string): Promise<void> => {
+  try {
+    await expect(page.locator('#roomStatus')).toContainText(`room ${roomId}`, { timeout: 15_000 });
+    return;
+  } catch {
+    await page.locator('[data-lobby-game="beat-the-house"]').click();
+    await page.getByRole('button', { name: 'Refresh Rooms' }).click();
+    const joinButton = page.locator(`[data-room-join="${roomId}"]`).first();
+    await expect(joinButton).toBeVisible({ timeout: 15_000 });
+    await joinButton.click();
+  }
+};
+
+const publicTunnelSmokeHeaders = (url: string | undefined): Record<string, string> | undefined => {
+  const headers: Record<string, string> = {};
+  if (usesNgrokBrowserWarning(url)) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+  }
+  if (usesLocaltunnelReminder(url)) {
+    headers['bypass-tunnel-reminder'] = 'true';
+  }
+  return Object.keys(headers).length > 0 ? headers : undefined;
+};
+
+const usesNgrokBrowserWarning = (url: string | undefined): boolean => {
+  if (!url) {
+    return false;
+  }
+  if (process.env.NGROK_SMOKE_URL) {
+    return true;
+  }
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.endsWith('.ngrok-free.dev') || hostname.endsWith('.ngrok.app') || hostname.endsWith('.ngrok.io');
+  } catch {
+    return false;
+  }
+};
+
+const usesLocaltunnelReminder = (url: string | undefined): boolean => {
+  if (!url) {
+    return false;
+  }
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname === 'loca.lt' || hostname.endsWith('.loca.lt') || hostname === 'localtunnel.me' || hostname.endsWith('.localtunnel.me');
+  } catch {
+    return false;
+  }
 };
 
 const createSession = async (page: Page, name: string): Promise<void> => {

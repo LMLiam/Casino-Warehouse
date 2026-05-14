@@ -12,6 +12,6 @@ export const maybeStartServer = (entryModuleUrl: string): void => {
   const server = createCasinoServer();
   server.listen(port, host, () => {
     console.log(`Casino Warehouse server listening on http://${host}:${port}`);
-    console.log(`Expose this port with ngrok for tablet multiplayer testing.`);
+    console.log(`Expose this port with a public tunnel for tablet multiplayer testing.`);
   });
 };

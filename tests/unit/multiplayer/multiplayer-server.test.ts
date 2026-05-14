@@ -276,6 +276,16 @@ describe('multiplayer WebSocket server', () => {
     await expect(sendUpgradeRequest(baseUrl.port, '/ws')).resolves.toBeUndefined();
   });
 
+  it('injects the configured public WebSocket URL into served app HTML', async () => {
+    const distRoot = await createStaticFixture();
+    const baseUrl = await startServer(distRoot, undefined, { publicWebSocketUrl: 'wss://ws.casino-public.example.test/ws' });
+
+    const response = await fetch(`${baseUrl.http}/`);
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain('<meta name="casino-realtime-url" content="wss://ws.casino-public.example.test/ws" />');
+  });
+
   it('returns not found for missing assets and suspicious file paths', async () => {
     const distRoot = await createStaticFixture();
     const baseUrl = await startServer(distRoot);
@@ -307,6 +317,16 @@ describe('multiplayer WebSocket server', () => {
   it('accepts the configured public WebSocket origin', async () => {
     const baseUrl = await startServer('.', undefined, { publicBaseUrl: 'https://casino-public.example.test/' });
 
+    const publicClient = await connect(baseUrl.ws, { origin: 'https://casino-public.example.test' });
+
+    await expect(publicClient.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({ type: 'server-hello' });
+  });
+
+  it('accepts a public WebSocket origin that becomes available after the server starts', async () => {
+    let publicBaseUrl = '';
+    const baseUrl = await startServer('.', undefined, { publicBaseUrl: () => publicBaseUrl });
+
+    publicBaseUrl = 'https://casino-public.example.test/';
     const publicClient = await connect(baseUrl.ws, { origin: 'https://casino-public.example.test' });
 
     await expect(publicClient.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({ type: 'server-hello' });
@@ -937,7 +957,7 @@ describe('multiplayer WebSocket server', () => {
     await expect(alice.waitForClose()).resolves.toBeUndefined();
   });
 
-  it('uses the public base URL in room invites when the integrated ngrok flow provides one', async () => {
+  it('uses the public base URL in room invites when an integrated public tunnel flow provides one', async () => {
     const originalPublicBaseUrl = process.env.PUBLIC_BASE_URL;
     process.env.PUBLIC_BASE_URL = 'https://casino-public.example.test/';
     try {
@@ -956,9 +976,7 @@ describe('multiplayer WebSocket server', () => {
       if (created.type !== 'room-created') {
         throw new Error('Expected room-created message.');
       }
-      expect(created.invitePath).toBe(
-        `https://casino-public.example.test/?game=blackjack&room=${created.room.roomId}&server=wss%3A%2F%2Fcasino-public.example.test%2Fws`,
-      );
+      expect(created.invitePath).toBe(`https://casino-public.example.test/?game=blackjack&room=${created.room.roomId}`);
       await alice.closeAndWait();
     } finally {
       if (originalPublicBaseUrl === undefined) {

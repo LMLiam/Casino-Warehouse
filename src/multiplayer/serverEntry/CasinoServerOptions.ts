@@ -9,5 +9,6 @@ export interface CasinoServerOptions {
   readonly heartbeatTimeoutMs?: number;
   readonly adminToken?: string;
   readonly serverInstanceId?: string;
-  readonly publicBaseUrl?: string;
+  readonly publicBaseUrl?: string | (() => string);
+  readonly publicWebSocketUrl?: string | (() => string);
 }

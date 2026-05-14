@@ -1,6 +1,6 @@
-# ngrok Multiplayer Smoke Report
+# Public Tunnel Multiplayer Smoke Report
 
-Final acceptance evidence for the public ngrok multiplayer run.
+Final acceptance evidence for the public tunnel multiplayer run. The recorded run below used ngrok; the smoke test now accepts the provider-neutral `PUBLIC_TUNNEL_SMOKE_URL` environment variable for ngrok, localtunnel, or another compatible public tunnel. The legacy `NGROK_SMOKE_URL` variable still works for existing ngrok notes and automatically applies ngrok's browser-warning skip header. The same smoke test applies localtunnel's `bypass-tunnel-reminder` header only for `loca.lt` and `localtunnel.me` URLs.
 
 ## Run Details
 
@@ -11,14 +11,15 @@ Final acceptance evidence for the public ngrok multiplayer run.
 - ngrok URL: `https://ferocity-hasty-landowner.ngrok-free.dev`
 - Device A browser/device: Playwright desktop browser context, 1366x768 viewport, through ngrok URL
 - Device B browser/device: Playwright tablet browser context, 1024x768 viewport, through ngrok URL
-- Latest smoke command: `NGROK_SMOKE_URL=https://ferocity-hasty-landowner.ngrok-free.dev npx playwright test tests/e2e/ngrok-smoke.spec.ts`
+- Historical smoke URL environment: `NGROK_SMOKE_URL=https://ferocity-hasty-landowner.ngrok-free.dev`
+- Current equivalent smoke command: `PUBLIC_TUNNEL_SMOKE_URL=https://ferocity-hasty-landowner.ngrok-free.dev npx playwright test tests/e2e/public-tunnel-smoke.spec.ts`
 - Latest result: laptop smoke passed in 24.6s; tablet project skipped because the spec creates its own tablet context.
 
 ## Evidence Checklist
 
 | Requirement                                                | Evidence                                                                                                                                                                                          |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Device A created/selected a profile                        | `NGROK_SMOKE_URL=https://ferocity-hasty-landowner.ngrok-free.dev npx playwright test tests/e2e/ngrok-smoke.spec.ts` created `Desktop Smoke`.                                                      |
+| Device A created/selected a profile                        | The recorded ngrok smoke run created `Desktop Smoke`.                                                                                                                                             |
 | Device A hosted a room                                     | Browser smoke hosted a room through `wss://ferocity-hasty-landowner.ngrok-free.dev/ws`; latest integrated `dev:public` Playwright smoke completed in 24.6s.                                       |
 | Device B opened the ngrok URL                              | Browser smoke opened a separate tablet context at the same public ngrok URL.                                                                                                                      |
 | Device B created/selected a different profile              | Browser smoke created `Tablet Smoke` in an independent browser context.                                                                                                                           |
@@ -38,3 +39,5 @@ Final acceptance evidence for the public ngrok multiplayer run.
 - Errors observed: This pass tightened the smoke to wait for durable room-code state after hosting, avoiding an unstable status-text race during public tunnel startup.
 - Screenshots/recordings: Playwright retained traces only for failed intermediary runs; final command passed.
 - Follow-up fixes needed: None from the final smoke run.
+- To run the same smoke through localtunnel, start `npm run dev:localtunnel`, then run `PUBLIC_TUNNEL_SMOKE_URL=<printed app URL> npx playwright test tests/e2e/public-tunnel-smoke.spec.ts`.
+- The public `loca.lt` service is best-effort. On 2026-05-13, its tunnel assignment endpoint reported `max_conn_count: 2`; a single localtunnel could be exhausted by two multiplayer WebSockets and then time out on `/health` or reload traffic. The integrated localtunnel flow now uses separate app and WebSocket tunnels plus startup probes to avoid that socket starvation.

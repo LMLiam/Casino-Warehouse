@@ -55,7 +55,19 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 30_000;
   const adminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
   const serverInstanceId = options.serverInstanceId ?? randomUUID();
-  const publicBaseUrl = (options.publicBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  const publicBaseUrl = (): string => {
+    const configuredBaseUrl = typeof options.publicBaseUrl === 'function' ? options.publicBaseUrl() : options.publicBaseUrl;
+    return (configuredBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  };
+  const publicWebSocketUrl = (): string => {
+    const configuredWebSocketUrl = typeof options.publicWebSocketUrl === 'function' ? options.publicWebSocketUrl() : options.publicWebSocketUrl;
+    const configuredUrl = configuredWebSocketUrl ?? process.env.PUBLIC_WEBSOCKET_URL ?? '';
+    if (configuredUrl) {
+      return configuredUrl.replace(/\/$/, '');
+    }
+    const currentPublicBaseUrl = publicBaseUrl();
+    return currentPublicBaseUrl ? webSocketUrl(currentPublicBaseUrl) : '';
+  };
   const peers = new Map<string, Peer>();
   const websocketServer = new WebSocketServer({
     clientTracking: false,
@@ -80,8 +92,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
           return;
         }
 
-        response.writeHead(200, responseHeaders({ 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' }));
-        response.end(readFileSync(join(distRoot, 'index.html')));
+        serveIndex(response);
+        return;
+      }
+
+      if (isIndexHtml(filePath)) {
+        serveIndex(response);
         return;
       }
 
@@ -432,7 +448,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       return;
     }
 
-    if (!WebSocketOriginPolicy.allows(request, publicBaseUrl)) {
+    if (!WebSocketOriginPolicy.allows(request, publicBaseUrl())) {
       rejectUpgrade(socket, 403, 'Forbidden');
       return;
     }
@@ -512,10 +528,33 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
   function createInvitePath(gameId: string, roomId: string): string {
     const query = `?game=${encodeURIComponent(gameId)}&room=${encodeURIComponent(roomId)}`;
-    if (!publicBaseUrl) {
+    const currentPublicBaseUrl = publicBaseUrl();
+    if (!currentPublicBaseUrl) {
       return `/${query}`;
     }
-    return `${publicBaseUrl}/${query}&server=${encodeURIComponent(publicBaseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:') + '/ws')}`;
+    return `${currentPublicBaseUrl}/${query}`;
+  }
+
+  function serveIndex(response: ServerResponse): void {
+    response.writeHead(200, responseHeaders({ 'cache-control': 'no-store', 'content-type': 'text/html; charset=utf-8' }));
+    response.end(injectRuntimeConfig(readFileSync(join(distRoot, 'index.html'), 'utf8')));
+  }
+
+  function injectRuntimeConfig(html: string): string {
+    const currentPublicWebSocketUrl = publicWebSocketUrl();
+    if (!currentPublicWebSocketUrl) {
+      return html;
+    }
+    const meta = `<meta name="casino-realtime-url" content="${escapeAttribute(currentPublicWebSocketUrl)}" />`;
+    return html.includes('</head>') ? html.replace('</head>', `    ${meta}\n  </head>`) : `${meta}\n${html}`;
+  }
+
+  function escapeAttribute(value: string): string {
+    return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  }
+
+  function webSocketUrl(baseUrl: string): string {
+    return `${baseUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:')}/ws`;
   }
 
   function textPayload(data: RawData): string {
@@ -541,6 +580,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
   function shouldServeAppFallback(request: IncomingMessage, filePath: string | undefined): boolean {
     return Boolean(filePath) && acceptsHtml(request) && !isFileLikeOrSuspiciousRequest(request);
+  }
+
+  function isIndexHtml(filePath: string): boolean {
+    return normalize(filePath) === normalize(join(distRoot, 'index.html'));
   }
 
   function acceptsHtml(request: IncomingMessage): boolean {
