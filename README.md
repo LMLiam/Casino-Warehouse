@@ -83,9 +83,19 @@ export NGROK_AUTHTOKEN=YOUR_TOKEN
 npm run dev:ngrok
 ```
 
-`npm run dev:public` remains an alias for the ngrok-backed flow. Both provider commands build the app and server, print the app URL and WebSocket URL, and route invite links through the public URL. Share the printed app URL with the other device. The public tunnel stays open only while the command is running. The localtunnel flow opens separate public tunnels for app pages and WebSocket traffic so two multiplayer clients do not exhaust the public service's limited forwarding sockets during reloads.
+For Cloudflare Tunnel quick tunnels:
+
+```bash
+npm run dev:cloudflare
+```
+
+`npm run dev:cloudflared` is an alias for the same Cloudflare-backed flow, and `npm run dev:public` remains an alias for the ngrok-backed flow. All provider commands build the app and server, print the app URL and WebSocket URL, and route invite links through the public URL. Share the printed app URL with the other device. The public tunnel stays open only while the command is running. The localtunnel flow opens separate public tunnels for app pages and WebSocket traffic so two multiplayer clients do not exhaust the public service's limited forwarding sockets during reloads.
 
 Public tunnels expose your local development server to the internet while they are running. Use them only for trusted demo sessions. localtunnel is convenient because it does not require an ngrok account token, but public service reliability can vary, requested custom subdomains are not guaranteed, browser users may see a localtunnel reminder page before the app, and self-hosting localtunnel or using a paid/stable tunnel provider may be better for recurring sessions. The public `loca.lt` service can also return timeouts while the local server is healthy; `npm run dev:localtunnel` retries startup probes before printing URLs. You can request localtunnel names with `LOCALTUNNEL_SUBDOMAIN=your-name npm run dev:localtunnel`, `LOCALTUNNEL_APP_SUBDOMAIN=your-name`, or `LOCALTUNNEL_WS_SUBDOMAIN=your-name-ws`; use `LOCALTUNNEL_HOST` only when you intentionally target a compatible self-hosted localtunnel server. Set `LOCALTUNNEL_HEALTH_TIMEOUT_MS` or `LOCALTUNNEL_STARTUP_ATTEMPTS` to adjust startup probing.
+
+Cloudflare quick tunnels are useful when you have the `cloudflared` binary installed and want a temporary public HTTPS URL without an ngrok account or a localtunnel service dependency. `npm run dev:cloudflare` runs `cloudflared tunnel --url http://127.0.0.1:<port>`, waits for the generated `https://*.trycloudflare.com` URL, then starts the integrated server with `PUBLIC_BASE_URL` set to that HTTPS URL so invite links and browser WebSocket URLs derive from the Cloudflare hostname. Quick tunnels are intended for development and testing, generate random `trycloudflare.com` URLs, have no uptime SLA, have a 200 in-flight request limit, and do not support Server-Sent Events. Install or update `cloudflared` from the [Cloudflare downloads documentation](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) before using this flow.
+
+For stable Cloudflare hostnames, use a named Cloudflare Tunnel instead of a quick tunnel. Named tunnels and custom hostnames require a Cloudflare account and a domain configured in Cloudflare. Configure a public hostname route that points to the local service, for example `http://localhost:8787`, run that named tunnel with `cloudflared`, then start Casino Warehouse with `PUBLIC_BASE_URL=https://your-hostname.example npm run dev:server` so room invites and WebSocket origins match the published hostname.
 
 Public tunnel sessions use three separate trust checks. WebSocket upgrades require an `Origin` header from a local development origin or from the configured public base URL; the integrated tunnel flows configure that base URL from the printed app URL. The localtunnel flow serves the app with a trusted runtime WebSocket URL for its separate WebSocket tunnel. If you expose the server through another public tunnel, set `PUBLIC_BASE_URL` to that app URL before starting `npm run dev:server`; set `PUBLIC_WEBSOCKET_URL` only when the browser should connect to a different public `ws://` or `wss://` URL. There is no development bypass for missing or unexpected WebSocket origins.
 
@@ -120,7 +130,7 @@ npm run dev:server
 
 - If the app stays on a reconnecting screen, make sure `npm run dev:server` or `npm run dev:full` is running.
 - `npm run dev` starts only the Vite client shell. Use it alongside a running server, or use `npm run dev:server` for the normal local app.
-- If multiplayer devices cannot join each other, create a fresh room after both devices open the same local, ngrok, or localtunnel URL.
+- If multiplayer devices cannot join each other, create a fresh room after both devices open the same local, ngrok, localtunnel, or Cloudflare Tunnel URL.
 - If dependencies fail to install, confirm your Node version matches the requirement above.
 - Development tools may emit Node 26 warnings from upstream packages, including `DEP0205` for `module.register()`, Vitest's localStorage warning, or color-environment warnings from Playwright web-server output. These are non-blocking toolchain warnings when the documented checks pass.
 
