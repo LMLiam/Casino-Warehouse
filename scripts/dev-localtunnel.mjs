@@ -99,8 +99,15 @@ const startTunnel = async (label, subdomain) => {
   }
 
   const tunnel = await localtunnel(options);
+  let publicUrl;
+  try {
+    publicUrl = normalizePublicUrl(tunnel.url);
+  } catch (error) {
+    closingTunnels.add(tunnel);
+    tunnel.close();
+    throw error;
+  }
   tunnels.push(tunnel);
-  const publicUrl = normalizePublicUrl(tunnel.url);
   tunnel.on('error', (error) => {
     if (!shuttingDown && !closingTunnels.has(tunnel)) {
       console.error(`localtunnel ${label} tunnel error: ${error instanceof Error ? error.message : String(error)}`);
