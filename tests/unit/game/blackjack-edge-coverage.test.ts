@@ -4,6 +4,7 @@ import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { BlackjackGame } from '../../../src/game/blackjack/BlackjackGame';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
+const malformedCard = (rank: string, suit: string): Card => JSON.parse(JSON.stringify({ rank, suit })) as Card;
 
 describe('BlackjackGame edge coverage', () => {
   it('keeps inactive actions as no-ops before and after a hand settles', () => {
@@ -29,11 +30,11 @@ describe('BlackjackGame edge coverage', () => {
     const restored = game.restore({
       phase: 'player',
       wager: 10.9,
-      playerCards: [card('10', 'clubs'), { rank: '1', suit: 'stars' } as unknown as Card],
+      playerCards: [card('10', 'clubs'), malformedCard('1', 'stars')],
       dealerCards: [card('A', 'spades'), { rank: 'J', suit: 'hearts' }],
       dealerHoleHidden: true,
       insuranceWager: -5,
-      splitHands: [[card('8', 'clubs'), { rank: 'bad', suit: 'bad' } as unknown as Card]],
+      splitHands: [[card('8', 'clubs'), malformedCard('bad', 'bad')]],
       result: undefined,
       returned: -50,
       status: '',

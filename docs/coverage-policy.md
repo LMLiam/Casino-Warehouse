@@ -5,10 +5,10 @@ Issue #17 raises the enforced unit coverage floor from `85/80/85/85` to `90/85/9
 The refreshed implementation run on this branch passed with 273 Vitest tests and:
 
 ```text
-Statements   : 93.13%
-Branches     : 85.15%
+Statements   : 93.07%
+Branches     : 85.11%
 Functions    : 94.67%
-Lines        : 93.21%
+Lines        : 93.15%
 ```
 
 ## Instrumented Scope
@@ -34,7 +34,7 @@ The following paths or path families are intentionally outside the Vitest unit c
 
 No high-risk file below the raised global threshold is hidden as complete. Remaining per-file gaps below 80% statement or branch coverage are tracked in follow-up issue [#133](https://github.com/LMLiam/Casino-Warehouse/issues/133), including:
 
-- `src/multiplayer/roomAuthority.ts`: 83.17% statements / 76.49% branches.
+- `src/multiplayer/roomAuthority.ts`: 82.86% statements / 76.11% branches.
 - `src/multiplayer/client/MultiplayerClient.ts`: 91.59% statements / 76.04% branches.
 - `src/multiplayer/serverEntry/maybeStartServer.ts`: 75.00% statements / 66.66% branches.
 - `scripts/codeql-autofix-prs.mjs`: 89.42% statements / 77.04% branches.
