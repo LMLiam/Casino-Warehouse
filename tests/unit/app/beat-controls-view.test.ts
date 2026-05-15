@@ -68,6 +68,52 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
 });
 
 describe('BeatControlsView', () => {
+  it('keeps local rebet availability on the game snapshot path', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = { ...base, canRebet: true };
+    const elements = createElements();
+
+    new BeatControlsView(elements).render(snapshot, true, () => undefined, true);
+
+    expect(elements.rebetButton.disabled).toBe(false);
+  });
+
+  it('confirms queued local deal actions after the main bet appears', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      bets: {
+        ...base.bets,
+        left: { ...base.bets.left, main: 25 },
+      },
+    };
+    const elements = createElements();
+    const view = new BeatControlsView(elements);
+    let confirmed = false;
+
+    view.markPendingBet('main');
+    view.queueStartRound();
+    view.render(snapshot, true, () => {
+      confirmed = true;
+    });
+
+    expect(confirmed).toBe(true);
+    expect(elements.dealButton.disabled).toBe(false);
+  });
+
+  it('clears pending controls when the Beat the House snapshot leaves betting', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = { ...base, phase: 'roundOver' };
+    const elements = createElements();
+    const view = new BeatControlsView(elements);
+
+    view.markPendingBet('main');
+    view.render(snapshot, true, () => undefined);
+
+    expect(elements.dealButton.disabled).toBe(true);
+    expect(elements.nextButton.disabled).toBe(false);
+  });
+
   it('uses the acting multiplayer seat for clear and rebet button availability', () => {
     const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
     const snapshot: GameSnapshot = {

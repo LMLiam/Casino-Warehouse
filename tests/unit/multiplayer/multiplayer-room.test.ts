@@ -9,6 +9,7 @@ import type { RoomSeatId } from '../../../src/multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
 import { serverMessageSchema } from '../../../src/schemas/protocol/serverMessageSchema';
+import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable/BlackjackTableSnapshot';
 import type { SlotSnapshot } from '../../../src/game/slots/SlotSnapshot';
@@ -537,7 +538,8 @@ describe('per-game room authority', () => {
   });
 
   it('scopes Beat the House clear and rebet to the acting player seat', () => {
-    const authority = new RoomAuthority();
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
     const roomId = authority.handle('a', create('beat-the-house', 'alice', 1000)).direct!.roomId;
     authority.handle('a', claimSeat('left'));
     authority.handle('b', join('beat-the-house', roomId, 'bob', 1000));
@@ -555,6 +557,7 @@ describe('per-game room authority', () => {
     expect(beat(cleared).bets.right.main).toBe(40);
     expect(cleared.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(1000);
     expect(cleared.players.find((player) => player.profileId === 'bob')?.bankroll).toBe(960);
+    expect(authority.handle('a', { version: 1, type: 'clear-bets' }).error).toBe('You do not have bets to clear.');
     expect(authority.handle('watch', { version: 1, type: 'rebet' }).error).toBe('Spectators cannot rebet.');
 
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
@@ -571,6 +574,10 @@ describe('per-game room authority', () => {
     expect(beat(room).phase).toBe('roundOver');
     const nextRound = authority.handle('a', { version: 1, type: 'next-round' }).broadcasts[0];
     expect(beat(nextRound).rebetAmounts).toMatchObject({ left: 25, right: 40 });
+    store.setProfileBankroll('bob', 1);
+    const lowBobBankroll = authority.reconcileProfiles('test bankroll update').broadcasts[0];
+    expect(lowBobBankroll.players.find((player) => player.profileId === 'bob')?.bankroll).toBe(1);
+    expect(authority.handle('b', { version: 1, type: 'rebet' }).error).toBe('Need £40 to rebet.');
     authority.handle('b', { version: 1, type: 'leave-room' });
     authority.handle('c', join('beat-the-house', roomId, 'cory', 1));
     const reseated = authority.handle('c', claimSeat('right')).broadcasts[0];
@@ -583,6 +590,7 @@ describe('per-game room authority', () => {
     expect(beat(aliceRebet).bets.right.main).toBe(0);
     expect(aliceRebet.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(aliceBeforeRebet - 25);
     expect(aliceRebet.players.find((player) => player.profileId === 'cory')?.bankroll).toBe(1);
+    expect(authority.handle('a', { version: 1, type: 'rebet' }).error).toBe('Clear your current bets before rebetting.');
     expect(authority.handle('c', { version: 1, type: 'rebet' }).error).toBe('No previous bet saved for your seat.');
     const afterBobError = authority.handle('a', { version: 1, type: 'resync' }).direct!;
     expect(beat(afterBobError).bets.left.main).toBe(25);
