@@ -43,6 +43,7 @@ Primary references:
 - `./start-codex-docs-audit.sh --print "audit scope"`: preview the Codex `/goal` for auditing documentation drift.
 - `./start-codex-security-pass.sh --print "pull request #123"`: preview the Codex `/goal` for a focused security review.
 - `./start-codex-multiplayer-check.sh --print "pull request #123"`: preview the Codex `/goal` for a multiplayer regression review.
+- `./start-codex-architecture-split.sh --print "src/multiplayer/roomAuthority.ts"`: preview the Codex `/goal` for planning a focused architecture cleanup or file split.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -180,6 +181,12 @@ The security review workflow must inspect the requested target and related tests
 When asked for a multiplayer regression pass, realtime flow review, public tunnel smoke assessment, room authority review, reconnect/reload check, or focused review of multiplayer behavior, use the Casino Warehouse multiplayer regression skill at `.agents/skills/casino-multiplayer-regression/SKILL.md`. For interactive launches, use `start-codex-multiplayer-check.sh`.
 
 The multiplayer regression workflow must inspect changed files and related protocol schemas, server authority, client realtime URL behavior, persistence boundaries, public tunnel scripts, and relevant tests when applicable. It must map room lifecycle, host/join, seat claim, spectator, reconnect, heartbeat, WebSocket origin, public invite URL, profile ownership, admin permission, room snapshot, settlement, and persistence reconciliation risks to targeted checks, including unit tests and Playwright multiplayer or public tunnel smoke lanes where relevant.
+
+## Architecture Cleanup Workflow
+
+When asked to split large files, fix source-file shape problems, reduce architecture-check failures, move modules between domain owners, or plan structural cleanup, use the Casino Warehouse architecture splitter skill at `.agents/skills/casino-architecture-splitter/SKILL.md`. For interactive launches, use `start-codex-architecture-split.sh`.
+
+The architecture cleanup workflow must inspect `docs/code-quality.md`, target files, imports, dependents, relevant tests, and architecture-check rules before proposing a split. It must preserve behavior, direct imports, one module-scope top-level element per source file, domain ownership, circular-dependency safety, and game/multiplayer/state authority boundaries.
 
 ## Pull Request Checklist
 
