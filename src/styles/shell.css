@@ -72,6 +72,14 @@ button.seat-status-pill {
     0 12px 26px rgba(0, 0, 0, 0.36);
 }
 
+.seat-status-pill.dealer-tipped {
+  border-color: #ffd56b;
+  box-shadow:
+    0 0 0 2px rgba(255, 213, 107, 0.22),
+    0 0 24px rgba(255, 213, 107, 0.38),
+    0 12px 26px rgba(0, 0, 0, 0.36);
+}
+
 .seat-status-pill b,
 .seat-status-pill small,
 .seat-status-pill span {

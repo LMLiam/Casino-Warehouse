@@ -95,6 +95,7 @@ export const clientMessageSchema = (() => {
     baseClientMessageSchema.extend({ type: z.literal('leave-room') }),
     baseClientMessageSchema.extend({ type: z.literal('assign-seat'), seatId: roomSeatIdSchema }),
     baseClientMessageSchema.extend({ type: z.literal('place-chip'), seatId: handIdSchema, betType: betTypeSchema, amount: positiveNetworkCreditSchema }),
+    baseClientMessageSchema.extend({ type: z.literal('place-tip'), seatId: handIdSchema, amount: positiveNetworkCreditSchema }),
     baseClientMessageSchema.extend({ type: z.literal('blackjack-deal'), wager: positiveNetworkCreditSchema }),
     baseClientMessageSchema.extend({ type: z.literal('blackjack-action'), action: z.enum(['hit', 'stand', 'double', 'split', 'insurance', 'new-hand']) }),
     baseClientMessageSchema.extend({ type: z.literal('slots-wager'), wager: positiveNetworkCreditSchema }),

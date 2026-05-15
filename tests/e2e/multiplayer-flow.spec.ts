@@ -243,10 +243,13 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
     await dropChipPercent(page, 19.25, 70.55, 25);
     await expect(page.locator('.seat-status-pill.mine')).toContainText('£975 (-£25)');
     await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left')).toBe(true);
+    await dropChipPercent(page, 26.25, 71.6, 25);
+    await expect(page.locator('.seat-status-pill.mine')).toContainText('£950 (-£50)');
+    await expect.poll(async () => (await parsedDataset(page, 'dealerTipSeats')).includes('left')).toBe(true);
     await dropChipPercent(page, 29.7, 44.2, 25);
     await dropChipPercent(page, 30.4, 45.0, 25);
     await dropChipPercent(page, 28.9, 43.8, 25);
-    await expect.poll(() => tableAmount(page)).toBeGreaterThan(25);
+    await expect.poll(() => tableAmount(page)).toBeGreaterThan(50);
     await page.locator('#dealBtn').click();
 
     await expect
@@ -296,6 +299,8 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
     await page.locator('#nextBtn').click();
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible)).toBe('false');
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.dealerCardCount)).toBe('0');
+    await expect.poll(async () => (await parsedDataset(page, 'dealerTipSeats')).length).toBe(0);
+    await expect.poll(async () => (await parsedDataset(page, 'dealerThanksRewards')).length).toBe(0);
     await expect(page.locator('#chipRail')).toBeVisible();
 
     await page.emulateMedia({ reducedMotion: 'reduce' });

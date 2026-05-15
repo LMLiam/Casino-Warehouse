@@ -9,5 +9,6 @@ export interface HandLayout {
   readonly cards: readonly PointPercent[];
   readonly marker: PointPercent;
   readonly popup: PointPercent;
+  readonly tipZone: RectPercent;
   readonly zones: Record<BetType, RectPercent>;
 }

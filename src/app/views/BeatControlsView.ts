@@ -1,4 +1,4 @@
-import type { BetType } from '../../game/types/BetType';
+import type { BeatTheHouseChipTarget } from '../../game/types/BeatTheHouseChipTarget';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { money } from '../format/appMoney';
@@ -31,10 +31,10 @@ export class BeatControlsView {
     private readonly onChipBankrollChange: (bankroll: number | undefined, canSelectChip: boolean) => void = () => undefined,
   ) {}
 
-  public markPendingBet(betType: BetType): void {
+  public markPendingBet(chipTarget: BeatTheHouseChipTarget): void {
     this.pendingAnyBet = true;
     this.setActionButton(this.elements.rebetButton, false);
-    if (betType !== 'main') {
+    if (chipTarget !== 'main') {
       return;
     }
     this.pendingMainBet = true;
@@ -72,12 +72,12 @@ export class BeatControlsView {
     this.elements.status.textContent = snapshot.status;
     const wageredOnTable = totalOnTable(snapshot);
     const activeHandId = activeRoom ? this.activeHandId(activeRoom, profileId) : undefined;
-    const currentProfileWagered = activeRoom ? (activeHandId ? this.totalHandBet(snapshot.bets[activeHandId]) : 0) : wageredOnTable;
+    const currentProfileWagered = activeRoom ? (activeHandId ? this.totalHandTableCredits(snapshot, activeHandId) : 0) : wageredOnTable;
     const hasMainBet = this.hasMainBet(snapshot);
     if (snapshot.phase !== 'betting') {
       this.clearPending();
     }
-    if (this.totalBet(snapshot.bets) > 0) {
+    if (wageredOnTable > 0) {
       this.pendingAnyBet = false;
     }
     if (hasMainBet) {
@@ -117,12 +117,12 @@ export class BeatControlsView {
     return Object.values(snapshot.bets).some((bet) => bet.main > 0);
   }
 
-  private totalBet(snapshotBets: GameSnapshot['bets']): number {
-    return Object.values(snapshotBets).reduce((sum, handBets) => sum + Object.values(handBets).reduce((handSum, amount) => handSum + amount, 0), 0);
-  }
-
   private totalHandBet(handBets: GameSnapshot['bets'][keyof GameSnapshot['bets']]): number {
     return Object.values(handBets).reduce((total, amount) => total + amount, 0);
+  }
+
+  private totalHandTableCredits(snapshot: GameSnapshot, handId: keyof GameSnapshot['bets']): number {
+    return this.totalHandBet(snapshot.bets[handId]) + snapshot.dealerTips[handId];
   }
 
   private activeHandId(room: RoomSnapshot, profileId: string | undefined): keyof GameSnapshot['bets'] | undefined {
@@ -139,7 +139,7 @@ export class BeatControlsView {
     if (!activeRoom) {
       return snapshot.canRebet;
     }
-    if (!activeHandId || snapshot.phase !== 'betting' || this.totalHandBet(snapshot.bets[activeHandId]) > 0) {
+    if (!activeHandId || snapshot.phase !== 'betting' || this.totalHandTableCredits(snapshot, activeHandId) > 0) {
       return false;
     }
     const rebetAmount = snapshot.rebetAmounts[activeHandId];

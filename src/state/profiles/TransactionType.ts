@@ -7,5 +7,7 @@ export type TransactionType =
   | 'reset'
   | 'import'
   | 'correction'
+  | 'dealer_tip'
+  | 'dealer_thanks'
   | 'house_advance_credit'
   | 'house_advance_repayment';

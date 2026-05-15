@@ -45,6 +45,7 @@ export class BeatSeatStatusView {
           : 'Open';
         const mine = owner?.profileId === profileId ? ' mine' : '';
         const occupied = owner ? ' occupied' : '';
+        const tipped = snapshot.phase !== 'betting' && snapshot.phase !== 'roundOver' && snapshot.dealerTips[hand.id] > 0 ? ' dealer-tipped' : '';
         const sessionDelta = owner ? owner.bankroll - owner.sessionStartBankroll : 0;
         const deltaClass = sessionDelta > 0 ? ' gain' : sessionDelta < 0 ? ' loss' : '';
         const deltaText = sessionDelta === 0 ? 'even' : `${sessionDelta > 0 ? '+' : '-'}${money(Math.abs(sessionDelta))}`;
@@ -66,7 +67,7 @@ export class BeatSeatStatusView {
           `;
         }
         return `
-          <span class="seat-status-pill${occupied}${mine}" style="left: ${hand.zones.main.x}%; top: ${hand.zones.main.y + hand.zones.main.height / 2 + BeatSeatStatusView.seatPillVerticalOffsetPercent}%">
+          <span class="seat-status-pill${occupied}${mine}${tipped}" style="left: ${hand.zones.main.x}%; top: ${hand.zones.main.y + hand.zones.main.height / 2 + BeatSeatStatusView.seatPillVerticalOffsetPercent}%">
             ${content}
           </span>
         `;

@@ -25,7 +25,11 @@ export const recordTransaction = (
   const balanceAfter = Math.max(0, profile.bankroll + amount);
   const countsAsWin = amount > 0 && (transaction.type === 'payout' || transaction.type === 'bonus');
   const countsAsWager = transaction.type === 'wager';
-  const statsNeutral = transaction.type === 'house_advance_credit' || transaction.type === 'house_advance_repayment';
+  const statsNeutral =
+    transaction.type === 'dealer_tip' ||
+    transaction.type === 'dealer_thanks' ||
+    transaction.type === 'house_advance_credit' ||
+    transaction.type === 'house_advance_repayment';
   const previousGame = profile.stats.perGame[transaction.gameId] ?? emptyPerGameStats();
   const nextPerGame: PerGameStats = {
     gamesPlayed: previousGame.gamesPlayed + (!statsNeutral && countsAsWager ? 1 : 0),

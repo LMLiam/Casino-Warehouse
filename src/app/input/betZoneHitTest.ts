@@ -1,9 +1,18 @@
 import type { BetType } from '../../game/types/BetType';
-import type { HandId } from '../../game/types/HandId';
+import type { RectPercent } from '../../ui/layout/RectPercent';
 import { handLayouts } from '../../ui/layout/handLayouts';
 import { tableSize } from '../../ui/layout/tableSize';
+import type { BeatTheHouseChipPlacement } from './BeatTheHouseChipPlacement';
 
-export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: number): { readonly handId: HandId; readonly betType: BetType } | undefined => {
+export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: number): BeatTheHouseChipPlacement | undefined => {
+  const contains = (zone: RectPercent, xPercent: number, yPercent: number): boolean => {
+    const left = zone.x - zone.width / 2;
+    const right = zone.x + zone.width / 2;
+    const top = zone.y - zone.height / 2;
+    const bottom = zone.y + zone.height / 2;
+    return xPercent >= left && xPercent <= right && yPercent >= top && yPercent <= bottom;
+  };
+
   const rect = host.getBoundingClientRect();
   const scale = Math.min(rect.width / tableSize.width, rect.height / tableSize.height);
   const renderedWidth = tableSize.width * scale;
@@ -14,12 +23,11 @@ export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: numb
   const yPercent = ((clientY - rect.top - offsetY) / renderedHeight) * 100;
 
   for (const hand of handLayouts) {
+    if (contains(hand.tipZone, xPercent, yPercent)) {
+      return { handId: hand.id, dealerTip: true };
+    }
     for (const [betType, zone] of Object.entries(hand.zones) as [BetType, (typeof hand.zones)[BetType]][]) {
-      const left = zone.x - zone.width / 2;
-      const right = zone.x + zone.width / 2;
-      const top = zone.y - zone.height / 2;
-      const bottom = zone.y + zone.height / 2;
-      if (xPercent >= left && xPercent <= right && yPercent >= top && yPercent <= bottom) {
+      if (contains(zone, xPercent, yPercent)) {
         return { handId: hand.id, betType };
       }
     }

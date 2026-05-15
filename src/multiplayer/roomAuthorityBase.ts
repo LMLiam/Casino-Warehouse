@@ -74,7 +74,7 @@ export abstract class RoomAuthorityBase {
       return [];
     }
     room.settledSessionIds.add(room.sessionId);
-    return snapshot.summaries.flatMap((summary) => {
+    const gameplaySettlements = snapshot.summaries.flatMap((summary) => {
       const profileId = room.seats.get(summary.handId);
       if (!profileId) {
         return [];
@@ -83,8 +83,55 @@ export abstract class RoomAuthorityBase {
       const returned = wagered + summary.profit;
       const player = room.players.get(profileId);
       const houseAdvanceRepayment = player && returned > 0 ? this.applyPlayerSettlement(room, profileId, returned, summary.profit) : 0;
-      return [{ id: createId('settlement'), profileId, seatId: summary.handId, wagered, returned, profit: summary.profit, houseAdvanceRepayment }];
+      return [
+        {
+          id: createId('settlement'),
+          kind: 'gameplay' as const,
+          profileId,
+          seatId: summary.handId,
+          wagered,
+          returned,
+          profit: summary.profit,
+          houseAdvanceRepayment,
+        },
+      ];
     });
+    const dealerThanksSettlements = handIds.flatMap((handId): RoomSettlement[] => {
+      const dealerThanks = snapshot.dealerTipRewards[handId];
+      const profileId = room.seats.get(handId);
+      if (!profileId || dealerThanks <= 0) {
+        return [];
+      }
+      const player = room.players.get(profileId);
+      const dealerTip = snapshot.dealerTips[handId];
+      const updated = this.dataStore.recordTransaction(profileId, {
+        gameId: room.gameId,
+        roomId: room.roomId,
+        sessionId: room.sessionId,
+        type: 'dealer_thanks',
+        amount: dealerThanks,
+        description: "Dealer's Thanks reward.",
+        metadata: { handId, dealerTip, dealerThanks },
+      });
+      if (player && updated) {
+        room.players.set(profileId, { ...player, bankroll: updated.bankroll });
+      }
+      return [
+        {
+          id: createId('settlement'),
+          kind: 'dealer-thanks',
+          profileId,
+          seatId: handId,
+          wagered: 0,
+          returned: dealerThanks,
+          profit: 0,
+          dealerTip,
+          dealerThanks,
+          houseAdvanceRepayment: 0,
+        },
+      ];
+    });
+    return [...gameplaySettlements, ...dealerThanksSettlements];
   }
 
   protected applyBlackjackSettlements(room: RoomState, result: BlackjackTableActionResult): readonly RoomSettlement[] {

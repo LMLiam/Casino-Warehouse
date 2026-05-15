@@ -9,6 +9,8 @@ export const transactionTypeSchema = z.enum([
   'reset',
   'import',
   'correction',
+  'dealer_tip',
+  'dealer_thanks',
   'house_advance_credit',
   'house_advance_repayment',
 ]);
