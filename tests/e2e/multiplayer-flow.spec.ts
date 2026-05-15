@@ -146,7 +146,7 @@ test('new browsers do not inherit another saved profile session and can switch p
   if (!aliceProfile) {
     throw new Error('Expected seeded Alice profile.');
   }
-  dataStore.saveSession(createSessionState([aliceProfile.id], { activeGame: 'blackjack', showingGameLobby: false }));
+  dataStore.saveSession(createSessionState(aliceProfile.id, { activeGame: 'blackjack', showingGameLobby: false }));
   const wsUrl = await startRealtimeServerWithStore(dataStore);
   const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Server Bob'));
   try {
@@ -507,7 +507,7 @@ const startExistingProfileSession = async (page: Page, name: string): Promise<vo
   await expect(row).toBeVisible();
   await expect(row.locator('[data-profile-select]')).toBeEnabled();
   await row.locator('[data-profile-select]').check();
-  await page.getByRole('button', { name: 'Start Selected Session' }).click();
+  await page.getByRole('button', { name: 'Start Profile Session' }).click();
 };
 
 const waitForRealtime = async (page: Page): Promise<void> => {

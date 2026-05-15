@@ -28,13 +28,12 @@ class MemoryStorage implements StorageLike {
 }
 
 describe('session store', () => {
-  it('persists current multiplayer session separately from profile records', () => {
+  it('persists the current single-profile session separately from profile records', () => {
     const storage = new MemoryStorage();
     const session = createSessionState(
-      ['profile-a', 'profile-b'],
+      'profile-a',
       {
         activeGame: 'blackjack',
-        selectedPlayerIndex: 1,
         showingGameLobby: false,
         wagerLimit: 500,
         wagered: 125,
@@ -43,21 +42,19 @@ describe('session store', () => {
           gameId: 'blackjack',
           role: 'player',
         },
-        gameSnapshots: {
-          'profile-a': {
-            blackjack: {
-              phase: 'player',
-              wager: 25,
-              playerCards: [{ rank: 'K', suit: 'spades' }],
-              dealerCards: [{ rank: '7', suit: 'hearts' }],
-              dealerHoleHidden: true,
-              insuranceWager: 0,
-              splitHands: [],
-              returned: 0,
-              status: 'Player K.',
-            },
-            slots: {},
+        gameSnapshot: {
+          blackjack: {
+            phase: 'player',
+            wager: 25,
+            playerCards: [{ rank: 'K', suit: 'spades' }],
+            dealerCards: [{ rank: '7', suit: 'hearts' }],
+            dealerHoleHidden: true,
+            insuranceWager: 0,
+            splitHands: [],
+            returned: 0,
+            status: 'Player K.',
           },
+          slots: {},
         },
       },
       new Date('2026-05-04T12:00:00Z'),
@@ -70,13 +67,13 @@ describe('session store', () => {
     expect(loaded.recovered).toBe(false);
   });
 
-  it('deduplicates selected profiles and clamps invalid wager values', () => {
-    const session = createSessionState(['a', 'a', '', 'b'], {
+  it('stores one selected profile and clamps invalid wager values', () => {
+    const session = createSessionState('a', {
       wagerLimit: -1,
       wagered: Number.NaN,
     });
 
-    expect(session.profileIds).toEqual(['a', 'b']);
+    expect(session.profileId).toBe('a');
     expect(session.wagerLimit).toBe(0);
     expect(session.wagered).toBe(0);
   });
@@ -123,7 +120,7 @@ describe('session store', () => {
 
   it('recovers gracefully from corrupt session storage', () => {
     const storage = new MemoryStorage();
-    storage.setItem('casino_warehouse_session_v1', '{ broken');
+    storage.setItem('casino_warehouse_session_v2', '{ broken');
 
     const loaded = loadSessionState(storage);
 
@@ -134,10 +131,9 @@ describe('session store', () => {
 
   it('rejects unknown game ids', () => {
     const session = parseSessionState({
-      version: 1,
-      profileIds: ['a'],
+      version: 2,
+      profileId: 'a',
       activeGame: 'not-real',
-      selectedPlayerIndex: 0,
       showingGameLobby: false,
       wagerLimit: 0,
       wagered: 0,
@@ -151,69 +147,64 @@ describe('session store', () => {
     const storage = new MemoryStorage();
     expect(loadSessionState(storage)).toEqual({ recovered: false });
     const session = parseSessionState({
-      version: 1,
-      profileIds: ['a', 7, 'b'],
-      selectedPlayerIndex: 4.7,
+      version: 2,
+      profileId: 'a',
       activeGame: 'slots:thai-princess',
       showingGameLobby: '',
       wagerLimit: '200',
       wagered: '50',
-      gameSnapshots: {
-        a: { beatTheHouse: {}, blackjack: {}, slots: { 'thai-princess': { themeId: 'thai-princess' } } },
-        bad: null,
-      },
+      gameSnapshot: { beatTheHouse: {}, blackjack: {}, slots: { 'thai-princess': { themeId: 'thai-princess' } } },
     });
 
-    expect(session.profileIds).toEqual(['a', 'b']);
+    expect(session.profileId).toBe('a');
     expect(session.activeGame).toBe('slots:thai-princess');
-    expect(session.selectedPlayerIndex).toBe(4);
     expect(
       parseSessionState({
-        version: 1,
-        profileIds: ['a'],
+        version: 2,
+        profileId: 'a',
         room: { roomId: 'mixed42', gameId: 'blackjack', role: 'spectator', seatId: 'seat-2' },
       }).room,
     ).toEqual({ roomId: 'MIXED42', gameId: 'blackjack', role: 'spectator', seatId: 'seat-2' });
     expect(
       parseSessionState({
-        version: 1,
-        profileIds: ['a'],
+        version: 2,
+        profileId: 'a',
         room: { roomId: 'mixed42', gameId: 'beat-the-house', role: 'player', seatId: 'centre' },
       }).room,
     ).toEqual({ roomId: 'MIXED42', gameId: 'beat-the-house', role: 'player', seatId: 'centre' });
     expect(
       parseSessionState({
-        version: 1,
-        profileIds: ['a'],
+        version: 2,
+        profileId: 'a',
         room: { roomId: 'mixed42', gameId: 'blackjack', role: 'player', seatId: 'not-a-seat' },
       }).room,
     ).toEqual({ roomId: 'MIXED42', gameId: 'blackjack', role: 'player', seatId: undefined });
     expect(
       parseSessionState({
-        version: 1,
-        profileIds: ['a'],
+        version: 2,
+        profileId: 'a',
         room: { roomId: '', gameId: 'blackjack', role: 'player' },
       }).room,
     ).toBeUndefined();
     expect(
       parseSessionState({
-        version: 1,
-        profileIds: ['a'],
+        version: 2,
+        profileId: 'a',
         room: { roomId: 'room42', gameId: 'not-real', role: 'player' },
       }).room,
     ).toBeUndefined();
     expect(
       parseSessionState({
-        version: 1,
-        profileIds: ['a'],
+        version: 2,
+        profileId: 'a',
         room: { roomId: 'room42', gameId: 'blackjack', role: 'dealer' },
       }).room,
     ).toBeUndefined();
-    expect(session.gameSnapshots.a.slots?.['thai-princess']).toEqual({ themeId: 'thai-princess' });
+    expect(session.gameSnapshot?.slots?.['thai-princess']).toEqual({ themeId: 'thai-princess' });
   });
 
-  it('rejects malformed and unsupported session-state migration inputs clearly', () => {
-    expect(() => parseSessionState({ version: 1 })).toThrow('Session v1 data is not valid.');
-    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data version 2 is not supported.');
+  it('rejects malformed and unsupported session-state inputs clearly', () => {
+    expect(() => parseSessionState({ version: 2 })).toThrow('Session v2 data is not valid.');
+    expect(() => parseSessionState({ version: 1, profileIds: [] })).toThrow('Session data version 1 is not supported.');
   });
 });

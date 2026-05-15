@@ -46,10 +46,9 @@ export abstract class GameAppRendering {
   protected abstract readonly slotsView: SlotsView;
   protected abstract readonly walletView: WalletView;
   protected abstract readonly multiplayer: MultiplayerClient;
-  protected abstract players: CasinoPlayer[];
+  protected abstract player: CasinoPlayer | undefined;
   protected abstract profileState: CasinoSaveState;
   protected abstract lastSaveError: string;
-  protected abstract selectedPlayerIndex: number;
   protected abstract activeGame: CasinoGameId;
   protected abstract showingGameLobby: boolean;
   protected abstract sessionWagerLimit: number;
@@ -108,13 +107,8 @@ export abstract class GameAppRendering {
     );
   }
 
-  protected renderPlayerButtons(): void {
-    this.playerStripView.render(this.players, (playerIndex) => {
-      this.selectedPlayerIndex = playerIndex;
-      this.walletView.resetPreviousBankroll();
-      this.saveSession();
-      this.renderCasino();
-    });
+  protected renderPlayerProfile(): void {
+    this.playerStripView.render(this.player);
   }
 
   protected renderCasino(): void {
@@ -124,9 +118,6 @@ export abstract class GameAppRendering {
     }
 
     this.elements.gameTabs.forEach((button) => button.classList.toggle('selected', button.dataset.game === this.activeGame));
-    this.elements.playerStrip.querySelectorAll<HTMLButtonElement>('[data-player]').forEach((button) => {
-      button.classList.toggle('selected', Number(button.dataset.player) === this.selectedPlayerIndex);
-    });
 
     const activeCatalogGame = findGame(this.activeGame);
     const isBeatTheHouse = activeCatalogGame.kind === 'beat-the-house';

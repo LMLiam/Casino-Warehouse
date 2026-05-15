@@ -31,13 +31,12 @@ export const clientMessageSchema = (() => {
   });
 
   const clientSessionStateSchema = z.object({
-    profileIds: z.array(profileIdSchema),
-    selectedPlayerIndex: networkCreditSchema,
+    profileId: profileIdSchema,
     activeGame: roomGameIdSchema,
     showingGameLobby: z.boolean(),
     wagerLimit: networkCreditSchema,
     wagered: networkCreditSchema,
-    gameSnapshots: z.record(z.string(), z.record(z.string(), z.unknown())),
+    gameSnapshot: z.record(z.string(), z.unknown()).optional(),
     room: z
       .object({
         roomId: z

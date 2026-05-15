@@ -99,14 +99,23 @@
 }
 
 .player-strip {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
+.player-strip-profile,
 .player-strip button,
 .game-tabs button {
   min-height: 38px;
   font-size: 13px;
   font-weight: 900;
+}
+
+.player-strip-profile {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
 .player-strip button.selected,

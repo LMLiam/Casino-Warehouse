@@ -211,13 +211,11 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.createProfile('Alice');
     client.renameProfile('profile-a', 'Alicia');
     client.saveSession({
-      profileIds: ['profile-a'],
-      selectedPlayerIndex: 0,
+      profileId: 'profile-a',
       activeGame: 'beat-the-house',
       showingGameLobby: true,
       wagerLimit: 0,
       wagered: 0,
-      gameSnapshots: {},
     });
     client.adjustBankroll('profile-a', 'add', 100);
     client.resetAllBankrolls();
@@ -452,16 +450,14 @@ describe('multiplayer realtime client reconnect reloads', () => {
     const client = new MultiplayerClient(events);
 
     client.saveSession({
-      profileIds: ['profile-a'],
-      selectedPlayerIndex: 0,
+      profileId: 'profile-a',
       activeGame: 'beat-the-house',
       showingGameLobby: true,
       wagerLimit: 0,
       wagered: 0,
-      gameSnapshots: {},
     });
     client.authorizeAdmin('   ');
-    expect(events.onError).toHaveBeenCalledWith('This browser does not own every profile in this session.');
+    expect(events.onError).toHaveBeenCalledWith('This browser does not own this session profile.');
     expect(events.onError).toHaveBeenCalledWith('Enter an admin token first.');
 
     client.connect('ws://first.casino.test/ws');
@@ -482,16 +478,15 @@ describe('multiplayer realtime client reconnect reloads', () => {
     socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
     const snapshot = new BeatTheHouseGame({ initialBankroll: 1000 }).saveState();
     client.saveSession({
-      profileIds: ['profile-a'],
-      selectedPlayerIndex: 0,
+      profileId: 'profile-a',
       activeGame: 'beat-the-house',
       showingGameLobby: true,
       wagerLimit: 0,
       wagered: 0,
-      gameSnapshots: { 'profile-a': { beatTheHouse: snapshot } },
+      gameSnapshot: { beatTheHouse: snapshot },
     });
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({
-      session: { gameSnapshots: { 'profile-a': { beatTheHouse: expect.objectContaining({ phase: 'betting' }) } } },
+      session: { gameSnapshot: { beatTheHouse: expect.objectContaining({ phase: 'betting' }) } },
       type: 'save-session',
     });
 

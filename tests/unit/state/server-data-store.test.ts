@@ -22,13 +22,12 @@ describe('server data store', () => {
     const profile = created.profileState.profiles[0];
 
     store.saveSession(
-      createSessionState([profile.id], {
-        selectedPlayerIndex: 0,
+      createSessionState(profile.id, {
         activeGame: 'blackjack',
         showingGameLobby: false,
         wagerLimit: 200,
         wagered: 50,
-        gameSnapshots: {},
+        gameSnapshot: undefined,
       }),
     );
 
@@ -44,13 +43,12 @@ describe('server data store', () => {
     const second = store.createProfile('Beta').profileState.profiles[1];
 
     store.saveSession(
-      createSessionState([first.id, second.id], {
-        selectedPlayerIndex: 0,
+      createSessionState(first.id, {
         activeGame: 'slots:thai-princess',
         showingGameLobby: false,
         wagerLimit: 100,
         wagered: 25,
-        gameSnapshots: {},
+        gameSnapshot: undefined,
       }),
     );
 
@@ -77,7 +75,7 @@ describe('server data store', () => {
         metadata: {},
       }),
     ).toBeUndefined();
-    expect(store.deleteProfile(second.id).session?.profileIds).toEqual([first.id]);
+    expect(store.deleteProfile(second.id).session?.profileId).toBe(first.id);
     expect(store.clear()).toMatchObject({ profileState: { profiles: [] }, session: undefined });
   });
 
@@ -130,13 +128,12 @@ describe('server data store', () => {
       metadata: {},
     });
     store.saveSession(
-      createSessionState([profile.id], {
-        selectedPlayerIndex: 0,
+      createSessionState(profile.id, {
         activeGame: 'beat-the-house',
         showingGameLobby: true,
         wagerLimit: 0,
         wagered: 0,
-        gameSnapshots: {},
+        gameSnapshot: undefined,
       }),
     );
 
@@ -147,7 +144,7 @@ describe('server data store', () => {
       bankroll: 1125,
       transactions: [expect.objectContaining({ type: 'admin_adjustment', amount: 125, description: 'SQLite persistence check' })],
     });
-    expect(reloaded.session).toMatchObject({ activeGame: 'beat-the-house', profileIds: [profile.id] });
+    expect(reloaded.session).toMatchObject({ activeGame: 'beat-the-house', profileId: profile.id });
   });
 
   it('persists House Advance state and repayment ledger entries in SQLite', async () => {
@@ -184,13 +181,12 @@ describe('server data store', () => {
     const profile = created.profileState.profiles[0];
 
     store.saveSession(
-      createSessionState([profile.id], {
-        selectedPlayerIndex: 0,
+      createSessionState(profile.id, {
         activeGame: 'blackjack',
         showingGameLobby: false,
         wagerLimit: 300,
         wagered: 75,
-        gameSnapshots: {},
+        gameSnapshot: undefined,
       }),
     );
     store.renameProfile(profile.id, 'SQLite Renamed');
@@ -210,7 +206,7 @@ describe('server data store', () => {
       bankroll: 200,
     });
     expect(reloaded.profileState.profiles.find((item) => item.id === 'manual-sqlite')).toMatchObject({ bankroll: 0 });
-    expect(reloaded.session).toMatchObject({ activeGame: 'blackjack', profileIds: [profile.id] });
+    expect(reloaded.session).toMatchObject({ activeGame: 'blackjack', profileId: profile.id });
 
     const clearingStore = new SqliteServerDataStore(dbPath);
     clearingStore.clear();
@@ -230,13 +226,12 @@ describe('server data store', () => {
     const profile = store.createProfile('SQLite Survivor').profileState.profiles[0];
     store.setProfileTokenHash(profile.id, 'token-hash');
     store.saveSession(
-      createSessionState([profile.id], {
-        selectedPlayerIndex: 0,
+      createSessionState(profile.id, {
         activeGame: 'blackjack',
         showingGameLobby: false,
         wagerLimit: 300,
         wagered: 75,
-        gameSnapshots: {},
+        gameSnapshot: undefined,
       }),
     );
     writeStateValue(dbPath, corruptKey, '{ broken json');

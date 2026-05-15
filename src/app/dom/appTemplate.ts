@@ -18,7 +18,7 @@ export const renderTemplate = (): string => `
         <button id="createProfileBtn" class="primary" type="button">Create</button>
       </div>
       <div id="profileList" class="profile-list" aria-label="Saved profiles"></div>
-      <button id="startSessionBtn" class="primary" type="button">Start Selected Session</button>
+      <button id="startSessionBtn" class="primary" type="button">Start Profile Session</button>
       <div id="setupRadixDialogs"></div>
       <p id="saveStatus" class="save-status" role="status"></p>
     </div>
@@ -102,8 +102,8 @@ export const renderTemplate = (): string => `
             </div>
           </details>
           <details class="hud-menu">
-            <summary>Players</summary>
-            <div id="playerStrip" class="player-strip" aria-label="Players"></div>
+            <summary>Profile</summary>
+            <div id="playerStrip" class="player-strip" aria-label="Active profile"></div>
           </details>
         </div>
         <div class="hud-button-row hud-button-row-right">

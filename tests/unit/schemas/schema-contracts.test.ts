@@ -67,10 +67,10 @@ describe('schema contract fixtures', () => {
     expect(() => parseCasinoSaveState(profileStoreContractFixtures.unsupportedVersion)).toThrow('Profile store data version 2 is not supported.');
   });
 
-  it('documents session-state v1 persistence contracts and restore failures', () => {
-    expect(parseSessionState(sessionStateContractFixtures.currentV1)).toEqual(sessionStateContractFixtures.currentV1);
+  it('documents session-state v2 persistence contracts and restore failures', () => {
+    expect(parseSessionState(sessionStateContractFixtures.currentV2)).toEqual(sessionStateContractFixtures.currentV2);
 
-    const restoredRoom = parseSessionState(sessionStateContractFixtures.roomRestoreV1);
+    const restoredRoom = parseSessionState(sessionStateContractFixtures.roomRestoreV2);
     expect(restoredRoom).toMatchObject({
       activeGame: 'blackjack',
       room: {
@@ -80,14 +80,14 @@ describe('schema contract fixtures', () => {
         seatId: 'seat-2',
       },
     });
-    expect(restoredRoom.gameSnapshots['profile-bob'].blackjack).toMatchObject({
+    expect(restoredRoom.gameSnapshot?.blackjack).toMatchObject({
       phase: 'settled',
       wager: 50,
       status: 'Representative restored Blackjack snapshot.',
     });
 
-    expect(() => parseSessionState(sessionStateContractFixtures.malformedV1)).toThrow('Session v1 data is not valid.');
-    expect(() => parseSessionState(sessionStateContractFixtures.unsupportedVersion)).toThrow('Session data version 2 is not supported.');
+    expect(() => parseSessionState(sessionStateContractFixtures.malformedV2)).toThrow('Session v2 data is not valid.');
+    expect(() => parseSessionState(sessionStateContractFixtures.unsupportedVersion)).toThrow('Session data version 1 is not supported.');
   });
 });
 

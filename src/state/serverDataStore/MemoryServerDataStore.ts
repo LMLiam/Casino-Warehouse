@@ -14,7 +14,6 @@ import { reduceHouseAdvanceBalance } from '../profiles/reduceHouseAdvanceBalance
 import { renameProfile } from '../profiles/renameProfile';
 import { replaceProfile } from '../profiles/replaceProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
-import { createSessionState } from '../session/createSessionState';
 import { parseSessionState } from '../session/parseSessionState';
 import type { GameplaySettlementContext } from './GameplaySettlementContext';
 import type { GameplaySettlementResult } from './GameplaySettlementResult';
@@ -45,12 +44,9 @@ export class MemoryServerDataStore implements ServerDataStore {
   public deleteProfile(profileId: string): ServerDataSnapshot {
     this.profileState = deleteProfile(this.profileState, profileId);
     this.deleteProfileTokenHash(profileId);
-    this.session = this.session
-      ? createSessionState(
-          this.session.profileIds.filter((id) => id !== profileId),
-          this.session,
-        )
-      : undefined;
+    if (this.session?.profileId === profileId) {
+      this.session = undefined;
+    }
     return this.snapshot();
   }
 

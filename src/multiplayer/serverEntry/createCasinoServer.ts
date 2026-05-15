@@ -235,9 +235,9 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
           emitAuthorityResult(peer, authority.reconcileProfiles('house-advance-accepted'), { forceDataState: true });
           return true;
         case 'save-session':
-          requireKnownProfiles(profileIdsInSession(message.session));
-          requireOwnedProfiles(peer, profileIdsInSession(message.session));
-          dataStore.saveSession(createSessionState(message.session.profileIds, message.session));
+          requireProfile(message.session.profileId);
+          requireOwnedProfile(peer, message.session.profileId);
+          dataStore.saveSession(createSessionState(message.session.profileId, message.session));
           sendDataState(peer);
           return true;
         case 'admin-bankroll':
@@ -309,12 +309,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     return profile;
   };
 
-  const requireOwnedProfiles = (peer: Peer, profileIds: readonly string[]): void => {
-    for (const profileId of profileIds) {
-      requireOwnedProfile(peer, profileId);
-    }
-  };
-
   const requireAdmin = (peer: Peer): void => {
     if (!peer.isAdmin) {
       throw new Error('Admin controls are locked for this browser.');
@@ -376,17 +370,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
     return profile;
   };
-
-  const requireKnownProfiles = (profileIds: readonly string[]): void => {
-    const knownIds = new Set(dataStore.snapshot().profileState.profiles.map((profile) => profile.id));
-    if (profileIds.some((profileId) => !knownIds.has(profileId))) {
-      throw new Error('Session includes an unknown server profile.');
-    }
-  };
-
-  const profileIdsInSession = (session: Extract<ClientMessage, { type: 'save-session' }>['session']): readonly string[] => [
-    ...new Set([...session.profileIds, ...Object.keys(session.gameSnapshots)]),
-  ];
 
   const useServerProfile = (peer: Peer, message: ClientMessage): ClientMessage => {
     if (message.type !== 'create-room' && message.type !== 'join-room') {

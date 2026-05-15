@@ -177,7 +177,7 @@ const createSession = async (page: Page, name: string): Promise<void> => {
   await page.getByPlaceholder('Player name').fill(name);
   await page.getByRole('button', { name: 'Create' }).click();
   await page.locator('[data-profile-select]:not(:disabled)').last().check();
-  await page.getByRole('button', { name: 'Start Selected Session' }).click();
+  await page.getByRole('button', { name: 'Start Profile Session' }).click();
 };
 
 const claimRoomSeat = async (page: Page, seatLabel: string): Promise<void> => {
