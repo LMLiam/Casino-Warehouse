@@ -29,16 +29,31 @@ import { safeBankroll } from './roomAuthorityModel/safeBankroll';
 import { totalBeatStake } from './roomAuthorityModel/totalBeatStake';
 
 export abstract class RoomAuthorityBase {
+  private static readonly beatNextRoundTimeoutMs = 20_000;
+
   protected readonly rooms = new Map<string, RoomState>();
+  private asyncResultHandler: ((result: AuthorityResult) => void) | undefined;
 
   public constructor(protected readonly dataStore: ServerDataStore = createMemoryServerDataStore()) {
     this.rooms.set(mainBeatRoomId, createServerManagedBeatRoom());
+  }
+
+  public setAsyncResultHandler(handler: ((result: AuthorityResult) => void) | undefined): void {
+    this.asyncResultHandler = handler;
+  }
+
+  public dispose(): void {
+    for (const room of this.rooms.values()) {
+      this.clearBeatNextRoundDeadline(room);
+    }
+    this.asyncResultHandler = undefined;
   }
 
   protected resetRoom(room: RoomState): AuthorityResult {
     room.sessionId = createId('session');
     room.settledSessionIds.clear();
     if (room.model.kind === 'beat-the-house') {
+      this.clearBeatReadiness(room);
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
       room.lastBeatBetOwners = {};
       this.syncBeatBankroll(room);
@@ -66,7 +81,28 @@ export abstract class RoomAuthorityBase {
       room.model.kind === 'beat-the-house' && snapshot && before && 'summaries' in snapshot && snapshot.phase === 'roundOver' && before.phase !== 'roundOver'
         ? this.settleBeat(room, snapshot)
         : [];
+    if (room.model.kind === 'beat-the-house' && snapshot && before && 'summaries' in snapshot) {
+      this.afterBeatSnapshotChange(room, before, snapshot);
+    }
     return this.broadcast(room, settlements);
+  }
+
+  protected afterBeatSnapshotChange(room: RoomState, before: GameSnapshot, after: GameSnapshot): void {
+    if (room.model.kind !== 'beat-the-house') {
+      return;
+    }
+    if (after.phase === 'roundOver' && before.phase !== 'roundOver') {
+      this.clearBeatReadyVotes(room);
+      this.scheduleBeatNextRoundDeadline(room);
+      return;
+    }
+    if (before.phase === 'roundOver' && after.phase !== 'roundOver') {
+      this.clearBeatReadiness(room);
+      return;
+    }
+    if (before.phase === 'betting' && after.phase !== 'betting') {
+      this.clearBeatReadyVotes(room);
+    }
   }
 
   protected settleBeat(room: RoomState, snapshot: GameSnapshot): readonly RoomSettlement[] {
@@ -222,6 +258,7 @@ export abstract class RoomAuthorityBase {
       }
 
       if (!room.serverManaged && (!this.roomHasProfile(room, room.hostProfileId) || this.roomMemberCount(room) === 0)) {
+        this.clearBeatReadiness(room);
         this.rooms.delete(room.roomId);
         roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: RoomAuthorityBase.unique(beforeConnectionIds), reason });
         continue;
@@ -248,6 +285,7 @@ export abstract class RoomAuthorityBase {
     for (const room of [...this.rooms.values()]) {
       const connectionIds = this.roomConnectionIds(room);
       if (!room.serverManaged) {
+        this.clearBeatReadiness(room);
         roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds, reason });
         this.rooms.delete(room.roomId);
         continue;
@@ -268,7 +306,18 @@ export abstract class RoomAuthorityBase {
 
   protected snapshot(room: RoomState): RoomSnapshot {
     const game = this.gameSnapshot(room);
-    const beat = room.model.kind === 'beat-the-house' ? { rebetSeatIds: this.beatRebetSeatIds(room, game as GameSnapshot) } : undefined;
+    const beat =
+      room.model.kind === 'beat-the-house'
+        ? {
+            rebetSeatIds: this.beatRebetSeatIds(room, game as GameSnapshot),
+            readyProfileIds: this.beatReadyProfileIds(room),
+            readyCount: this.beatReadyProfileIds(room).length,
+            playerCount: room.players.size,
+            readyPhase: room.model.readyPhase,
+            nextRoundDeadlineAt: room.model.nextRoundDeadlineAt,
+            nextRoundRemainingMs: room.model.nextRoundDeadlineAt ? Math.max(0, room.model.nextRoundDeadlineAt - Date.now()) : undefined,
+          }
+        : undefined;
     return {
       roomId: room.roomId,
       roomName: room.roomName,
@@ -397,6 +446,9 @@ export abstract class RoomAuthorityBase {
   }
 
   protected removeProfileGameState(room: RoomState, profileId: string): void {
+    if (room.model.kind === 'beat-the-house') {
+      room.model.readyProfileIds.delete(profileId);
+    }
     if (room.model.kind === 'slots') {
       room.model.readyProfileIds.delete(profileId);
       room.model.wagersByProfileId.delete(profileId);
@@ -411,8 +463,96 @@ export abstract class RoomAuthorityBase {
     room.lastBeatBetOwners = {};
     room.sessionId = createId('session');
     if (room.model.kind === 'beat-the-house') {
+      this.clearBeatReadiness(room);
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
     }
+  }
+
+  protected clearBeatReadiness(room: RoomState): void {
+    if (room.model.kind !== 'beat-the-house') {
+      return;
+    }
+    room.model.readyProfileIds.clear();
+    room.model.readyPhase = undefined;
+    this.clearBeatNextRoundDeadline(room);
+  }
+
+  protected clearBeatReadyVotes(room: RoomState): void {
+    if (room.model.kind !== 'beat-the-house') {
+      return;
+    }
+    room.model.readyProfileIds.clear();
+    room.model.readyPhase = undefined;
+  }
+
+  protected clearBeatReadyProfile(room: RoomState, profileId: string): void {
+    if (room.model.kind !== 'beat-the-house') {
+      return;
+    }
+    room.model.readyProfileIds.delete(profileId);
+    if (room.model.readyProfileIds.size === 0) {
+      room.model.readyPhase = undefined;
+    }
+  }
+
+  protected clearBeatNextRoundDeadline(room: RoomState): void {
+    if (room.model.kind !== 'beat-the-house') {
+      return;
+    }
+    if (room.model.nextRoundTimer) {
+      clearTimeout(room.model.nextRoundTimer);
+    }
+    room.model.nextRoundTimer = undefined;
+    room.model.nextRoundDeadlineAt = undefined;
+  }
+
+  protected beatReadyProfileIds(room: RoomState): readonly string[] {
+    if (room.model.kind !== 'beat-the-house') {
+      return [];
+    }
+    return [...room.model.readyProfileIds].filter((profileId) => room.players.has(profileId));
+  }
+
+  protected everyBeatPlayerReady(room: RoomState): boolean {
+    if (room.model.kind !== 'beat-the-house' || room.players.size <= 0) {
+      return false;
+    }
+    const readyProfileIds = room.model.readyProfileIds;
+    return [...room.players.keys()].every((profileId) => readyProfileIds.has(profileId));
+  }
+
+  protected advanceReadyBeatNextRound(room: RoomState): AuthorityResult {
+    room.sessionId = createId('session');
+    this.clearBeatReadiness(room);
+    this.syncBeatBankroll(room);
+    return this.ownerAction(room, () => (room.model.kind === 'beat-the-house' ? room.model.game.nextRound() : undefined));
+  }
+
+  private scheduleBeatNextRoundDeadline(room: RoomState): void {
+    if (room.model.kind !== 'beat-the-house' || room.model.nextRoundDeadlineAt) {
+      return;
+    }
+    const deadlineAt = Date.now() + RoomAuthorityBase.beatNextRoundTimeoutMs;
+    room.model.nextRoundDeadlineAt = deadlineAt;
+    const timer = setTimeout(() => {
+      const currentRoom = this.rooms.get(room.roomId);
+      if (
+        !currentRoom ||
+        currentRoom.model.kind !== 'beat-the-house' ||
+        currentRoom.model.nextRoundDeadlineAt !== deadlineAt ||
+        currentRoom.model.game.snapshot().phase !== 'roundOver'
+      ) {
+        return;
+      }
+      const result = this.advanceReadyBeatNextRound(currentRoom);
+      if (result.broadcasts.length > 0 || result.settlements.length > 0) {
+        this.asyncResultHandler?.(result);
+      }
+    }, RoomAuthorityBase.beatNextRoundTimeoutMs);
+    if (typeof timer === 'object' && 'unref' in timer && typeof timer.unref === 'function') {
+      timer.unref();
+    }
+    room.model.nextRoundTimer = timer;
   }
 
   protected seatIds(room: RoomState): readonly RoomSeatId[] {

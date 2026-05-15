@@ -7,7 +7,7 @@ import type { GameModel } from './GameModel';
 
 export const createGameModel = (gameId: RoomGameId, bankroll: number): GameModel => {
   if (gameId === 'beat-the-house') {
-    return { kind: 'beat-the-house', game: new BeatTheHouseGame({ initialBankroll: bankroll }) };
+    return { kind: 'beat-the-house', game: new BeatTheHouseGame({ initialBankroll: bankroll }), readyProfileIds: new Set() };
   }
   if (gameId === 'blackjack') {
     return { kind: 'blackjack', table: new BlackjackTable(), settledSessionIds: new Set() };

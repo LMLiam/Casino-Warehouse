@@ -70,6 +70,12 @@ export const serverMessageSchema = (() => {
   });
   const beatRoomStateSchema = z.object({
     rebetSeatIds: z.array(z.enum(['left', 'centre', 'right'])),
+    readyProfileIds: z.array(z.string()),
+    readyCount: finiteNumberSchema,
+    playerCount: finiteNumberSchema,
+    readyPhase: z.enum(['betting', 'roundOver']).optional(),
+    nextRoundDeadlineAt: finiteNumberSchema.optional(),
+    nextRoundRemainingMs: finiteNumberSchema.optional(),
   });
 
   const roomSnapshotShapeSchema = z.object({

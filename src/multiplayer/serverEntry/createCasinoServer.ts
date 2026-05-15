@@ -193,6 +193,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       broadcastDataState();
     }
   };
+  authority.setAsyncResultHandler?.((result) => {
+    const peer = peers.values().next().value;
+    if (peer) {
+      emitAuthorityResult(peer, result);
+    }
+  });
 
   const handleDataMessage = (peer: Peer, message: ReturnType<typeof parseClientMessage>['message']): boolean => {
     if (!message) {
@@ -437,6 +443,8 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   }, heartbeatIntervalMs);
   server.on('close', () => {
     clearInterval(heartbeat);
+    authority.setAsyncResultHandler?.(undefined);
+    authority.dispose?.();
     websocketServer.close();
   });
   websocketServer.on('wsClientError', (_error, socket) => {

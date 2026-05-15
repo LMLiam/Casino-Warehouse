@@ -1,4 +1,6 @@
 import type { BlackjackSnapshot } from '../../../src/game/blackjack/BlackjackSnapshot';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { RoomSummary } from '../../../src/multiplayer/protocol/RoomSummary';
@@ -75,6 +77,8 @@ const blackjackSnapshotFixture = {
   status: 'Player blackjack contract snapshot.',
 } satisfies BlackjackSnapshot;
 
+const beatSnapshotFixture = new BeatTheHouseGame({ initialBankroll: 500 }).snapshot() satisfies GameSnapshot;
+
 const sessionStateCurrentV2Fixture = {
   version: 2,
   profileId: 'profile-alice',
@@ -138,6 +142,64 @@ const roomSnapshotFixture = {
     },
   ],
   game: blackjackSnapshotFixture,
+} satisfies RoomSnapshot;
+
+const beatRoomSnapshotFixture = {
+  roomId: 'BEAT42',
+  roomName: 'Beat Contract Room',
+  hostProfileId: 'profile-alice',
+  gameId: 'beat-the-house',
+  gameTitle: 'Beat the House',
+  status: 'betting',
+  phase: 'betting',
+  sessionId: 'session-beat-contract',
+  revision: 4,
+  maxPlayers: 3,
+  allowSpectators: true,
+  createdAt: 1778407200000,
+  updatedAt: 1778407320000,
+  players: [
+    {
+      connectionId: 'connection-alice',
+      profileId: 'profile-alice',
+      profileName: 'Alice',
+      bankroll: 1200,
+      sessionStartBankroll: 1150,
+      role: 'player',
+    },
+    {
+      connectionId: 'connection-bob',
+      profileId: 'profile-bob',
+      profileName: 'Bob',
+      bankroll: 900,
+      sessionStartBankroll: 900,
+      role: 'player',
+    },
+  ],
+  spectators: [],
+  seats: [
+    {
+      seatId: 'left',
+      profileId: 'profile-alice',
+    },
+    {
+      seatId: 'centre',
+      profileId: 'profile-bob',
+    },
+    {
+      seatId: 'right',
+    },
+  ],
+  game: beatSnapshotFixture,
+  beat: {
+    rebetSeatIds: ['left'],
+    readyProfileIds: ['profile-alice'],
+    readyCount: 1,
+    playerCount: 2,
+    readyPhase: 'betting',
+    nextRoundDeadlineAt: 1778407340000,
+    nextRoundRemainingMs: 8000,
+  },
 } satisfies RoomSnapshot;
 
 const roomSummaryFixture = {
@@ -225,6 +287,7 @@ export const serverMessageContractFixtures = [
   { version: 1, type: 'room-closed', roomId: 'ROOM42', gameId: 'blackjack', reason: 'host-left' },
   { version: 1, type: 'room-list', gameId: 'blackjack', rooms: [roomSummaryFixture] },
   { version: 1, type: 'room-state', room: roomSnapshotFixture },
+  { version: 1, type: 'room-state', room: beatRoomSnapshotFixture },
   {
     version: 1,
     type: 'settlement',

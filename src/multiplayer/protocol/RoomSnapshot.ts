@@ -25,6 +25,12 @@ export interface RoomSnapshot {
   readonly game: RoomGameSnapshot;
   readonly beat?: {
     readonly rebetSeatIds: readonly HandId[];
+    readonly readyProfileIds: readonly string[];
+    readonly readyCount: number;
+    readonly playerCount: number;
+    readonly readyPhase?: 'betting' | 'roundOver';
+    readonly nextRoundDeadlineAt?: number;
+    readonly nextRoundRemainingMs?: number;
   };
   readonly slots?: {
     readonly wager: number;

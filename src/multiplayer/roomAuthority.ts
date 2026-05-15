@@ -203,7 +203,11 @@ export class RoomAuthority extends RoomAuthorityBase {
       }
     }
     this.removeProfileGameState(room, member.profileId);
+    if (room.model.kind === 'beat-the-house') {
+      this.clearBeatReadyVotes(room);
+    }
     if (room.players.size === 0 && room.spectators.size === 0 && !room.serverManaged) {
+      this.clearBeatReadiness(room);
       this.rooms.delete(room.roomId);
       return { broadcasts: [], settlements: [] };
     }
@@ -237,6 +241,9 @@ export class RoomAuthority extends RoomAuthorityBase {
     room.spectators.delete(profileId);
     room.connectionToMember.set(seatedPlayer.connectionId, { profileId, role: 'player' });
     room.seats.set(seatId, profileId);
+    if (room.model.kind === 'beat-the-house') {
+      this.clearBeatReadyVotes(room);
+    }
     this.syncBeatBankroll(room);
     return this.broadcast(room);
   }
@@ -267,6 +274,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.placeBet(seatId, betType, amount));
     const debited = room.model.game.snapshot().bets[seatId][betType] - beforeAmount;
     if (debited > 0) {
+      this.clearBeatReadyProfile(room, profileId);
       this.setPlayerBankroll(room, profileId, player.bankroll - debited);
       return this.broadcast(room, result.settlements);
     }
@@ -296,6 +304,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.placeDealerTip(seatId, amount));
     const debited = room.model.game.snapshot().dealerTips[seatId] - beforeAmount;
     if (debited > 0) {
+      this.clearBeatReadyProfile(room, profileId);
       this.setPlayerBankroll(room, profileId, player.bankroll - debited);
       return this.broadcast(room, result.settlements);
     }
@@ -327,6 +336,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (player) {
       this.setPlayerBankroll(room, profileId, player.bankroll + refund);
     }
+    this.clearBeatReadyProfile(room, profileId);
     this.syncBeatBankroll(room);
     return this.broadcast(room, result.settlements);
   }
@@ -367,6 +377,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (debited > 0) {
       this.setPlayerBankroll(room, profileId, player.bankroll - debited);
     }
+    this.clearBeatReadyProfile(room, profileId);
     this.syncBeatBankroll(room);
     return this.broadcast(room, result.settlements);
   }
@@ -389,10 +400,22 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (!canRoomFlowTransition(roomPhase(room), { type: 'START_PLAY' })) {
       return this.error('Room phase does not allow starting play.');
     }
+    room.model.readyPhase = 'betting';
+    room.model.readyProfileIds.add(profileId);
+    if (!this.everyBeatPlayerReady(room)) {
+      return this.broadcast(room);
+    }
     this.syncBeatBankroll(room);
+    return this.dealReadyBeatRound(room);
+  }
+
+  private dealReadyBeatRound(room: RoomState): AuthorityResult {
+    if (room.model.kind !== 'beat-the-house') {
+      return this.error('Wrong room game.');
+    }
     const model = room.model;
     const before = model.game.snapshot();
-    const after = room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot();
+    const after = room.seats.size > 0 && room.players.size > 0 ? model.game.deal() : model.game.snapshot();
     room.lastBeatEvents = after.lastEvents;
     let settlements: readonly RoomSettlement[] = [];
     if (before.phase === 'betting' && after.phase !== 'betting') {
@@ -402,6 +425,8 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (after.phase === 'roundOver' && before.phase !== 'roundOver') {
       settlements = this.settleBeat(room, after);
     }
+    this.clearBeatReadyVotes(room);
+    this.afterBeatSnapshotChange(room, before, after);
     return this.broadcast(room, settlements);
   }
 
@@ -492,9 +517,12 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (!canRoomFlowTransition(roomPhase(room), { type: 'NEXT_ROUND' })) {
       return this.error('Room phase does not allow advancing rounds.');
     }
-    room.sessionId = createId('session');
-    this.syncBeatBankroll(room);
-    return this.ownerAction(room, () => (room.model.kind === 'beat-the-house' ? room.model.game.nextRound() : undefined));
+    room.model.readyPhase = 'roundOver';
+    room.model.readyProfileIds.add(profileId);
+    if (!this.everyBeatPlayerReady(room)) {
+      return this.broadcast(room);
+    }
+    return this.advanceReadyBeatNextRound(room);
   }
 
   private dealBlackjack(room: RoomState, profileId: string, role: RoomRole, wager: number): AuthorityResult {
