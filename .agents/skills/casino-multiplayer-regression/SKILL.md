@@ -144,7 +144,7 @@ npm run test -- tests/unit/multiplayer
 npm run test -- tests/unit/state
 npm run visual -- --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --project=laptop tests/e2e/public-tunnel-smoke.spec.ts
-bash -n start-codex-multiplayer-check.sh
+bash -n start-codex.sh .agents/launchers/start-codex-multiplayer-check.sh
 npm run format
 npm run lint
 ```
