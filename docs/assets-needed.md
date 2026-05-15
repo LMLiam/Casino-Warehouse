@@ -18,7 +18,7 @@ Casino Warehouse uses `src/assets/manifest.ts` as the source of truth for produc
 | Temple slot symbol        | `public/assets/slots/symbols/temple.png`            | generated final        | `$imagegen`                                                                                                             | 512x512    | yes         | Thai Princess reel symbol                    |
 | Fan slot symbol           | `public/assets/slots/symbols/fan.png`               | generated final        | `$imagegen`                                                                                                             | 512x512    | yes         | Thai Princess reel symbol                    |
 | Orchid slot symbol        | `public/assets/slots/symbols/orchid.png`            | generated final        | `$imagegen`                                                                                                             | 512x512    | yes         | Thai Princess reel symbol                    |
-| Beat the House table      | `public/assets/beat-the-house/table.png`            | approved user-provided | copied from root `table.png`, matching SHA-256 `45604950fd2c5769540c8bddbc62287921a8b25885e7d795950d2c8600ca4fd6`       | 1672x941   | no          | PixiJS Beat the House table                  |
+| Beat the House table      | `public/assets/beat-the-house/table.png`            | approved user-provided | promoted dealer-tip table art, matching SHA-256 `783ea6fbb963e9dabf6f43831f8f30faf37a92c8d95ea4e5040bdec15c13f1e2`      | 1672x941   | no          | PixiJS Beat the House table                  |
 | Beat the House chip sheet | `public/assets/common/chips-sheet.png`              | approved user-provided | copied from root `chips-sheet.png`, matching SHA-256 `a89ba4ff5aa402885a79180ebf464fdb3a3920555eea1993b4f24e24a64d8ae7` | 1536x1024  | yes         | PixiJS chips and HTML chip rail              |
 
 No SVG files are currently referenced or kept as production assets. There are no intentional final vector assets in the current asset tree.
@@ -44,7 +44,7 @@ All generated assets were produced with the built-in `$imagegen` tool, copied in
 
 ## Current Confirmation
 
-`table.png` lives at `public/assets/beat-the-house/table.png` and is classified as approved user-provided production art.
+`table.png` lives at `public/assets/beat-the-house/table.png`, includes the visible Beat the House `TIP DEALER` areas, and is classified as approved user-provided production art. The former docs-only dealer-tip reference copy was removed after promotion so the production asset path is the tracked table-art source.
 
 `chips-sheet.png` lives at `public/assets/common/chips-sheet.png` and is classified as approved user-provided production art.
 

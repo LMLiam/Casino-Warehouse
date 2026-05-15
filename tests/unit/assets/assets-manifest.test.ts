@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
@@ -30,6 +31,11 @@ const pngDimensions = (assetPath: string): string => {
   expect(buffer.subarray(1, 4).toString('ascii')).toBe('PNG');
   return `${buffer.readUInt32BE(16)}x${buffer.readUInt32BE(20)}`;
 };
+
+const sha256 = (assetPath: string): string =>
+  createHash('sha256')
+    .update(readFileSync(assetFilePath(assetPath)))
+    .digest('hex');
 
 const pngAlphaSummary = (
   assetPath: string,
@@ -177,6 +183,10 @@ describe('casino asset manifest', () => {
         .map((asset) => asset.path)
         .sort(),
     ).toEqual(['/assets/beat-the-house/table.png', '/assets/common/chips-sheet.png']);
+    expect(Object.fromEntries(assets.filter((asset) => asset.status === 'approved-user-provided').map((asset) => [asset.path, sha256(asset.path)]))).toEqual({
+      '/assets/beat-the-house/table.png': '783ea6fbb963e9dabf6f43831f8f30faf37a92c8d95ea4e5040bdec15c13f1e2',
+      '/assets/common/chips-sheet.png': 'a89ba4ff5aa402885a79180ebf464fdb3a3920555eea1993b4f24e24a64d8ae7',
+    });
   });
 
   it('provides distinct lobby tile and slot frame art for every catalog game', () => {
