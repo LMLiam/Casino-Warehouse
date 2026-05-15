@@ -40,6 +40,7 @@ Primary references:
 - `./start-codex-create-issue.sh --print "issue topic"`: preview the Codex `/goal` for researching and creating a new GitHub issue.
 - `./start-codex-ci-failure.sh --print 123`: preview the Codex `/goal` for diagnosing failing checks on a pull request.
 - `./start-codex-triage-issue.sh --print 121`: preview the Codex `/goal` for triaging an existing GitHub issue.
+- `./start-codex-docs-audit.sh --print "audit scope"`: preview the Codex `/goal` for auditing documentation drift.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -159,6 +160,12 @@ The issue-triage workflow must inspect the issue, search existing issues and pul
 When asked to inspect, explain, diagnose, review, retry, or fix failing pull request checks, use the Casino Warehouse CI failure review skill at `.agents/skills/casino-ci-failure-review/SKILL.md`. For interactive launches, use `start-codex-ci-failure.sh`.
 
 The CI failure review workflow must fetch current pull request metadata, head SHA, base branch, required check status, workflow runs, failing jobs, and relevant logs before diagnosing a failure. It must distinguish required checks from informational or external checks, map visual/e2e failures to local reproduction commands where applicable, classify the failure cause, and ask before making fixes unless the user's active goal clearly asks to fix CI.
+
+## Documentation Audit Workflow
+
+When asked to audit, verify, or report documentation drift without immediately implementing fixes, use the Casino Warehouse documentation audit skill at `.agents/skills/casino-docs-audit/SKILL.md`. For interactive launches, use `start-codex-docs-audit.sh`.
+
+The documentation audit workflow must compare docs, wiki pages, workflow references, npm scripts, issue and pull request templates, launcher scripts, and local agent skills against source-of-truth files, commands, GitHub metadata, and wiki evidence. It must report findings with location, evidence, severity, suggested remediation, skipped checks, and whether each finding is docs-only drift or implementation work.
 
 ## Pull Request Checklist
 
