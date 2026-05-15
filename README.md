@@ -1,6 +1,10 @@
 # Casino Warehouse
 
+[![Project Checks](https://github.com/LMLiam/Casino-Warehouse/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/LMLiam/Casino-Warehouse/actions/workflows/ci.yml?query=branch%3Amain)
+[![CodeQL](https://github.com/LMLiam/Casino-Warehouse/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/LMLiam/Casino-Warehouse/actions/workflows/codeql.yml?query=branch%3Amain)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/LMLiam/Casino-Warehouse/badge)](https://scorecard.dev/viewer/?uri=github.com/LMLiam/Casino-Warehouse)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE)
+[![Node 26.x](https://img.shields.io/badge/node-26.x-43853d?logo=node.js&logoColor=white)](#requirements)
 
 Casino Warehouse is a fictional-money casino arcade for desktop and tablet browsers. It includes Beat the House, Blackjack, and slots rooms with local multiplayer through a small Node server.
 
