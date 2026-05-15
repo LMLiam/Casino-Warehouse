@@ -1,3 +1,14 @@
+@media (max-width: 1100px) {
+  .hud-overflow-panel {
+    width: min(240px, calc(100vw - 20px));
+  }
+
+  .hud-overflow-actions,
+  .hud-overflow-panel .admin-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   body {
     min-height: 100vh;
