@@ -534,15 +534,14 @@ describe('per-game room authority', () => {
     if (beatState.model.kind !== 'beat-the-house') {
       throw new Error('Expected a Beat the House test room.');
     }
-    beatState.model.game.restoreState({
-      ...beatState.model.game.saveState(),
-      deck: rigDeck([
+    const deterministicRound = beatState.model.game.deal(
+      rigDeck([
         { rank: '7', suit: 'spades' },
         { rank: '9', suit: 'hearts' },
         { rank: 'K', suit: 'clubs' },
       ] satisfies Card[]),
-    });
-    expect(beat(authority.handle('beat-host', { version: 1, type: 'start-round' }).broadcasts[0]).activeHand).toBe('left');
+    );
+    expect(deterministicRound.activeHand).toBe('left');
     expect(authority.handle('beat-watch', { version: 1, type: 'player-action', action: 'hit' }).error).toBe('Spectators cannot act.');
     expect(authority.handle('beat-host', { version: 1, type: 'player-action', action: 'hit' }).broadcasts[0].gameId).toBe('beat-the-house');
 
