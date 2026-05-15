@@ -287,6 +287,13 @@ describe('Beat the House popup and animation behaviour', () => {
     table.render(settled);
 
     expect(JSON.parse(host.dataset.dealerThanksRewards ?? '[]')).toEqual(['left:10']);
+    expect(chipRenderer.drawStack).toHaveBeenCalledWith(
+      10,
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.objectContaining({ key: 'dealer-thanks-left-10', from: toPixels(dealerChipBank) }),
+    );
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
       'Main LOSE -£10',
       'Side bets NONE +£0',
@@ -296,6 +303,37 @@ describe('Beat the House popup and animation behaviour', () => {
       'push',
       false,
     );
+  });
+
+  it('draws Dealer Thanks reward chips for every settled tipped seat', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, host, chipRenderer } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    const tippedSeats = ['left', 'centre', 'right'] as const;
+    tippedSeats.forEach((handId) => {
+      game.placeBet(handId, 'main', 10);
+      game.placeDealerTip(handId, 5);
+    });
+
+    table.render(game.deal(rigDeck([card('2'), card('2'), card('2'), card('K')])));
+
+    expect(JSON.parse(host.dataset.dealerThanksRewards ?? '[]')).toEqual(['left:10', 'centre:10', 'right:10']);
+    tippedSeats.forEach((handId) => {
+      expect(chipRenderer.drawStack).toHaveBeenCalledWith(
+        10,
+        expect.any(Number),
+        expect.any(Number),
+        expect.any(Number),
+        expect.objectContaining({ key: `dealer-thanks-${handId}-10`, from: toPixels(dealerChipBank) }),
+      );
+    });
   });
 
   it('keeps House Advance metadata when the delayed settlement timer re-renders the popup', () => {

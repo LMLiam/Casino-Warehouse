@@ -239,6 +239,7 @@ export class PixiTable {
       const tipX = tipPx.x + tipPx.width / 2;
       const tipY = tipPx.y + tipPx.height / 2;
       this.drawDealerTipZone(snapshot, hand.id, tipX, tipY, tipPx.width, tipPx.height);
+      this.drawDealerThanksPayout(snapshot, hand.id, tipX, tipY);
     }
   }
 
@@ -317,6 +318,15 @@ export class PixiTable {
     if (amount > 0 && snapshot.phase === 'betting') {
       this.chipRenderer?.drawStack(amount, x, y, PixiTable.liveBetChipRadius, `tip-${handId}-${amount}`);
     }
+  }
+
+  private drawDealerThanksPayout(snapshot: GameSnapshot, handId: HandId, x: number, y: number): void {
+    const amount = snapshot.dealerTipRewards[handId];
+    if (amount <= 0 || !this.shouldShowSettlement(snapshot)) {
+      return;
+    }
+
+    this.drawDealerPayout(amount, x, y, BET_RENDERING.sideChipRadius, `dealer-thanks-${handId}-${amount}`);
   }
 
   private drawHands(snapshot: GameSnapshot): void {
