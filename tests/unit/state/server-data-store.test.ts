@@ -250,6 +250,40 @@ describe('server data store', () => {
     warn.mockRestore();
   });
 
+  it('deletes unsupported SQLite session rows without dropping profiles or profile auth', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
+    tempDirs.push(dir);
+    const dbPath = join(dir, 'casino.sqlite');
+    const store = new SqliteServerDataStore(dbPath);
+    const profile = store.createProfile('SQLite Session Break').profileState.profiles[0];
+    store.setProfileTokenHash(profile.id, 'token-hash');
+    writeStateValue(
+      dbPath,
+      'session',
+      JSON.stringify({
+        version: 1,
+        profileIds: [profile.id],
+        selectedPlayerIndex: 0,
+        activeGame: 'beat-the-house',
+        showingGameLobby: true,
+        wagerLimit: 0,
+        wagered: 0,
+        gameSnapshots: {},
+      }),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const reloaded = new SqliteServerDataStore(dbPath);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('server_state row "session"'), expect.any(Error));
+    expect(readStateValue(dbPath, 'session')).toBeUndefined();
+    expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({ name: 'SQLite Session Break' });
+    expect(reloaded.profileTokenHash(profile.id)).toBe('token-hash');
+    expect(reloaded.snapshot().session).toBeUndefined();
+
+    warn.mockRestore();
+  });
+
   it('uses SQLite outside the test environment when an explicit path is configured', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
     tempDirs.push(dir);

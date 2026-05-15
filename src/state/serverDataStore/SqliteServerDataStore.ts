@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
+import { parseSessionState } from '../session/parseSessionState';
 import type { GameplaySettlementContext } from './GameplaySettlementContext';
 import type { GameplaySettlementResult } from './GameplaySettlementResult';
 import { MemoryServerDataStore } from './MemoryServerDataStore';
@@ -152,7 +153,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
       return;
     }
     if (storedKey === 'session') {
-      stored.session = value as ServerDataSnapshot['session'];
+      stored.session = parseSessionState(value);
     }
   }
 
