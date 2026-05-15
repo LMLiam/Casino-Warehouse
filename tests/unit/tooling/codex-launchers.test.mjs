@@ -14,6 +14,9 @@ const issueGoal =
 const triageGoal =
   '/goal Triage issue #121 using $casino-issue-triage + AGENTS.md: inspect the issue, search existing issues and pull requests for duplicates or related work, inspect repository context, update issue metadata or body only when evidence supports it, verify the updated issue, and report the before/after triage evidence.';
 
+const issueDependenciesGoal =
+  '/goal Audit Casino Warehouse issue dependencies using $casino-issue-dependency-audit + AGENTS.md: review every open issue for dependency or sequencing relationships; list open issues by milestone, label, and status; inspect issue bodies, comments, linked pull requests, reverse references, and repository guidance; distinguish hard blockers from preferred order using milestone context and evidence; update issue labels, bodies, or canonical dependency comments only when evidence supports it; avoid closing, deprioritizing, or re-scoping issues unless a maintainer explicitly asks; verify any updates; and report a maintainer-readable dependency map listing each blocker relationship in both directions plus preferred sequencing, stale relationships, unresolved clarification needs, commands used, skipped checks, and residual risk.';
+
 const prReviewGoal =
   '/goal Review pull request #42 in full using $casino-pr-full-review, $casino-issue-completion, and AGENTS.md: use a separate worktree when local checkout is needed, inspect the full PR diff and related context, check prior comments/base freshness/CI, run relevant evidence checks, leave inline GitHub review comments for every finding or record exact comment failure, use the issue-completion evidence and status rules for any readiness claim, and report an evidence-backed verdict.';
 
@@ -52,6 +55,14 @@ describe('Codex launcher scripts', () => {
     expect(result.stderr).toBe('');
   });
 
+  it('prints the issue-dependency-audit goal without launching Codex', () => {
+    const result = runLauncher('start-codex-issue-dependencies.sh', ['--dry-run']);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(issueDependenciesGoal);
+    expect(result.stderr).toBe('');
+  });
+
   it('prints the security-review goal without launching Codex', () => {
     const result = runLauncher('start-codex-security-pass.sh', ['--dry-run', 'pull request #123']);
 
@@ -85,10 +96,12 @@ describe('Codex launcher scripts', () => {
       for (const [script, number] of [
         ['start-codex-issue.sh', '128'],
         ['start-codex-triage-issue.sh', '121'],
+        ['start-codex-issue-dependencies.sh', ''],
         ['start-codex-pr-review.sh', '42'],
         ['start-codex-security-pass.sh', 'pull request #123'],
       ]) {
-        const result = runLauncher(script, ['--print', number], { cwd: outsideRepo });
+        const args = number ? ['--print', number] : ['--print'];
+        const result = runLauncher(script, args, { cwd: outsideRepo });
 
         expect(result.status).toBe(1);
         expect(result.stderr).toContain('error: run this script from the Casino Warehouse repository root.');
@@ -102,10 +115,12 @@ describe('Codex launcher scripts', () => {
     for (const [script, number] of [
       ['start-codex-issue.sh', '128'],
       ['start-codex-triage-issue.sh', '121'],
+      ['start-codex-issue-dependencies.sh', ''],
       ['start-codex-pr-review.sh', '42'],
       ['start-codex-security-pass.sh', 'pull request #123'],
     ]) {
-      const result = runLauncher(script, [number], {
+      const args = number ? [number] : [];
+      const result = runLauncher(script, args, {
         env: { CODEX_BIN: 'definitely-not-codex' },
       });
 
@@ -125,10 +140,12 @@ describe('Codex launcher scripts', () => {
       for (const [script, number] of [
         ['start-codex-issue.sh', '128'],
         ['start-codex-triage-issue.sh', '121'],
+        ['start-codex-issue-dependencies.sh', ''],
         ['start-codex-pr-review.sh', '42'],
         ['start-codex-security-pass.sh', 'pull request #123'],
       ]) {
-        const result = runLauncher(script, [number], {
+        const args = number ? [number] : [];
+        const result = runLauncher(script, args, {
           env: { CODEX_BIN: 'codex', PATH: binDir },
         });
 
@@ -143,12 +160,14 @@ describe('Codex launcher scripts', () => {
   it('keeps the expect flow and readiness pattern in the shared helper', () => {
     const issueLauncher = readFileSync(join(repoRoot, 'start-codex-issue.sh'), 'utf8');
     const triageLauncher = readFileSync(join(repoRoot, 'start-codex-triage-issue.sh'), 'utf8');
+    const issueDependenciesLauncher = readFileSync(join(repoRoot, 'start-codex-issue-dependencies.sh'), 'utf8');
     const prLauncher = readFileSync(join(repoRoot, 'start-codex-pr-review.sh'), 'utf8');
     const securityLauncher = readFileSync(join(repoRoot, 'start-codex-security-pass.sh'), 'utf8');
     const helper = readFileSync(join(repoRoot, '.agents/scripts/codex-goal-launcher.sh'), 'utf8');
 
     expect(issueLauncher).not.toContain('cat >"$expect_script"');
     expect(triageLauncher).not.toContain('cat >"$expect_script"');
+    expect(issueDependenciesLauncher).not.toContain('cat >"$expect_script"');
     expect(prLauncher).not.toContain('cat >"$expect_script"');
     expect(securityLauncher).not.toContain('cat >"$expect_script"');
     expect(helper).toContain('-re {·[^\\r\\n]*(~|/)}');
@@ -158,6 +177,7 @@ describe('Codex launcher scripts', () => {
     for (const script of [
       'start-codex-issue.sh',
       'start-codex-triage-issue.sh',
+      'start-codex-issue-dependencies.sh',
       'start-codex-pr-review.sh',
       'start-codex-security-pass.sh',
       '.agents/scripts/codex-goal-launcher.sh',

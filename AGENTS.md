@@ -41,6 +41,7 @@ Primary references:
 - `./start-codex-ci-failure.sh --print 123`: preview the Codex `/goal` for diagnosing failing checks on a pull request.
 - `./start-codex-triage-issue.sh --print 121`: preview the Codex `/goal` for triaging an existing GitHub issue.
 - `./start-codex-docs-audit.sh --print "audit scope"`: preview the Codex `/goal` for auditing documentation drift.
+- `./start-codex-issue-dependencies.sh --print`: preview the Codex `/goal` for auditing open issue dependency relationships.
 - `./start-codex-security-pass.sh --print "pull request #123"`: preview the Codex `/goal` for a focused security review.
 - `./start-codex-multiplayer-check.sh --print "pull request #123"`: preview the Codex `/goal` for a multiplayer regression review.
 - `./start-codex-architecture-split.sh --print "src/multiplayer/roomAuthority.ts"`: preview the Codex `/goal` for planning a focused architecture cleanup or file split.
@@ -157,6 +158,12 @@ When asked to triage, groom, clarify, label, milestone, de-duplicate, decline, b
 Use issue creation for new issue drafting, issue triage for improving an existing issue into a repo-compliant state, and issue completion for implementation work that opens or updates a pull request.
 
 The issue-triage workflow must inspect the issue, search existing issues and pull requests for duplicates or related work, read relevant repository context, update labels/milestone/body/comments only when evidence supports the change, then verify and report the issue URL, labels/milestone before and after, duplicate-search terms, files inspected, and unresolved questions.
+
+## Issue Dependency Audit Workflow
+
+When asked to audit, map, review, clarify, update, or report dependency relationships between existing GitHub issues, use the Casino Warehouse issue dependency audit skill at `.agents/skills/casino-issue-dependency-audit/SKILL.md`. For interactive launches, use `start-codex-issue-dependencies.sh`.
+
+The issue dependency audit workflow must review every open issue, group the backlog by milestone, label, and status, inspect issue bodies, comments, linked pull requests, and reverse references, distinguish evidence-backed blockers from preferred sequencing, update issue labels or canonical dependency notes only when evidence supports the change, avoid closing or re-scoping issues unless a maintainer explicitly asks, verify any updates, and report blocker relationships in both directions plus maintainer-clarification needs.
 
 ## CI Failure Review Workflow
 

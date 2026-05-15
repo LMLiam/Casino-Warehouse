@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Casino Issue Dependency Audit'
+  short_description: 'Audit Casino Warehouse issue dependencies'
+  default_prompt: 'Use $casino-issue-dependency-audit to review every open Casino Warehouse issue for blockers, downstream impacts, preferred sequencing, stale dependency notes, and maintainer clarification needs.'
+
+policy:
+  allow_implicit_invocation: true
