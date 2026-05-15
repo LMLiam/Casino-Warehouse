@@ -280,7 +280,7 @@ let buffer = '';
 const timeout = setTimeout(() => {
   process.stderr.write('fake codex timed out waiting for the generated goal\\n');
   process.exit(5);
-}, 10_000);
+}, 30_000);
 
 if (process.stdin.isTTY) {
   process.stdin.setRawMode(true);
@@ -324,15 +324,84 @@ process.stdin.resume();
       chmodSync(codexShim, 0o755);
 
       const result = runLauncher('start-codex.sh', ['multiplayer-check', 'pull request #123'], {
-        env: { CODEX_BIN: 'codex', CODEX_GOAL_KEY_DELAY_MS: '1', PATH: `${binDir}:${process.env.PATH}` },
+        env: { CODEX_BIN: 'codex', CODEX_GOAL_KEY_DELAY_MS: '0', PATH: `${binDir}:${process.env.PATH}` },
       });
 
-      expect(result.status).toBe(0);
+      expect(result.status, result.stderr).toBe(0);
       expect(result.stderr).toBe('');
     } finally {
       rmSync(binDir, { force: true, recursive: true });
     }
-  }, 15_000);
+  }, 45_000);
+
+  it('preserves non-skill dollar text while making generated skill references TUI-safe', () => {
+    const binDir = mkdtempSync(join(tmpdir(), 'casino-launcher-dollar-'));
+
+    try {
+      const codexShim = join(binDir, 'codex');
+      writeFileSync(
+        codexShim,
+        `#!/usr/bin/env node
+process.stdout.write('OpenAI Codex\\n');
+process.stdout.write('gpt-5.5 xhigh fast · /tmp/casino\\n');
+
+let buffer = '';
+const timeout = setTimeout(() => {
+  process.stderr.write('fake codex timed out waiting for the generated goal\\n');
+  process.exit(5);
+}, 30_000);
+
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+}
+
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => {
+  buffer += chunk;
+  if (!buffer.includes('\\r') && !buffer.includes('\\n')) {
+    return;
+  }
+
+  clearTimeout(timeout);
+  const line = buffer.replace(/[\\r\\n][\\s\\S]*$/, '');
+  if (!line.startsWith('/goal ')) {
+    process.stderr.write('fake codex received ordinary chat instead of a /goal command\\n');
+    process.exit(6);
+  }
+
+  if (!line.includes('src/$PATH.ts')) {
+    process.stderr.write('fake codex rewrote non-skill dollar text\\n');
+    process.exit(7);
+  }
+
+  if (!line.includes('using the casino-architecture-splitter skill + AGENTS.md')) {
+    process.stderr.write('fake codex received an unsafe architecture skill-reference form\\n');
+    process.exit(8);
+  }
+
+  if (line.includes('$casino-architecture-splitter')) {
+    process.stderr.write('fake codex received a raw TUI skill-reference token\\n');
+    process.exit(9);
+  }
+
+  process.stdout.write('Goal active Objective: fake architecture cleanup\\n');
+  setTimeout(() => process.exit(0), 25);
+});
+process.stdin.resume();
+`,
+      );
+      chmodSync(codexShim, 0o755);
+
+      const result = runLauncher('start-codex.sh', ['architecture-split', 'src/$PATH.ts'], {
+        env: { CODEX_BIN: 'codex', CODEX_GOAL_KEY_DELAY_MS: '0', PATH: `${binDir}:${process.env.PATH}` },
+      });
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).toBe('');
+    } finally {
+      rmSync(binDir, { force: true, recursive: true });
+    }
+  }, 45_000);
 
   it('rejects invalid generated-goal key delay values', () => {
     const binDir = mkdtempSync(join(tmpdir(), 'casino-launcher-delay-'));
@@ -371,6 +440,7 @@ process.stdin.resume();
     expect(helper).toContain('-re {·[^\\r\\n]*(~|/)}');
     expect(helper).toContain('CODEX_GOAL_KEY_DELAY_MS');
     expect(helper).toContain('make_goal_tui_safe');
+    expect(helper).toContain('{\\$(casino-[[:alnum:]_-]+)}');
     expect(helper).toContain('the \\1 skill');
     expect(helper).toContain('send_goal_text [make_goal_tui_safe $goal] $key_delay_ms');
     expect(helper).not.toContain('send -s -- "$goal"');

@@ -89,7 +89,7 @@ set ready 0
 set seen_main 0
 
 proc make_goal_tui_safe {goal} {
-  regsub -all {\$([[:alnum:]_][[:alnum:]_:-]*)} $goal {the \1 skill} safe_goal
+  regsub -all {\$(casino-[[:alnum:]_-]+)} $goal {the \1 skill} safe_goal
   return $safe_goal
 }
 
@@ -114,16 +114,16 @@ while {!$ready} {
       send -- "2\r"
       exp_continue
     }
+    -re {OpenAI Codex} {
+      set seen_main 1
+      exp_continue
+    }
     -re {·[^\r\n]*(~|/)} {
       if {$seen_main} {
         set ready 1
       } else {
         exp_continue
       }
-    }
-    -re {OpenAI Codex} {
-      set seen_main 1
-      exp_continue
     }
     timeout {
       puts stderr "error: timed out waiting for the Codex TUI to become ready."
