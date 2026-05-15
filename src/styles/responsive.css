@@ -1,3 +1,14 @@
+@media (max-width: 1100px) {
+  .hud-overflow-panel {
+    width: min(240px, calc(100vw - 20px));
+  }
+
+  .hud-overflow-actions,
+  .hud-overflow-panel .admin-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   body {
     min-height: 100vh;
@@ -19,10 +30,17 @@
   }
 
   .hud-button,
-  .hud-menu > summary {
+  .hud-overflow-menu > summary {
     min-width: 62px;
     padding: 0 10px;
     font-size: 12px;
+  }
+
+  .hud-overflow-menu > summary {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 18px;
   }
 
   .game-tabs {

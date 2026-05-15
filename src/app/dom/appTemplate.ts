@@ -88,71 +88,80 @@ export const renderTemplate = (): string => `
       <div id="gameHud" class="game-hud" aria-label="Game menus">
         <div class="hud-button-row">
           <button id="backToLobbyBtn" class="hud-button primary" type="button">Home</button>
-          <button id="switchProfileBtn" class="hud-button" type="button">Switch Profile</button>
-          <button id="leaveRoomBtn" class="hud-button" type="button">Exit Room</button>
-          <details class="hud-menu">
-            <summary>Info</summary>
-            <div class="rules-menu-stack">
-              <div id="beatRules"></div>
-              <div id="blackjackRules"></div>
-              <div id="slotsRules"></div>
-              <div id="beatPaytable"></div>
-              <div id="blackjackPaytable"></div>
-              <div id="slotsPaytable"></div>
-            </div>
-          </details>
-          <details class="hud-menu">
-            <summary>Profile</summary>
-            <div id="playerStrip" class="player-strip" aria-label="Active profile"></div>
-          </details>
         </div>
         <div class="hud-button-row hud-button-row-right">
-          <details id="roomMenu" class="hud-menu room-menu hidden">
-            <summary>Room</summary>
-            <div id="roomSeats" class="room-seats">No active room.</div>
-          </details>
-          <details class="hud-menu stats-menu">
-            <summary>Stats</summary>
-            <div class="stats-menu-content">
-              <small id="profileStats"></small>
-              <small>Beat the House table: <b id="onTable">£0</b></small>
-              <p id="sessionNotice" class="session-notice">Session wagered £0 / no limit. Fictional currency only.</p>
-            </div>
-          </details>
-          <details class="admin-panel hud-menu">
-            <summary>Admin</summary>
-            <div class="admin-menu-content">
-              <label>
-                Admin token
-                <input id="adminTokenInput" type="password" autocomplete="off" />
-              </label>
-              <button id="authorizeAdminBtn" type="button">Unlock Admin</button>
-              <label>
-                Add bankroll
-                <input id="moneyInput" type="number" min="1" value="1000" />
-              </label>
-              <div class="admin-actions">
-                <button id="addMoneyBtn" type="button">Add</button>
-                <button id="subtractMoneyBtn" type="button">Subtract</button>
-                <button id="resetMoneyBtn" type="button">Reset £1,000</button>
-                <button id="resetAllBtn" type="button">Reset All</button>
-                <button id="clearSavesBtn" type="button">Clear Saves</button>
-                <button id="layoutOverlayBtn" type="button">Layout Overlay</button>
+          <details id="hudOverflowMenu" class="hud-overflow-menu">
+            <summary id="hudOverflowButton" aria-label="Game actions menu" title="Game actions">
+              <span aria-hidden="true">...</span>
+            </summary>
+            <div id="hudOverflowPanel" class="hud-overflow-panel" aria-label="Secondary game actions">
+              <div class="hud-overflow-actions">
+                <button id="switchProfileBtn" class="hud-overflow-action" type="button">Switch Profile</button>
+                <button id="leaveRoomBtn" class="hud-overflow-action hidden" type="button">Exit Room</button>
               </div>
-              <details class="log-panel">
-                <summary>Game Log</summary>
-                <div id="log"></div>
+              <details class="hud-overflow-section" data-hud-section="info">
+                <summary>Info</summary>
+                <div class="rules-menu-stack">
+                  <div id="beatRules"></div>
+                  <div id="blackjackRules"></div>
+                  <div id="slotsRules"></div>
+                  <div id="beatPaytable"></div>
+                  <div id="blackjackPaytable"></div>
+                  <div id="slotsPaytable"></div>
+                </div>
               </details>
-              <details class="log-panel">
-                <summary>Audit</summary>
-                <div id="auditLog"></div>
+              <details class="hud-overflow-section" data-hud-section="profile">
+                <summary>Profile</summary>
+                <div id="playerStrip" class="player-strip" aria-label="Active profile"></div>
               </details>
-              <details class="log-panel">
-                <summary>Responsible Play</summary>
-                <label>
-                  Session wager limit
-                  <input id="sessionLimitInput" type="number" min="0" value="0" />
-                </label>
+              <details id="roomMenu" class="hud-overflow-section room-menu hidden" data-hud-section="room">
+                <summary>Room</summary>
+                <div id="roomSeats" class="room-seats">No active room.</div>
+              </details>
+              <details class="hud-overflow-section stats-menu" data-hud-section="stats">
+                <summary>Stats</summary>
+                <div class="stats-menu-content">
+                  <small id="profileStats"></small>
+                  <small>Beat the House table: <b id="onTable">£0</b></small>
+                  <p id="sessionNotice" class="session-notice">Session wagered £0 / no limit. Fictional currency only.</p>
+                </div>
+              </details>
+              <details class="admin-panel hud-overflow-section" data-hud-section="admin">
+                <summary>Admin</summary>
+                <div class="admin-menu-content">
+                  <label>
+                    Admin token
+                    <input id="adminTokenInput" type="password" autocomplete="off" />
+                  </label>
+                  <button id="authorizeAdminBtn" type="button">Unlock Admin</button>
+                  <label>
+                    Add bankroll
+                    <input id="moneyInput" type="number" min="1" value="1000" />
+                  </label>
+                  <div class="admin-actions">
+                    <button id="addMoneyBtn" type="button">Add</button>
+                    <button id="subtractMoneyBtn" type="button">Subtract</button>
+                    <button id="resetMoneyBtn" type="button">Reset £1,000</button>
+                    <button id="resetAllBtn" type="button">Reset All</button>
+                    <button id="clearSavesBtn" type="button">Clear Saves</button>
+                    <button id="layoutOverlayBtn" type="button">Layout Overlay</button>
+                  </div>
+                  <details class="log-panel">
+                    <summary>Game Log</summary>
+                    <div id="log"></div>
+                  </details>
+                  <details class="log-panel">
+                    <summary>Audit</summary>
+                    <div id="auditLog"></div>
+                  </details>
+                  <details class="log-panel">
+                    <summary>Responsible Play</summary>
+                    <label>
+                      Session wager limit
+                      <input id="sessionLimitInput" type="number" min="0" value="0" />
+                    </label>
+                  </details>
+                </div>
               </details>
             </div>
           </details>

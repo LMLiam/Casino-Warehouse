@@ -27,7 +27,7 @@ button.primary {
   @apply bg-casino-panel shadow-casino-panel;
 }
 
-.admin-panel.hud-menu {
+.admin-panel.hud-overflow-section {
   border: 0;
   background: transparent;
   box-shadow: none;

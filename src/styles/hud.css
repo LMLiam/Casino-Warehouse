@@ -25,7 +25,7 @@
 }
 
 .hud-button,
-.hud-menu > summary {
+.hud-overflow-menu > summary {
   display: grid;
   place-items: center;
   min-width: 78px;
@@ -43,40 +43,46 @@
   backdrop-filter: blur(10px);
 }
 
+.hud-overflow-menu > summary {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
 .hud-button.primary {
   border-color: var(--gold);
   background: rgba(154, 106, 22, 0.94);
 }
 
-.hud-menu {
+.hud-overflow-menu {
   position: relative;
   min-width: 0;
 }
 
-.hud-menu > summary {
+.hud-overflow-menu > summary,
+.hud-overflow-section > summary {
   list-style: none;
 }
 
-.hud-menu > summary::-webkit-details-marker {
+.hud-overflow-menu > summary::-webkit-details-marker,
+.hud-overflow-section > summary::-webkit-details-marker {
   display: none;
 }
 
-.hud-menu[open] {
+.hud-overflow-menu[open] {
   z-index: 12;
 }
 
-.hud-menu > .game-tabs,
-.hud-menu > .rules-menu-stack,
-.hud-menu > .room-seats,
-.hud-menu > .stats-menu-content,
-.hud-menu > .admin-menu-content {
+.hud-overflow-panel {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
   display: grid;
-  gap: 8px;
-  width: min(340px, calc(100vw - 28px));
-  max-height: min(520px, calc(100vh - 88px));
+  gap: 10px;
+  width: min(360px, calc(100vw - 28px));
+  max-height: min(560px, calc(100vh - 88px));
   overflow: auto;
   padding: 12px;
   border: 1px solid var(--line);
@@ -85,11 +91,51 @@
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.5);
 }
 
-.hud-button-row-right .hud-menu > .room-seats,
-.hud-button-row-right .hud-menu > .stats-menu-content,
-.hud-button-row-right .hud-menu > .admin-menu-content {
-  right: 0;
-  left: auto;
+.hud-overflow-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hud-overflow-action {
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid rgba(255, 213, 107, 0.34);
+  border-radius: 8px;
+  color: #fff5d6;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.hud-overflow-section {
+  min-width: 0;
+  border: 1px solid rgba(255, 213, 107, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hud-overflow-section > summary {
+  min-height: 38px;
+  padding: 11px 12px;
+  color: var(--gold-bright);
+  font-size: 13px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.hud-overflow-section > .player-strip,
+.hud-overflow-section > .rules-menu-stack,
+.hud-overflow-section > .room-seats,
+.hud-overflow-section > .stats-menu-content,
+.hud-overflow-section > .admin-menu-content {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.admin-panel.hud-overflow-section {
+  padding: 0;
 }
 
 .player-strip,
