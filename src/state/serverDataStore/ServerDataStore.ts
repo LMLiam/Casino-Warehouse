@@ -18,6 +18,17 @@ export interface ServerDataStore {
   deleteProfileTokenHash(profileId: string): void;
   clearProfileTokenHashes(): void;
   setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined;
+  acceptHouseAdvance(profileId: string): CasinoProfile | undefined;
+  applyGameplaySettlement(
+    profileId: string,
+    returned: number,
+    profit: number,
+    context: {
+      readonly gameId: string;
+      readonly roomId?: string;
+      readonly sessionId?: string;
+    },
+  ): { readonly profile: CasinoProfile; readonly houseAdvanceRepayment: number } | undefined;
   recordTransaction(
     profileId: string,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,

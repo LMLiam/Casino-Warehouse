@@ -81,6 +81,39 @@ describe('server data store', () => {
     expect(store.clear()).toMatchObject({ profileState: { profiles: [] }, session: undefined });
   });
 
+  it('accepts House Advances atomically and applies repayment only to net positive gameplay settlements', () => {
+    const store = createMemoryServerDataStore();
+    const profile = store.createProfile('Advance QA', 0).profileState.profiles[0];
+
+    expect(store.acceptHouseAdvance(profile.id)).toMatchObject({
+      bankroll: 100,
+      houseAdvance: { outstandingBalance: 100, activeCount: 1 },
+      transactions: [expect.objectContaining({ type: 'house_advance_credit', amount: 100 })],
+    });
+    expect(store.acceptHouseAdvance(profile.id)).toBeUndefined();
+
+    store.setProfileBankroll(profile.id, 0);
+    expect(store.acceptHouseAdvance(profile.id)?.houseAdvance).toEqual({ outstandingBalance: 200, activeCount: 2 });
+    store.setProfileBankroll(profile.id, 0);
+    expect(store.acceptHouseAdvance(profile.id)?.houseAdvance).toEqual({ outstandingBalance: 300, activeCount: 3 });
+    store.setProfileBankroll(profile.id, 0);
+    expect(store.acceptHouseAdvance(profile.id)).toBeUndefined();
+
+    const push = store.applyGameplaySettlement(profile.id, 25, 0, { gameId: 'blackjack', roomId: 'ROOM1', sessionId: 'SESSION1' });
+    expect(push).toMatchObject({ houseAdvanceRepayment: 0, profile: { bankroll: 25, houseAdvance: { outstandingBalance: 300, activeCount: 3 } } });
+
+    const win = store.applyGameplaySettlement(profile.id, 60, 50, { gameId: 'blackjack', roomId: 'ROOM1', sessionId: 'SESSION2' });
+    expect(win).toMatchObject({ houseAdvanceRepayment: 5, profile: { bankroll: 80, houseAdvance: { outstandingBalance: 295, activeCount: 3 } } });
+    expect(win?.profile.transactions[0]).toMatchObject({
+      type: 'house_advance_repayment',
+      amount: -5,
+      metadata: { grossReturned: 60, netWinnings: 50, houseAdvanceRepayment: 5, outstandingBefore: 300, outstandingAfter: 295 },
+    });
+
+    const cleared = store.applyGameplaySettlement(profile.id, 1000, 5000, { gameId: 'blackjack' });
+    expect(cleared).toMatchObject({ houseAdvanceRepayment: 295, profile: { bankroll: 785, houseAdvance: { outstandingBalance: 0, activeCount: 0 } } });
+  });
+
   it('persists profile, ledger, and session data in SQLite', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
     tempDirs.push(dir);
@@ -115,6 +148,31 @@ describe('server data store', () => {
       transactions: [expect.objectContaining({ type: 'admin_adjustment', amount: 125, description: 'SQLite persistence check' })],
     });
     expect(reloaded.session).toMatchObject({ activeGame: 'beat-the-house', profileIds: [profile.id] });
+  });
+
+  it('persists House Advance state and repayment ledger entries in SQLite', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
+    tempDirs.push(dir);
+    const dbPath = join(dir, 'casino.sqlite');
+    const store = new SqliteServerDataStore(dbPath);
+    const profile = store.createProfile('SQLite Advance', 0).profileState.profiles[0];
+
+    store.acceptHouseAdvance(profile.id);
+
+    expect(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles[0]).toMatchObject({
+      bankroll: 100,
+      houseAdvance: { outstandingBalance: 100, activeCount: 1 },
+      transactions: [expect.objectContaining({ type: 'house_advance_credit', amount: 100 })],
+    });
+
+    const reloaded = new SqliteServerDataStore(dbPath);
+    reloaded.applyGameplaySettlement(profile.id, 50, 50, { gameId: 'blackjack', roomId: 'ROOM1', sessionId: 'SESSION1' });
+
+    expect(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles[0]).toMatchObject({
+      bankroll: 145,
+      houseAdvance: { outstandingBalance: 95, activeCount: 1 },
+      transactions: expect.arrayContaining([expect.objectContaining({ type: 'house_advance_repayment', amount: -5 })]),
+    });
   });
 
   it('persists SQLite profile mutations and session removal', async () => {

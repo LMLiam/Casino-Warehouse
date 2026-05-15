@@ -81,6 +81,27 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     return profile;
   }
 
+  public override acceptHouseAdvance(profileId: string): CasinoProfile | undefined {
+    const profile = super.acceptHouseAdvance(profileId);
+    this.persist(this.snapshot());
+    return profile;
+  }
+
+  public override applyGameplaySettlement(
+    profileId: string,
+    returned: number,
+    profit: number,
+    context: {
+      readonly gameId: string;
+      readonly roomId?: string;
+      readonly sessionId?: string;
+    },
+  ): { readonly profile: CasinoProfile; readonly houseAdvanceRepayment: number } | undefined {
+    const result = super.applyGameplaySettlement(profileId, returned, profit, context);
+    this.persist(this.snapshot());
+    return result;
+  }
+
   public override recordTransaction(
     profileId: string,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,

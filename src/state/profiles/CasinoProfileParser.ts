@@ -2,6 +2,7 @@ import type { BankrollTransaction } from './BankrollTransaction';
 import type { CasinoProfile } from './CasinoProfile';
 import { emptyStats } from './emptyStats';
 import { favouriteGame } from './favouriteGame';
+import { normalizeHouseAdvanceState } from './normalizeHouseAdvanceState';
 import { normalizeProfileName } from './normalizeProfileName';
 import type { PerGameStats } from './PerGameStats';
 import { profileColorFromName } from './profileColorFromName';
@@ -19,6 +20,7 @@ export class CasinoProfileParser {
       name: normalizeProfileName(value.name),
       color: typeof value.color === 'string' ? value.color : profileColorFromName(value.name),
       bankroll: CasinoProfileParser.safeMoney(value.bankroll),
+      houseAdvance: normalizeHouseAdvanceState(value.houseAdvance),
       stats: CasinoProfileParser.parseStats(value.stats),
       transactions: Array.isArray(value.transactions) ? value.transactions.map(CasinoProfileParser.parseTransaction) : [],
       createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date().toISOString(),
@@ -93,7 +95,9 @@ export class CasinoProfileParser {
       value === 'admin_adjustment' ||
       value === 'reset' ||
       value === 'import' ||
-      value === 'correction'
+      value === 'correction' ||
+      value === 'house_advance_credit' ||
+      value === 'house_advance_repayment'
     );
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createProfile } from '../../../src/state/profiles/createProfile';
 import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
+import { houseAdvanceRepaymentForProfit } from '../../../src/state/profiles/houseAdvanceRepaymentForProfit';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
 import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
 import { parseCasinoProfile } from '../../../src/state/profiles/parseCasinoProfile';
@@ -37,6 +38,7 @@ describe('profile store', () => {
     expect(loaded.state.profiles).toHaveLength(1);
     expect(loaded.state.profiles[0].name).toBe('Liam');
     expect(loaded.state.profiles[0].bankroll).toBe(1500);
+    expect(loaded.state.profiles[0].houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
   });
 
   it('renames and deletes profiles without touching other records', () => {
@@ -77,6 +79,50 @@ describe('profile store', () => {
     expect(profile.stats.perGame.blackjack).toMatchObject({ gamesPlayed: 1, wagered: 25, won: 50, netProfit: 25 });
     expect(profile.transactions.map((tx) => tx.balanceAfter)).toEqual([1025, 975]);
     expect(profile.transactions[0]).toMatchObject({ profileId: profile.id, balanceBefore: 975, description: 'Blackjack win' });
+  });
+
+  it('keeps House Advance credits and repayments out of gameplay stats', () => {
+    const state = createProfile({ version: 1, profiles: [] }, 'Advance Stats', 0, new Date('2026-05-04T12:00:00Z'));
+    let profile = state.profiles[0];
+
+    profile = recordTransaction(
+      { ...profile, houseAdvance: { outstandingBalance: 100, activeCount: 1 } },
+      { gameId: 'house-advance', type: 'house_advance_credit', amount: 100, description: 'House Advance accepted.', metadata: { outstandingBalance: 100 } },
+      new Date('2026-05-04T12:01:00Z'),
+    );
+    profile = recordTransaction(
+      { ...profile, houseAdvance: { outstandingBalance: 95, activeCount: 1 } },
+      {
+        gameId: 'blackjack',
+        type: 'house_advance_repayment',
+        amount: -5,
+        description: 'House Advance repayment.',
+        metadata: { houseAdvanceRepayment: 5, outstandingAfter: 95 },
+      },
+      new Date('2026-05-04T12:02:00Z'),
+    );
+
+    expect(profile.bankroll).toBe(95);
+    expect(profile.stats).toMatchObject({
+      totalWagered: 0,
+      totalWon: 0,
+      netProfit: 0,
+      biggestWin: 0,
+      biggestWager: 0,
+      gamesPlayed: 0,
+      perGame: {},
+    });
+    expect(profile.transactions.map((transaction) => transaction.type)).toEqual(['house_advance_repayment', 'house_advance_credit']);
+  });
+
+  it('computes House Advance repayments from net positive winnings only', () => {
+    const state = { outstandingBalance: 100, activeCount: 1 };
+
+    expect(houseAdvanceRepaymentForProfit(state, 0)).toBe(0);
+    expect(houseAdvanceRepaymentForProfit(state, -25)).toBe(0);
+    expect(houseAdvanceRepaymentForProfit(state, 5)).toBe(1);
+    expect(houseAdvanceRepaymentForProfit(state, 50)).toBe(5);
+    expect(houseAdvanceRepaymentForProfit({ outstandingBalance: 3, activeCount: 1 }, 100)).toBe(3);
   });
 
   it('creates secure state ids without Math.random', () => {
@@ -216,6 +262,7 @@ describe('profile store', () => {
 
     expect(imported.version).toBe(1);
     expect(imported.profiles[0].color).toMatch(/^#/);
+    expect(imported.profiles[0].houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
     expect(imported.profiles[0].stats.netProfit).toBe(10);
     expect(imported.profiles[0].transactions.map((transaction) => transaction.type)).toEqual(['push_refund', 'admin_adjustment']);
     expect(imported.profiles[0].transactions[0].description).toBe('Old push');
@@ -232,6 +279,10 @@ describe('profile store', () => {
       id: 'rich',
       name: '  Rich  ',
       bankroll: Number.NaN,
+      houseAdvance: {
+        outstandingBalance: 425,
+        activeCount: 99,
+      },
       stats: {
         perGame: {
           ignored: null,
@@ -273,6 +324,25 @@ describe('profile store', () => {
       ],
     });
     expect(rich.stats.perGame.slots).toMatchObject({ gamesPlayed: 2, wagered: 0, won: 25, netProfit: 7 });
+    expect(rich.houseAdvance).toEqual({ outstandingBalance: 300, activeCount: 3 });
+  });
+
+  it('normalizes invalid House Advance imports without rejecting profiles', () => {
+    expect(parseCasinoProfile({ id: 'missing', name: 'Missing' }).houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
+    expect(parseCasinoProfile({ id: 'negative', name: 'Negative', houseAdvance: { outstandingBalance: -100, activeCount: 2 } }).houseAdvance).toEqual({
+      outstandingBalance: 0,
+      activeCount: 0,
+    });
+    expect(
+      parseCasinoProfile({ id: 'active-missing', name: 'Active Missing', houseAdvance: { outstandingBalance: 100, activeCount: -5 } }).houseAdvance,
+    ).toEqual({
+      outstandingBalance: 100,
+      activeCount: 1,
+    });
+    expect(parseCasinoProfile({ id: 'too-high', name: 'Too High', houseAdvance: { outstandingBalance: 999, activeCount: 8 } }).houseAdvance).toEqual({
+      outstandingBalance: 300,
+      activeCount: 3,
+    });
   });
 
   it('rejects invalid imported profiles and transactions', () => {
