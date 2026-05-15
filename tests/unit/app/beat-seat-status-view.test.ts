@@ -12,10 +12,10 @@ describe('BeatSeatStatusView', () => {
       style: {},
       querySelectorAll: () => [],
     };
-    const elements = {
+    const elements = appElementsTestDouble({
       tableHost: { clientWidth: 1000, clientHeight: 600 },
       beatSeatStatus: statusLayer,
-    } as unknown as AppElements;
+    });
     const base = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
     const active: GameSnapshot = {
       ...base,
@@ -52,3 +52,5 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
   game,
   beat: { rebetSeatIds: [] },
 });
+
+const appElementsTestDouble = (implementation: object): AppElements => implementation as AppElements;
