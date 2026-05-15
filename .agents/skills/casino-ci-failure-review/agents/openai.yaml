@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Casino CI Failure Review'
+  short_description: 'Diagnose failing Casino Warehouse PR checks'
+  default_prompt: 'Use $casino-ci-failure-review to inspect failing checks for pull request #123 and report the evidence-backed diagnosis.'
+
+policy:
+  allow_implicit_invocation: false

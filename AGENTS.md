@@ -38,6 +38,7 @@ Primary references:
 - `npm run dev:cloudflare`: run the provider-specific Cloudflare Tunnel quick-tunnel public demo flow.
 - `npm run dev:cloudflared`: alias for `npm run dev:cloudflare`.
 - `./start-codex-create-issue.sh --print "issue topic"`: preview the Codex `/goal` for researching and creating a new GitHub issue.
+- `./start-codex-ci-failure.sh --print 123`: preview the Codex `/goal` for diagnosing failing checks on a pull request.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -143,6 +144,12 @@ After any new commit, rebase, merge from the target branch, force-push, PR body 
 When asked to create, open, draft, file, or prepare a new GitHub issue from a user request, use the Casino Warehouse issue-creation skill at `.agents/skills/casino-issue-creation/SKILL.md`. For interactive launches, use `start-codex-create-issue.sh`; `start-codex-issue.sh` remains for completing an existing issue number.
 
 The issue-creation workflow must inspect relevant repository context, search existing open and closed issues and pull requests for duplicates or related work, choose repository-compliant title/labels/status/milestone, create the issue through GitHub, then verify the created issue number, URL, metadata, and body before reporting success.
+
+## CI Failure Review Workflow
+
+When asked to inspect, explain, diagnose, review, retry, or fix failing pull request checks, use the Casino Warehouse CI failure review skill at `.agents/skills/casino-ci-failure-review/SKILL.md`. For interactive launches, use `start-codex-ci-failure.sh`.
+
+The CI failure review workflow must fetch current pull request metadata, head SHA, base branch, required check status, workflow runs, failing jobs, and relevant logs before diagnosing a failure. It must distinguish required checks from informational or external checks, map visual/e2e failures to local reproduction commands where applicable, classify the failure cause, and ask before making fixes unless the user's active goal clearly asks to fix CI.
 
 ## Pull Request Checklist
 
