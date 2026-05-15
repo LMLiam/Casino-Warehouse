@@ -138,6 +138,7 @@ export abstract class GameAppRendering {
     const hasActiveRoomSeat = Boolean(activeRoom?.seats.some((seat) => seat.profileId === player.profileId));
     const canUseGameControls = !activeRoom || hasActiveRoomSeat;
     const beatSnapshot = isBeatTheHouse && activeRoom && isBeatSnapshot(activeRoom.game) ? activeRoom.game : player.beatTheHouse.snapshot();
+    const beatBankroll = roomMember?.bankroll ?? this.currentProfile()?.bankroll ?? beatSnapshot.bankroll;
     const blackjackSnapshot = isBlackjack && activeRoom && isBlackjackTableSnapshot(activeRoom.game) ? activeRoom.game : player.blackjack.snapshot();
     const slotsSnapshot = isSlots && activeRoom && isSlotSnapshot(activeRoom.game) ? activeRoom.game : this.currentSlots().snapshot();
     const showingRoomLobby = !this.showingGameLobby && !activeRoom;
@@ -173,7 +174,7 @@ export abstract class GameAppRendering {
     this.table.render(beatSnapshot, this.beatSettlementMetadataFor(activeRoom, player.profileId));
     this.beatSeatStatusView.render(beatSnapshot, isBeatTheHouse ? activeRoom : undefined, player.profileId, (seatId) => this.claimRoomSeat(seatId));
     this.renderWallet(beatSnapshot, roomMember?.bankroll);
-    this.renderBeatControls(beatSnapshot, canUseGameControls, activeRoom, player.profileId, roomMember?.bankroll);
+    this.renderBeatControls(beatSnapshot, canUseGameControls, activeRoom, player.profileId, beatBankroll);
     this.blackjackView.render(blackjackSnapshot, player.profileId);
     this.slotsView.render(slotsSnapshot, this.activeGame, activeRoom, player.profileId);
     this.renderRoomBrowser();

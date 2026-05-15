@@ -4,6 +4,7 @@ import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { HandId } from '../../../src/game/types/HandId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import { BeatControlsView } from '../../../src/app/views/BeatControlsView';
+import { chipValues } from '../../../src/ui/chips/chipValues';
 
 class FakeClassList {
   private readonly classes = new Set<string>();
@@ -25,6 +26,15 @@ class FakeClassList {
 
 const createButton = () => ({
   disabled: false,
+  draggable: false,
+  dataset: {},
+  classList: new FakeClassList(),
+});
+
+const createChipButton = (value: number) => ({
+  disabled: false,
+  draggable: false,
+  dataset: { chip: String(value) },
   classList: new FakeClassList(),
 });
 
@@ -37,6 +47,7 @@ const createElements = () => ({
   status: createElement(),
   onTable: createElement(),
   chipRail: createElement(),
+  chipButtons: chipValues.map((value) => createChipButton(value)),
   dealButton: createButton(),
   rebetButton: createButton(),
   clearButton: createButton(),
@@ -174,5 +185,34 @@ describe('BeatControlsView', () => {
     expect(aliceElements.rebetButton.disabled).toBe(false);
     expect(coryElements.rebetButton.disabled).toBe(true);
     expect(missingEligibilityElements.rebetButton.disabled).toBe(true);
+  });
+
+  it('hides Beat the House chip buttons above the active bankroll', () => {
+    const snapshot = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const elements = createElements();
+
+    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, undefined, undefined, 1000);
+
+    const visibleValues = elements.chipButtons.filter((button) => !button.classList.contains('hidden')).map((button) => Number(button.dataset.chip));
+    const hiddenValues = elements.chipButtons.filter((button) => button.classList.contains('hidden')).map((button) => Number(button.dataset.chip));
+    expect(visibleValues).toEqual([1, 5, 25, 100, 500, 1000]);
+    expect(hiddenValues).toEqual([5000, 10000]);
+    expect(elements.chipButtons.find((button) => button.dataset.chip === '5000')?.disabled).toBe(true);
+  });
+
+  it('updates the visible chip list when the active bankroll changes', () => {
+    const snapshot = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const elements = createElements();
+    const view = new BeatControlsView(elements);
+
+    view.render(snapshot, true, () => undefined, true, undefined, undefined, 1000);
+    view.render(snapshot, true, () => undefined, true, undefined, undefined, 25);
+
+    expect(elements.chipButtons.filter((button) => !button.classList.contains('hidden')).map((button) => Number(button.dataset.chip))).toEqual([1, 5, 25]);
+
+    view.render(snapshot, true, () => undefined, true, undefined, undefined, 0);
+
+    expect(elements.chipButtons.every((button) => button.classList.contains('hidden'))).toBe(true);
+    expect(elements.chipRail.classList.contains('hidden')).toBe(true);
   });
 });

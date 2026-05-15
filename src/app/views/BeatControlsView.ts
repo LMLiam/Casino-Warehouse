@@ -15,6 +15,12 @@ export class BeatControlsView {
       readonly status: { textContent: string | null };
       readonly onTable: { textContent: string | null };
       readonly chipRail: { classList: Pick<DOMTokenList, 'toggle'> };
+      readonly chipButtons: readonly {
+        disabled: boolean;
+        draggable: boolean;
+        readonly dataset: DOMStringMap;
+        readonly classList: Pick<DOMTokenList, 'toggle'>;
+      }[];
       readonly dealButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
       readonly rebetButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
       readonly clearButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
@@ -22,6 +28,7 @@ export class BeatControlsView {
       readonly hitButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
       readonly stickButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
     },
+    private readonly onChipBankrollChange: (bankroll: number | undefined, canSelectChip: boolean) => void = () => undefined,
   ) {}
 
   public markPendingBet(betType: BetType): void {
@@ -87,7 +94,23 @@ export class BeatControlsView {
     this.setActionButton(this.elements.nextButton, controlsAvailable && snapshot.phase === 'roundOver');
     this.setActionButton(this.elements.hitButton, controlsAvailable && snapshot.phase === 'playing');
     this.setActionButton(this.elements.stickButton, controlsAvailable && snapshot.phase === 'playing');
-    this.elements.chipRail.classList.toggle('hidden', !isBeatTheHouse || snapshot.phase !== 'betting' || !controlsAvailable);
+    const hasAffordableChip = this.renderAffordableChips(bankroll);
+    this.elements.chipRail.classList.toggle('hidden', !isBeatTheHouse || snapshot.phase !== 'betting' || !controlsAvailable || !hasAffordableChip);
+    this.onChipBankrollChange(bankroll, controlsAvailable && snapshot.phase === 'betting');
+  }
+
+  private renderAffordableChips(bankroll: number | undefined): boolean {
+    const maximumChipValue = bankroll ?? Number.POSITIVE_INFINITY;
+    let hasAffordableChip = false;
+    this.elements.chipButtons.forEach((button) => {
+      const chipValue = Number(button.dataset.chip);
+      const affordable = Number.isFinite(chipValue) && chipValue > 0 && chipValue <= maximumChipValue;
+      button.disabled = !affordable;
+      button.draggable = affordable;
+      button.classList.toggle('hidden', !affordable);
+      hasAffordableChip ||= affordable;
+    });
+    return hasAffordableChip;
   }
 
   private hasMainBet(snapshot: GameSnapshot): boolean {
