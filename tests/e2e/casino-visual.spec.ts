@@ -150,7 +150,7 @@ test('House Advance offer, owed balance, and capped-state messaging render in th
   await expect(page.locator('#bankroll')).toContainText('£0');
   await expect(page.locator('#houseAdvancePanel')).toBeVisible();
   await expect(page.locator('#houseAdvancePanel')).toContainText('House Advance available');
-  await expect(page.locator('#houseAdvancePanel')).toContainText('no real-world debt');
+  await expect(page.locator('#houseAdvancePanel')).toContainText('Future net wins repay 10%');
 
   await page.getByRole('button', { name: 'Take House Advance' }).click();
   await expect(page.locator('#bankroll')).toContainText('£100');

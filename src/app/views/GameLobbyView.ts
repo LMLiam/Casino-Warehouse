@@ -48,7 +48,7 @@ export class GameLobbyView {
         title.textContent = 'House Advance available';
       }
       if (message) {
-        message.textContent = `${money(houseAdvanceConfig.amount)} can be added to this profile. Future net wins repay 10%, and there is no real-world debt.`;
+        message.textContent = `${money(houseAdvanceConfig.amount)} can be added to this profile. Future net wins repay 10%.`;
       }
       this.elements.houseAdvanceButton.classList.remove('hidden');
       this.elements.houseAdvanceButton.disabled = false;
