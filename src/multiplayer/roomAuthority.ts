@@ -1,7 +1,9 @@
 import { findGame } from '../game/catalog/findGame';
 import type { BetType } from '../game/types/BetType';
 import { betTypes } from '../game/types/betTypes';
+import type { GameSnapshot } from '../game/types/GameSnapshot';
 import type { HandId } from '../game/types/HandId';
+import { handIds } from '../game/types/handIds';
 import { canRoomFlowTransition } from '../state/roomMachines/canRoomFlowTransition';
 import { canSharedSlotsTransition } from '../state/roomMachines/canSharedSlotsTransition';
 import { deriveSharedSlotsPhase } from '../state/roomMachines/deriveSharedSlotsPhase';
@@ -144,6 +146,7 @@ export class RoomAuthority extends RoomAuthorityBase {
       serverManaged: false,
       settledSessionIds: new Set(),
       lastBeatEvents: [],
+      lastBeatBetOwners: {},
     };
     this.rooms.set(room.roomId, room);
     this.addMember(room, connectionId, 'spectator', message.profileId, message.profileName, bankroll);
@@ -319,6 +322,9 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (wager <= 0) {
       return this.error('No previous bet saved for your seat.');
     }
+    if (room.lastBeatBetOwners[seatId] !== profileId) {
+      return this.error('No previous bet saved for your seat.');
+    }
     const player = room.players.get(profileId);
     if (!player || player.bankroll < wager) {
       return this.error(`Need £${wager} to rebet.`);
@@ -353,7 +359,22 @@ export class RoomAuthority extends RoomAuthorityBase {
     }
     this.syncBeatBankroll(room);
     const model = room.model;
-    return this.ownerAction(room, () => (room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot()));
+    const before = model.game.snapshot();
+    const result = this.ownerAction(room, () => (room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot()));
+    const after = model.game.snapshot();
+    if (before.phase === 'betting' && after.phase !== 'betting') {
+      this.recordBeatBetOwners(room, before);
+    }
+    return result;
+  }
+
+  private recordBeatBetOwners(room: RoomState, snapshot: GameSnapshot): void {
+    room.lastBeatBetOwners = Object.fromEntries(
+      handIds.flatMap((handId) => {
+        const ownerProfileId = room.seats.get(handId);
+        return ownerProfileId && totalBeatStake(snapshot, handId) > 0 ? [[handId, ownerProfileId]] : [];
+      }),
+    ) as Partial<Record<HandId, string>>;
   }
 
   private activeBeatSeatAction(room: RoomState, profileId: string, role: RoomRole, action: 'hit' | 'stick'): AuthorityResult {

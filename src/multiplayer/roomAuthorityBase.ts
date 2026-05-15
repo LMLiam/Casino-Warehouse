@@ -39,6 +39,7 @@ export abstract class RoomAuthorityBase {
     room.settledSessionIds.clear();
     if (room.model.kind === 'beat-the-house') {
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
+      room.lastBeatBetOwners = {};
       this.syncBeatBankroll(room);
     } else if (room.model.kind === 'blackjack') {
       room.model.table.reset(this.blackjackOccupants(room));
@@ -346,6 +347,7 @@ export abstract class RoomAuthorityBase {
     room.seats.clear();
     room.settledSessionIds.clear();
     room.lastBeatEvents = [];
+    room.lastBeatBetOwners = {};
     room.sessionId = createId('session');
     if (room.model.kind === 'beat-the-house') {
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
