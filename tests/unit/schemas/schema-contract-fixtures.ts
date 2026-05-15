@@ -197,6 +197,7 @@ export const clientMessageContractFixtures = [
   { version: 1, type: 'leave-room' },
   { version: 1, type: 'assign-seat', seatId: 'seat-1' },
   { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 },
+  { version: 1, type: 'place-tip', seatId: 'left', amount: 5 },
   { version: 1, type: 'blackjack-deal', wager: 25 },
   { version: 1, type: 'blackjack-action', action: 'stand' },
   { version: 1, type: 'slots-wager', wager: 10 },

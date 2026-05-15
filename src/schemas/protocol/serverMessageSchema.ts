@@ -97,11 +97,14 @@ export const serverMessageSchema = (() => {
 
   const roomSettlementShapeSchema = z.object({
     id: z.string(),
+    kind: z.enum(['gameplay', 'dealer-thanks']).optional(),
     profileId: z.string(),
     seatId: roomSeatIdSchema,
     wagered: finiteNumberSchema,
     returned: finiteNumberSchema,
     profit: finiteNumberSchema,
+    dealerTip: finiteNumberSchema.optional(),
+    dealerThanks: finiteNumberSchema.optional(),
     houseAdvanceRepayment: finiteNumberSchema.optional(),
   });
   const roomSettlementSchema = z.custom<RoomSettlement>((value) => roomSettlementShapeSchema.safeParse(value).success);

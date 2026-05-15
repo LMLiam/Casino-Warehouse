@@ -4,9 +4,11 @@ import { createDeck } from '../cards/createDeck';
 import { isBlackAce } from '../cards/isBlackAce';
 import { rankValue } from '../cards/rankValue';
 import type { Rng } from '../rng/Rng';
+import { secureRandomInt } from '../rng/secureRandomInt';
 import type { Bets } from '../types/Bets';
 import type { BetType } from '../types/BetType';
 import { betTypes } from '../types/betTypes';
+import type { DealerTips } from '../types/DealerTips';
 import type { GameEvent } from '../types/GameEvent';
 import type { GameSnapshot } from '../types/GameSnapshot';
 import type { HandId } from '../types/HandId';
@@ -24,6 +26,9 @@ export class BeatTheHouseGame {
   private static readonly maxPlayerCards = 4;
   private static readonly dealerDrawMaxRank = 10;
   private static readonly maxDealerCards = 4;
+  private static readonly dealerThanksChanceDenominator = 10;
+  private static readonly dealerThanksWinningRoll = 0;
+  private static readonly dealerThanksMultiplier = 2;
   private static readonly sideBetMultipliers = {
     aceFlashBoth: 50,
     aceFlashSingle: 10,
@@ -42,6 +47,8 @@ export class BeatTheHouseGame {
   private phase: GameSnapshot['phase'] = 'betting';
   private bankroll: number;
   private bets = BeatTheHouseGame.emptyBets();
+  private dealerTips = BeatTheHouseGame.emptyDealerTips();
+  private dealerTipRewards = BeatTheHouseGame.emptyDealerTips();
   private lastBets?: Bets;
   private deck: Card[];
   private hands = BeatTheHouseGame.emptyHands();
@@ -51,10 +58,12 @@ export class BeatTheHouseGame {
   private summaries: RoundSummary[] = [];
   private status = 'Place chips on any hand, then deal.';
   private readonly rng?: Rng;
+  private readonly randomInt: (maxExclusive: number) => number;
 
   public constructor(options: GameOptions = {}) {
     this.bankroll = options.initialBankroll ?? BeatTheHouseGame.defaultInitialBankroll;
     this.rng = options.rng;
+    this.randomInt = options.randomInt ?? secureRandomInt;
     this.deck = options.deck ? [...options.deck] : createDeck(this.rng);
   }
 
@@ -63,6 +72,8 @@ export class BeatTheHouseGame {
       phase: this.phase,
       bankroll: this.bankroll,
       bets: BeatTheHouseGame.cloneBets(this.bets),
+      dealerTips: BeatTheHouseGame.cloneDealerTips(this.dealerTips),
+      dealerTipRewards: BeatTheHouseGame.cloneDealerTips(this.dealerTipRewards),
       activeHand: this.activeHand,
       hands: BeatTheHouseGame.cloneHands(this.hands),
       dealer: {
@@ -91,6 +102,8 @@ export class BeatTheHouseGame {
     this.phase = state.phase;
     this.bankroll = Math.max(0, Math.floor(state.bankroll));
     this.bets = BeatTheHouseGame.cloneBets(state.bets);
+    this.dealerTips = BeatTheHouseGame.cloneDealerTips(BeatTheHouseGame.restoredDealerTips(state, 'dealerTips'));
+    this.dealerTipRewards = BeatTheHouseGame.cloneDealerTips(BeatTheHouseGame.restoredDealerTips(state, 'dealerTipRewards'));
     this.lastBets = state.lastBets ? BeatTheHouseGame.cloneBets(state.lastBets) : undefined;
     this.deck = [...state.deck];
     this.hands = BeatTheHouseGame.cloneHands(state.hands);
@@ -100,6 +113,26 @@ export class BeatTheHouseGame {
     this.summaries = [...state.summaries];
     this.status = state.status;
     return this.snapshot();
+  }
+
+  public placeDealerTip(handId: HandId, amount: number): GameSnapshot {
+    const wholeAmount = Math.floor(amount);
+    if (this.phase !== 'betting' || wholeAmount <= 0) {
+      return this.snapshot();
+    }
+
+    if (this.bankroll < wholeAmount) {
+      return this.emit([{ type: 'message', message: `Need £${wholeAmount} available.` }], `Need £${wholeAmount} available.`);
+    }
+
+    this.bankroll -= wholeAmount;
+    this.dealerTips[handId] += wholeAmount;
+    this.dealerTipRewards = BeatTheHouseGame.emptyDealerTips();
+    this.summaries = [];
+    return this.emit(
+      [{ type: 'dealer-tip-placed', handId, amount: wholeAmount }],
+      `${BeatTheHouseGame.handName[handId]} dealer tip: £${this.dealerTips[handId]}.`,
+    );
   }
 
   public placeBet(handId: HandId, betType: BetType, amount: number): GameSnapshot {
@@ -130,7 +163,10 @@ export class BeatTheHouseGame {
     }
 
     this.bankroll += BeatTheHouseGame.totalBet(this.bets);
+    this.bankroll += BeatTheHouseGame.totalDealerTips(this.dealerTips);
     this.bets = BeatTheHouseGame.emptyBets();
+    this.dealerTips = BeatTheHouseGame.emptyDealerTips();
+    this.dealerTipRewards = BeatTheHouseGame.emptyDealerTips();
     this.summaries = [];
     this.sideStates = BeatTheHouseGame.emptySideStates();
     return this.emit([{ type: 'bets-cleared' }], 'Bets cleared.');
@@ -141,13 +177,15 @@ export class BeatTheHouseGame {
       return this.snapshot();
     }
 
-    const refund = BeatTheHouseGame.handStake(this.bets, handId);
+    const refund = BeatTheHouseGame.handStake(this.bets, handId) + this.dealerTips[handId];
     if (refund <= 0) {
       return this.snapshot();
     }
 
     this.bankroll += refund;
     this.bets[handId] = BeatTheHouseGame.emptyHandBets();
+    this.dealerTips[handId] = 0;
+    this.dealerTipRewards[handId] = 0;
     this.summaries = [];
     this.sideStates[handId] = BeatTheHouseGame.emptySideState();
     return this.emit([{ type: 'bets-cleared', handId }], `${BeatTheHouseGame.handName[handId]} bets cleared.`);
@@ -208,13 +246,17 @@ export class BeatTheHouseGame {
 
     this.phase = 'dealing';
     this.lastBets = BeatTheHouseGame.cloneBets(this.bets);
+    this.dealerTipRewards = BeatTheHouseGame.emptyDealerTips();
     this.deck = deckOverride ? [...deckOverride] : createDeck(this.rng);
     this.hands = BeatTheHouseGame.emptyHands();
     this.dealer = { cards: [], holeRevealed: false, bust: false, blackAce: false };
     this.sideStates = BeatTheHouseGame.emptySideStates();
     this.summaries = [];
 
-    const events: GameEvent[] = [{ type: 'round-started', message: 'Round started.' }];
+    const events: GameEvent[] = [
+      ...handIds.flatMap((handId): GameEvent[] => (this.dealerTips[handId] > 0 ? [{ type: 'dealer-tip-taken', handId, amount: this.dealerTips[handId] }] : [])),
+      { type: 'round-started', message: 'Round started.' },
+    ];
     for (const handId of active) {
       const card = this.draw();
       const current = this.hands[handId];
@@ -298,6 +340,8 @@ export class BeatTheHouseGame {
     }
 
     this.bets = BeatTheHouseGame.emptyBets();
+    this.dealerTips = BeatTheHouseGame.emptyDealerTips();
+    this.dealerTipRewards = BeatTheHouseGame.emptyDealerTips();
     this.hands = BeatTheHouseGame.emptyHands();
     this.dealer = { cards: [], holeRevealed: false, bust: false, blackAce: false };
     this.activeHand = undefined;
@@ -345,6 +389,10 @@ export class BeatTheHouseGame {
     return Object.fromEntries(handIds.map((handId) => [handId, BeatTheHouseGame.emptyHandBets()])) as Bets;
   }
 
+  private static emptyDealerTips(): DealerTips {
+    return Object.fromEntries(handIds.map((handId) => [handId, 0])) as DealerTips;
+  }
+
   private static emptyHandBets(): Bets[HandId] {
     return Object.fromEntries(betTypes.map((betType) => [betType, 0])) as Bets[HandId];
   }
@@ -378,6 +426,10 @@ export class BeatTheHouseGame {
     return handIds.reduce((total, handId) => total + betTypes.reduce((handTotal, betType) => handTotal + bets[handId][betType], 0), 0);
   }
 
+  private static totalDealerTips(dealerTips: DealerTips): number {
+    return handIds.reduce((total, handId) => total + dealerTips[handId], 0);
+  }
+
   private static handStake(bets: Bets, handId: HandId): number {
     return betTypes.reduce((total, betType) => total + bets[handId][betType], 0);
   }
@@ -393,6 +445,14 @@ export class BeatTheHouseGame {
 
   private static cloneBets(bets: Bets): Bets {
     return Object.fromEntries(handIds.map((handId) => [handId, { ...bets[handId] }])) as Bets;
+  }
+
+  private static cloneDealerTips(dealerTips: DealerTips): DealerTips {
+    return Object.fromEntries(handIds.map((handId) => [handId, Math.max(0, Math.floor(dealerTips[handId] ?? 0))])) as DealerTips;
+  }
+
+  private static restoredDealerTips(state: BeatTheHouseSaveState, key: 'dealerTips' | 'dealerTipRewards'): DealerTips {
+    return ((state as BeatTheHouseSaveState & Partial<Record<typeof key, DealerTips>>)[key] ?? BeatTheHouseGame.emptyDealerTips()) as DealerTips;
   }
 
   private static cloneHands(hands: Record<HandId, PlayerHand>): Record<HandId, PlayerHand> {
@@ -454,6 +514,7 @@ export class BeatTheHouseGame {
     let returned = 0;
     const summaries: RoundSummary[] = [];
     const sideStates = BeatTheHouseGame.emptySideStates();
+    const dealerTipRewards = this.resolveDealerThanks();
 
     for (const handId of BeatTheHouseGame.playableHands(this.bets)) {
       const hand = this.hands[handId];
@@ -500,13 +561,29 @@ export class BeatTheHouseGame {
       });
     }
 
-    this.bankroll += returned;
+    const dealerThanksTotal = BeatTheHouseGame.totalDealerTips(dealerTipRewards);
+    this.bankroll += returned + dealerThanksTotal;
     this.summaries = summaries;
     this.sideStates = sideStates;
+    this.dealerTipRewards = dealerTipRewards;
     this.phase = 'roundOver';
     const totalProfit = summaries.reduce((total, summary) => total + summary.profit, 0);
-    const events: GameEvent[] = [...previousEvents, { type: 'round-settled', summaries, totalProfit }];
-    return this.emit(events, `Round complete. Total ${BeatTheHouseGame.formatMoneyDelta(totalProfit)}.`);
+    const events: GameEvent[] = [...previousEvents, { type: 'round-settled', summaries, totalProfit, dealerThanksTotal }];
+    const thanksStatus = dealerThanksTotal > 0 ? ` Dealer's Thanks ${BeatTheHouseGame.formatMoneyDelta(dealerThanksTotal)}.` : '';
+    return this.emit(events, `Round complete. Total ${BeatTheHouseGame.formatMoneyDelta(totalProfit)}.${thanksStatus}`);
+  }
+
+  private resolveDealerThanks(): DealerTips {
+    return Object.fromEntries(
+      handIds.map((handId) => {
+        const tip = this.dealerTips[handId];
+        const reward =
+          tip > 0 && this.randomInt(BeatTheHouseGame.dealerThanksChanceDenominator) === BeatTheHouseGame.dealerThanksWinningRoll
+            ? tip * BeatTheHouseGame.dealerThanksMultiplier
+            : 0;
+        return [handId, reward];
+      }),
+    ) as DealerTips;
   }
 
   private resolveSideBets(handId: HandId, mainResult: RoundSummary['mainResult']) {
@@ -586,6 +663,7 @@ export class BeatTheHouseGame {
       this.phase === 'betting' &&
       Boolean(this.lastBets) &&
       BeatTheHouseGame.totalBet(this.bets) === 0 &&
+      BeatTheHouseGame.totalDealerTips(this.dealerTips) === 0 &&
       BeatTheHouseGame.totalBet(this.lastBets ?? BeatTheHouseGame.emptyBets()) <= this.bankroll
     );
   }

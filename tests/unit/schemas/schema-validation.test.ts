@@ -57,6 +57,11 @@ describe('Zod-backed runtime validation', () => {
       ok: false,
       error: 'Amount must be greater than zero.',
     });
+    expect(parseClientMessage({ version: 1, type: 'place-tip', seatId: 'left', amount: 5 })).toMatchObject({ ok: true });
+    expect(parseClientMessage({ version: 1, type: 'place-tip', seatId: 'left', amount: 0 })).toEqual({
+      ok: false,
+      error: 'Amount must be greater than zero.',
+    });
   });
 
   it('validates session room restore targets without trusting malformed rooms', () => {
@@ -146,6 +151,8 @@ describe('Zod-backed runtime validation', () => {
     expect(bankrollTransactionSchema.parse({ id: 'tx-a', gameId: 'admin', type: 'unknown', amount: 1 }).at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(profileNameSchema.parse('   ')).toBe('Player');
     expect(transactionTypeSchema.parse('correction')).toBe('correction');
+    expect(transactionTypeSchema.parse('dealer_tip')).toBe('dealer_tip');
+    expect(transactionTypeSchema.parse('dealer_thanks')).toBe('dealer_thanks');
     expect(transactionTypeSchema.parse('house_advance_repayment')).toBe('house_advance_repayment');
     expect(roomNameSchema.parse('  Late    Table  ')).toBe('Late Table');
     expect(roomNameSchema.parse(undefined)).toBeUndefined();

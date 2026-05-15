@@ -498,6 +498,52 @@ describe('per-game room authority', () => {
     expect(blackjackRoom.gameId).toBe('blackjack');
   });
 
+  it('authorizes Beat the House dealer tips by seat and records tip ledger entries when the round starts', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = authority.handle('a', create('beat-the-house', 'alice', 100)).direct!.roomId;
+    authority.handle('a', claimSeat('left'));
+    authority.handle('watch', join('beat-the-house', roomId, 'watcher', 100, 'spectator'));
+
+    expect(authority.handle('watch', { version: 1, type: 'place-tip', seatId: 'left', amount: 5 }).error).toBe('Spectators cannot tip the dealer.');
+    expect(authority.handle('a', { version: 1, type: 'place-tip', seatId: 'right', amount: 5 }).error).toBe('You can only tip from your own seat.');
+    expect(authority.handle('a', { version: 1, type: 'place-tip', seatId: 'left', amount: 999 }).error).toBe(
+      'Insufficient profile bankroll for that dealer tip.',
+    );
+
+    const tipped = authority.handle('a', { version: 1, type: 'place-tip', seatId: 'left', amount: 10 }).broadcasts[0];
+    expect(beat(tipped).dealerTips.left).toBe(10);
+    expect(tipped.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(90);
+
+    const cleared = authority.handle('a', { version: 1, type: 'clear-bets' }).broadcasts[0];
+    expect(beat(cleared).dealerTips.left).toBe(0);
+    expect(cleared.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(100);
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.transactions).toEqual([]);
+
+    authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    authority.handle('a', { version: 1, type: 'place-tip', seatId: 'left', amount: 10 });
+    authority.handle('a', { version: 1, type: 'start-round' });
+
+    const transactions = store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.transactions ?? [];
+    expect(transactions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'dealer_tip',
+          amount: -10,
+          description: 'Dealer tip taken.',
+          metadata: { handId: 'left', dealerTip: 10 },
+        }),
+      ]),
+    );
+    expect(authority.handle('a', { version: 1, type: 'start-round' }).error).toBe('Round is already in progress.');
+    expect(
+      store
+        .snapshot()
+        .profileState.profiles.find((profile) => profile.id === 'alice')
+        ?.transactions.filter((transaction) => transaction.type === 'dealer_tip'),
+    ).toHaveLength(1);
+  });
+
   it('covers additional room authority validation edges without trusting malformed client state', () => {
     const authority = new RoomAuthority();
     const blackjackRoom = authority.handle('host', create('blackjack', 'host', 500, 1)).direct!;

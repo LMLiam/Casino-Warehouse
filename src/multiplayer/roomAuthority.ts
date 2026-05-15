@@ -61,6 +61,8 @@ export class RoomAuthority extends RoomAuthorityBase {
         return this.assignSeat(room, member.profileId, message.seatId);
       case 'place-chip':
         return this.placeBeatChip(room, member.profileId, member.role, message.seatId, message.betType, message.amount);
+      case 'place-tip':
+        return this.placeBeatTip(room, member.profileId, member.role, message.seatId, message.amount);
       case 'clear-bets':
         return this.beatOnly(room, () => this.clearBeatBets(room, member.profileId, member.role));
       case 'rebet':
@@ -270,6 +272,35 @@ export class RoomAuthority extends RoomAuthorityBase {
     return result;
   }
 
+  private placeBeatTip(room: RoomState, profileId: string, role: RoomRole, seatId: HandId, amount: number): AuthorityResult {
+    if (room.model.kind !== 'beat-the-house') {
+      return this.error('Beat the House tips are not valid in this room.');
+    }
+    if (role !== 'player') {
+      return this.error('Spectators cannot tip the dealer.');
+    }
+    if (room.seats.get(seatId) !== profileId) {
+      return this.error('You can only tip from your own seat.');
+    }
+    if (amount <= 0) {
+      return this.error('Dealer tip is invalid.');
+    }
+    const player = room.players.get(profileId);
+    if (!player || player.bankroll < amount) {
+      return this.error('Insufficient profile bankroll for that dealer tip.');
+    }
+    this.syncBeatBankroll(room);
+    const before = room.model.game.snapshot();
+    const beforeAmount = before.dealerTips[seatId];
+    const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.placeDealerTip(seatId, amount));
+    const debited = room.model.game.snapshot().dealerTips[seatId] - beforeAmount;
+    if (debited > 0) {
+      this.setPlayerBankroll(room, profileId, player.bankroll - debited);
+      return this.broadcast(room, result.settlements);
+    }
+    return result;
+  }
+
   private clearBeatBets(room: RoomState, profileId: string, role: RoomRole): AuthorityResult {
     if (room.model.kind !== 'beat-the-house') {
       return this.error('Wrong room game.');
@@ -286,7 +317,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (before.phase !== 'betting') {
       return this.error('Bets can only be cleared before the round starts.');
     }
-    const refund = totalBeatStake(before, seatId);
+    const refund = this.totalBeatTableCredits(before, seatId);
     if (refund <= 0) {
       return this.error('You do not have bets to clear.');
     }
@@ -315,7 +346,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     if (before.phase !== 'betting') {
       return this.error('Rebet is only available before the round starts.');
     }
-    if (totalBeatStake(before, seatId) > 0) {
+    if (this.totalBeatTableCredits(before, seatId) > 0) {
       return this.error('Clear your current bets before rebetting.');
     }
     const wager = before.rebetAmounts[seatId];
@@ -364,6 +395,7 @@ export class RoomAuthority extends RoomAuthorityBase {
     const after = model.game.snapshot();
     if (before.phase === 'betting' && after.phase !== 'betting') {
       this.recordBeatBetOwners(room, before);
+      this.recordBeatDealerTips(room, before);
     }
     return result;
   }
@@ -375,6 +407,54 @@ export class RoomAuthority extends RoomAuthorityBase {
         return ownerProfileId && totalBeatStake(snapshot, handId) > 0 ? [[handId, ownerProfileId]] : [];
       }),
     ) as Partial<Record<HandId, string>>;
+  }
+
+  private recordBeatDealerTips(room: RoomState, snapshot: GameSnapshot): void {
+    for (const handId of handIds) {
+      const tip = snapshot.dealerTips[handId];
+      const profileId = room.seats.get(handId);
+      if (!profileId || tip <= 0) {
+        continue;
+      }
+      this.recordReservedDebitTransaction(room, profileId, {
+        amount: tip,
+        description: 'Dealer tip taken.',
+        metadata: { handId, dealerTip: tip },
+      });
+    }
+  }
+
+  private recordReservedDebitTransaction(
+    room: RoomState,
+    profileId: string,
+    transaction: {
+      readonly amount: number;
+      readonly description: string;
+      readonly metadata: Readonly<Record<string, string | number | boolean>>;
+    },
+  ): void {
+    const profile = this.dataStore.snapshot().profileState.profiles.find((candidate) => candidate.id === profileId);
+    if (!profile) {
+      return;
+    }
+    const player = room.players.get(profileId);
+    this.dataStore.setProfileBankroll(profileId, profile.bankroll + transaction.amount);
+    const updated = this.dataStore.recordTransaction(profileId, {
+      gameId: room.gameId,
+      roomId: room.roomId,
+      sessionId: room.sessionId,
+      type: 'dealer_tip',
+      amount: -transaction.amount,
+      description: transaction.description,
+      metadata: transaction.metadata,
+    });
+    if (player && updated) {
+      room.players.set(profileId, { ...player, bankroll: updated.bankroll });
+    }
+  }
+
+  private totalBeatTableCredits(snapshot: GameSnapshot, handId: HandId): number {
+    return totalBeatStake(snapshot, handId) + snapshot.dealerTips[handId];
   }
 
   private activeBeatSeatAction(room: RoomState, profileId: string, role: RoomRole, action: 'hit' | 'stick'): AuthorityResult {

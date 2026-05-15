@@ -7,6 +7,8 @@ import type { RoundSummary } from './RoundSummary';
 export interface GameEvent {
   readonly type:
     | 'bet-placed'
+    | 'dealer-tip-placed'
+    | 'dealer-tip-taken'
     | 'bets-cleared'
     | 'round-started'
     | 'player-card'
@@ -24,4 +26,5 @@ export interface GameEvent {
   readonly result?: HandResult;
   readonly summaries?: RoundSummary[];
   readonly totalProfit?: number;
+  readonly dealerThanksTotal?: number;
 }

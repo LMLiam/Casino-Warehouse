@@ -143,6 +143,10 @@ export class PixiTable {
     this.prepareSettlementVisibility(snapshot);
     this.host.dataset.settlementVisible = String(this.shouldShowSettlement(snapshot));
     this.host.dataset.settlementHandCount = String(this.shouldShowSettlement(snapshot) ? snapshot.summaries.length : 0);
+    this.host.dataset.dealerTipSeats = JSON.stringify(handLayouts.filter((hand) => snapshot.dealerTips[hand.id] > 0).map((hand) => hand.id));
+    this.host.dataset.dealerThanksRewards = JSON.stringify(
+      handLayouts.flatMap((hand) => (snapshot.dealerTipRewards[hand.id] > 0 ? [`${hand.id}:${snapshot.dealerTipRewards[hand.id]}`] : [])),
+    );
     this.host.dataset.settlementResults = JSON.stringify(
       this.shouldShowSettlement(snapshot) ? snapshot.summaries.map((summary) => `${summary.handId}:${summary.mainResult}:${summary.profit}`) : [],
     );
@@ -231,6 +235,10 @@ export class PixiTable {
           this.chipRenderer?.drawStack(amount, centerX, centerY, PixiTable.liveBetChipRadius, `bet-${hand.id}-${betType}-${amount}`);
         }
       }
+      const tipPx = rectToPixels(hand.tipZone);
+      const tipX = tipPx.x + tipPx.width / 2;
+      const tipY = tipPx.y + tipPx.height / 2;
+      this.drawDealerTipZone(snapshot, hand.id, tipX, tipY, tipPx.width, tipPx.height);
     }
   }
 
@@ -269,6 +277,46 @@ export class PixiTable {
       graphics.alpha = 1;
     });
     this.zoneLayer.addChild(graphics);
+  }
+
+  private drawDealerTipZone(snapshot: GameSnapshot, handId: HandId, x: number, y: number, width: number, height: number): void {
+    const amount = snapshot.dealerTips[handId];
+    const isBettable = snapshot.phase === 'betting' && this.selectedChip > 0;
+    const graphics = new Graphics();
+    graphics.ellipse(x, y, width / 2, height / 2);
+    graphics.fill({
+      color: COLORS.gold,
+      alpha: isBettable ? BET_RENDERING.zoneBettableAlpha : snapshot.phase === 'betting' ? BET_RENDERING.zoneIdleAlpha : BET_RENDERING.zoneInvalidAlpha,
+    });
+    graphics.stroke({
+      color: COLORS.gold,
+      width: BET_RENDERING.zoneStrokeWidth,
+      alpha: isBettable
+        ? BET_RENDERING.zoneBettableStrokeAlpha
+        : snapshot.phase === 'betting'
+          ? BET_RENDERING.zoneIdleStrokeAlpha
+          : BET_RENDERING.zoneInvalidStrokeAlpha,
+    });
+    graphics.eventMode = isBettable ? 'static' : 'none';
+    graphics.cursor = isBettable ? 'pointer' : 'default';
+    graphics.on('pointertap', () => {
+      if (isBettable) {
+        this.options.onBet(handId, 'dealerTip');
+      }
+    });
+    graphics.on('pointerover', () => {
+      if (isBettable) {
+        graphics.alpha = BET_RENDERING.hoverAlpha;
+      }
+    });
+    graphics.on('pointerout', () => {
+      graphics.alpha = 1;
+    });
+    this.zoneLayer.addChild(graphics);
+
+    if (amount > 0 && snapshot.phase === 'betting') {
+      this.chipRenderer?.drawStack(amount, x, y, PixiTable.liveBetChipRadius, `tip-${handId}-${amount}`);
+    }
   }
 
   private drawHands(snapshot: GameSnapshot): void {
@@ -510,6 +558,7 @@ export class PixiTable {
       (total, betType) => total + snapshot.bets[summary.handId][betType],
       0,
     );
+    const dealerThanks = snapshot.dealerTipRewards[summary.handId];
     const mainProfit = PixiTable.mainProfitForSummary(summary.mainResult, mainStake);
     const sideProfit = summary.profit - mainProfit;
     const houseAdvanceRepayment = Math.max(
@@ -520,16 +569,21 @@ export class PixiTable {
     return {
       mainLine: `Main ${summary.mainResult.toUpperCase()} ${PixiTable.formatProfit(mainProfit)}`,
       sideLine: `Side bets ${sideStake > 0 ? PixiTable.netLabel(sideProfit, 'EVEN') : 'NONE'} ${PixiTable.formatProfit(sideProfit)}`,
-      detailLines:
-        houseAdvanceRepayment > 0
-          ? [
-              `Gross ${PixiTable.netLabel(summary.profit, 'PUSH')} ${PixiTable.formatProfit(summary.profit)}`,
-              `House Advance payment -£${houseAdvanceRepayment}`,
-              `Net ${PixiTable.netLabel(netProfit, 'PUSH')} ${PixiTable.formatProfit(netProfit)}`,
-            ]
-          : [`Total ${PixiTable.netLabel(summary.profit, 'PUSH')} ${PixiTable.formatProfit(summary.profit)}`],
+      detailLines: PixiTable.settlementDetailLines(summary.profit, houseAdvanceRepayment, netProfit, dealerThanks),
       result: PixiTable.resultForProfit(netProfit),
     };
+  }
+
+  private static settlementDetailLines(profit: number, houseAdvanceRepayment: number, netProfit: number, dealerThanks: number): string[] {
+    const dealerThanksLine = dealerThanks > 0 ? [`Dealer's Thanks +£${dealerThanks}`] : [];
+    return houseAdvanceRepayment > 0
+      ? [
+          `Gross ${PixiTable.netLabel(profit, 'PUSH')} ${PixiTable.formatProfit(profit)}`,
+          `House Advance payment -£${houseAdvanceRepayment}`,
+          `Net ${PixiTable.netLabel(netProfit, 'PUSH')} ${PixiTable.formatProfit(netProfit)}`,
+          ...dealerThanksLine,
+        ]
+      : [`Total ${PixiTable.netLabel(profit, 'PUSH')} ${PixiTable.formatProfit(profit)}`, ...dealerThanksLine];
   }
 
   private static mainProfitForSummary(result: RoundSummary['mainResult'], mainStake: number): number {

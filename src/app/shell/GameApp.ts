@@ -158,13 +158,13 @@ export class GameApp extends GameAppSession {
     this.table = new PixiTable(
       this.elements.tableHost,
       {
-        onBet: (handId: HandId, betType: BetType) => {
+        onBet: (handId: HandId, betType: BetType | 'dealerTip') => {
           if (this.beatChipSelection.value > 0 && this.currentPlayer) {
             if (!this.beatChipSelection.ensureSelectedAffordable()) {
               return;
             }
             const selectedChip = this.beatChipSelection.value;
-            if (!this.canWager(selectedChip)) {
+            if (betType !== 'dealerTip' && !this.canWager(selectedChip)) {
               this.elements.status.textContent = 'Session wager limit reached.';
               return;
             }
@@ -172,8 +172,13 @@ export class GameApp extends GameAppSession {
               return;
             }
             if (this.activeRoomForGame()) {
-              this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType, amount: selectedChip });
-              this.beatControlsView.markPendingBet(betType);
+              if (betType === 'dealerTip') {
+                this.multiplayer.send({ version: currentProtocolVersion, type: 'place-tip', seatId: handId, amount: selectedChip });
+                this.beatControlsView.markPendingBet('dealerTip');
+              } else {
+                this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType, amount: selectedChip });
+                this.beatControlsView.markPendingBet(betType);
+              }
             }
             this.audio.play('chip');
           }
@@ -291,13 +296,18 @@ export class GameApp extends GameAppSession {
       return;
     }
     const activeRoom = this.activeRoomForGame();
-    if (target.betType !== 'main' && activeRoom && isBeatSnapshot(activeRoom.game) && activeRoom.game.bets[target.handId].main <= 0) {
+    if ('betType' in target && target.betType !== 'main' && activeRoom && isBeatSnapshot(activeRoom.game) && activeRoom.game.bets[target.handId].main <= 0) {
       this.elements.status.textContent = 'Place a main bet before side bets.';
       return;
     }
     if (activeRoom) {
-      this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: target.handId, betType: target.betType, amount });
-      this.beatControlsView.markPendingBet(target.betType);
+      if ('dealerTip' in target) {
+        this.multiplayer.send({ version: currentProtocolVersion, type: 'place-tip', seatId: target.handId, amount });
+        this.beatControlsView.markPendingBet('dealerTip');
+      } else {
+        this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: target.handId, betType: target.betType, amount });
+        this.beatControlsView.markPendingBet(target.betType);
+      }
     }
     this.audio.play('chip');
   }

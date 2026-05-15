@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Card } from '../../../src/game/cards/Card';
 import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
@@ -177,6 +177,57 @@ describe('BeatTheHouseGame', () => {
     expect(next.canRebet).toBe(true);
     expect(game.rebet().bets.left.main).toBe(10);
     expect(game.snapshot().canRebet).toBe(false);
+  });
+
+  it('manages dealer tips as pending table credits before the round starts', () => {
+    const game = new BeatTheHouseGame({ initialBankroll: 50 });
+
+    const firstTip = game.placeDealerTip('left', 10);
+    expect(firstTip.bankroll).toBe(40);
+    expect(firstTip.dealerTips.left).toBe(10);
+    expect(firstTip.lastEvents).toEqual([{ type: 'dealer-tip-placed', handId: 'left', amount: 10 }]);
+
+    expect(game.placeDealerTip('left', 5).dealerTips.left).toBe(15);
+    expect(game.placeDealerTip('right', 100).status).toBe('Need £100 available.');
+
+    const handCleared = game.clearHandBets('left');
+    expect(handCleared.bankroll).toBe(50);
+    expect(handCleared.dealerTips.left).toBe(0);
+
+    game.placeBet('right', 'main', 10);
+    game.placeDealerTip('right', 5);
+    const tableCleared = game.clearBets();
+
+    expect(tableCleared.bankroll).toBe(50);
+    expect(tableCleared.bets.right.main).toBe(0);
+    expect(tableCleared.dealerTips.right).toBe(0);
+  });
+
+  it('settles Dealer Thanks independently of a losing game result', () => {
+    const randomInt = vi.fn(() => 0);
+    const game = new BeatTheHouseGame({ initialBankroll: 100, randomInt });
+    game.placeBet('left', 'main', 10);
+    game.placeDealerTip('left', 5);
+
+    const snapshot = game.deal(rigDeck([card('2', 'diamonds'), card('K', 'spades')]));
+
+    expect(snapshot.phase).toBe('roundOver');
+    expect(snapshot.summaries[0]).toMatchObject({ handId: 'left', mainResult: 'lose', profit: -10 });
+    expect(snapshot.bankroll).toBe(95);
+    expect(snapshot.dealerTips.left).toBe(5);
+    expect(snapshot.dealerTipRewards.left).toBe(10);
+    expect(snapshot.lastEvents).toEqual(
+      expect.arrayContaining([
+        { type: 'dealer-tip-taken', handId: 'left', amount: 5 },
+        expect.objectContaining({ type: 'round-settled', totalProfit: -10, dealerThanksTotal: 10 }),
+      ]),
+    );
+    expect(randomInt).toHaveBeenCalledOnce();
+    expect(randomInt).toHaveBeenCalledWith(10);
+
+    const next = game.nextRound();
+    expect(next.dealerTips.left).toBe(0);
+    expect(next.dealerTipRewards.left).toBe(0);
   });
 
   it('clears and rebets individual hands without changing other hands', () => {

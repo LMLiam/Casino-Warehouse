@@ -263,6 +263,41 @@ describe('Beat the House popup and animation behaviour', () => {
     expect(popupText).not.toContain('House Advance payment');
   });
 
+  it('draws dealer tip chips while betting and lists Dealer Thanks separately', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, host, chipRenderer, tagRenderer } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    game.placeBet('left', 'main', 10);
+    const tipped = game.placeDealerTip('left', 5);
+
+    table.render(tipped);
+
+    expect(JSON.parse(host.dataset.dealerTipSeats ?? '[]')).toEqual(['left']);
+    expect(chipRenderer.drawStack).toHaveBeenCalledWith(5, expect.any(Number), expect.any(Number), expect.any(Number), 'tip-left-5');
+
+    vi.clearAllMocks();
+    const settled = game.deal(rigDeck([card('2'), card('K')]));
+    table.render(settled);
+
+    expect(JSON.parse(host.dataset.dealerThanksRewards ?? '[]')).toEqual(['left:10']);
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main LOSE -£10',
+      'Side bets NONE +£0',
+      ['Total LOSE -£10', "Dealer's Thanks +£10"],
+      expect.any(Number),
+      expect.any(Number),
+      'lose',
+      false,
+    );
+  });
+
   it('keeps House Advance metadata when the delayed settlement timer re-renders the popup', () => {
     let revealSettlement: (() => void) | undefined;
     vi.stubGlobal('window', {

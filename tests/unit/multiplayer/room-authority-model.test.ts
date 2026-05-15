@@ -213,4 +213,50 @@ describe('room authority model helpers', () => {
       transactions: expect.arrayContaining([expect.objectContaining({ type: 'house_advance_repayment', amount: -5 })]),
     });
   });
+
+  it('records Dealer Thanks as a separate idempotent settlement without House Advance repayment', () => {
+    const store = createMemoryServerDataStore();
+    const profile = store.createProfile('Dealer Thanks Player', 0).profileState.profiles[0];
+    store.acceptHouseAdvance(profile.id);
+    store.setProfileBankroll(profile.id, 80);
+    const harness = new AuthorityHarness(store);
+    const target = room({
+      players: new Map([[profile.id, { ...player(profile.id), bankroll: 80 }]]),
+      seats: new Map([['left', profile.id]]),
+    });
+    const base = new BeatTheHouseGame({ initialBankroll: 80 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      phase: 'roundOver',
+      bets: { ...base.bets, left: { ...base.bets.left, main: 10 } },
+      dealerTips: { ...base.dealerTips, left: 5 },
+      dealerTipRewards: { ...base.dealerTipRewards, left: 10 },
+      summaries: [{ handId: 'left', mainResult: 'lose', stake: 10, returned: 0, profit: -10, sideWins: [] }],
+    };
+
+    const settlements = harness.settleBeatFor(target, snapshot);
+
+    expect(settlements).toHaveLength(2);
+    expect(settlements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'gameplay', wagered: 10, returned: 0, profit: -10, houseAdvanceRepayment: 0 }),
+        expect.objectContaining({
+          kind: 'dealer-thanks',
+          wagered: 0,
+          returned: 10,
+          profit: 0,
+          dealerTip: 5,
+          dealerThanks: 10,
+          houseAdvanceRepayment: 0,
+        }),
+      ]),
+    );
+    expect(store.snapshot().profileState.profiles[0]).toMatchObject({
+      bankroll: 90,
+      houseAdvance: { outstandingBalance: 100, activeCount: 1 },
+      transactions: expect.arrayContaining([expect.objectContaining({ type: 'dealer_thanks', amount: 10 })]),
+    });
+    expect(store.snapshot().profileState.profiles[0].transactions.some((transaction) => transaction.type === 'house_advance_repayment')).toBe(false);
+    expect(harness.settleBeatFor(target, snapshot)).toEqual([]);
+  });
 });

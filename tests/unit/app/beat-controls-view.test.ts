@@ -159,6 +159,23 @@ describe('BeatControlsView', () => {
     expect(bobElements.clearButton.disabled).toBe(false);
   });
 
+  it('counts dealer tips as clearable table credits without enabling rebet', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      canRebet: false,
+      rebetAmounts: { ...base.rebetAmounts, right: 40 },
+      dealerTips: { ...base.dealerTips, right: 10 },
+    };
+    const room = createRoom(snapshot, { rebetSeatIds: ['right'] });
+    const bobElements = createElements();
+
+    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, 'bob', 100);
+
+    expect(bobElements.clearButton.disabled).toBe(false);
+    expect(bobElements.rebetButton.disabled).toBe(true);
+  });
+
   it('keeps rebet disabled when a replacement player claims a seat with another profile saved wager', () => {
     const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
     const snapshot: GameSnapshot = {

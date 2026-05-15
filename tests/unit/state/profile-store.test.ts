@@ -115,6 +115,34 @@ describe('profile store', () => {
     expect(profile.transactions.map((transaction) => transaction.type)).toEqual(['house_advance_repayment', 'house_advance_credit']);
   });
 
+  it('keeps dealer tips and Dealer Thanks rewards out of wager and winnings stats', () => {
+    const state = createProfile({ version: 1, profiles: [] }, 'Tip Stats', 100, new Date('2026-05-04T12:00:00Z'));
+    let profile = state.profiles[0];
+
+    profile = recordTransaction(
+      profile,
+      { gameId: 'beat-the-house', type: 'dealer_tip', amount: -10, description: 'Dealer tip taken.', metadata: { handId: 'left' } },
+      new Date('2026-05-04T12:01:00Z'),
+    );
+    profile = recordTransaction(
+      profile,
+      { gameId: 'beat-the-house', type: 'dealer_thanks', amount: 20, description: "Dealer's Thanks reward.", metadata: { handId: 'left' } },
+      new Date('2026-05-04T12:02:00Z'),
+    );
+
+    expect(profile.bankroll).toBe(110);
+    expect(profile.stats).toMatchObject({
+      totalWagered: 0,
+      totalWon: 0,
+      netProfit: 0,
+      biggestWin: 0,
+      biggestWager: 0,
+      gamesPlayed: 0,
+      perGame: {},
+    });
+    expect(profile.transactions.map((transaction) => transaction.type)).toEqual(['dealer_thanks', 'dealer_tip']);
+  });
+
   it('computes House Advance repayments from net positive winnings only', () => {
     const state = { outstandingBalance: 100, activeCount: 1 };
 

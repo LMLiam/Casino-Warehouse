@@ -97,6 +97,8 @@ export class CasinoProfileParser {
       value === 'reset' ||
       value === 'import' ||
       value === 'correction' ||
+      value === 'dealer_tip' ||
+      value === 'dealer_thanks' ||
       value === 'house_advance_credit' ||
       value === 'house_advance_repayment'
     );

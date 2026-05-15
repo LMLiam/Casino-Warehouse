@@ -1,5 +1,6 @@
 import type { Bets } from './Bets';
 import type { DealerHand } from './DealerHand';
+import type { DealerTips } from './DealerTips';
 import type { GameEvent } from './GameEvent';
 import type { HandId } from './HandId';
 import type { Phase } from './Phase';
@@ -11,6 +12,8 @@ export interface GameSnapshot {
   readonly phase: Phase;
   readonly bankroll: number;
   readonly bets: Bets;
+  readonly dealerTips: DealerTips;
+  readonly dealerTipRewards: DealerTips;
   readonly activeHand?: HandId;
   readonly hands: Record<HandId, PlayerHand>;
   readonly dealer: DealerHand;
