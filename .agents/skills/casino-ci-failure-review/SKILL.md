@@ -122,10 +122,10 @@ gh pr checks <pr> --required --json name,state,bucket,link,workflow
 gh pr checks <pr> --json name,state,bucket,link,workflow
 gh run list --commit <head-sha> --json databaseId,name,headSha,status,conclusion,event,url,createdAt,updatedAt
 gh run view <run-id> --json name,headSha,event,status,conclusion,url,jobs
-gh run view <run-id> --job <job-id> --log
+gh run view --log --job <job-id>
 ```
 
-Prefer `gh run view --job <job-id> --log` for the smallest relevant log. Keep log snippets short and quote only the lines needed to prove the diagnosis.
+Prefer `gh run view --log --job <job-id>` for the smallest relevant log. Keep log snippets short and quote only the lines needed to prove the diagnosis.
 
 ## Report Format
 
