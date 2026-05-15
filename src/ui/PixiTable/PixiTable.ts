@@ -27,6 +27,7 @@ import { SIDE_WIN_EFFECT } from '../renderers/renderingConstants/SIDE_WIN_EFFECT
 import { TagRenderer } from '../renderers/TagRenderer';
 import type { PixiTableDependencies } from './PixiTableDependencies';
 import type { PixiTableOptions } from './PixiTableOptions';
+import type { PixiTableSettlementMetadata } from './PixiTableSettlementMetadata';
 import { roundStartAnimationKey } from './roundStartAnimationKey';
 
 export class PixiTable {
@@ -46,6 +47,7 @@ export class PixiTable {
   private processedRoundStartKey = '';
   private settlementKey = '';
   private celebratedSettlementKey = '';
+  private settlementMetadata: readonly PixiTableSettlementMetadata[] = [];
   private settlementVisible = false;
   private settlementTimer?: number;
   private initialized = false;
@@ -101,7 +103,8 @@ export class PixiTable {
     this.host.classList.toggle('layout-debug');
   }
 
-  public render(snapshot: GameSnapshot | undefined): void {
+  public render(snapshot: GameSnapshot | undefined, settlementMetadata: readonly PixiTableSettlementMetadata[] = this.settlementMetadata): void {
+    this.settlementMetadata = settlementMetadata;
     if (!snapshot || !this.initialized || !this.chipRenderer) {
       return;
     }
@@ -137,6 +140,14 @@ export class PixiTable {
     this.host.dataset.settlementHandCount = String(this.shouldShowSettlement(snapshot) ? snapshot.summaries.length : 0);
     this.host.dataset.settlementResults = JSON.stringify(
       this.shouldShowSettlement(snapshot) ? snapshot.summaries.map((summary) => `${summary.handId}:${summary.mainResult}:${summary.profit}`) : [],
+    );
+    this.host.dataset.settlementPopupLines = JSON.stringify(
+      this.shouldShowSettlement(snapshot)
+        ? snapshot.summaries.map((summary) => {
+            const popup = PixiTable.settlementPopupForSummary(snapshot, summary, this.settlementMetadata);
+            return [popup.mainLine, popup.sideLine, ...popup.detailLines];
+          })
+        : [],
     );
     this.host.dataset.sideBetLabels = JSON.stringify(this.settledSideBetLabels(snapshot));
     this.host.dataset.activeMainBets = JSON.stringify(handLayouts.filter((hand) => snapshot.bets[hand.id].main > 0).map((hand) => hand.id));
@@ -311,11 +322,11 @@ export class PixiTable {
       }
 
       const point = toPixels(layout.popup);
-      const popup = PixiTable.settlementPopupForSummary(snapshot, summary);
+      const popup = PixiTable.settlementPopupForSummary(snapshot, summary, this.settlementMetadata);
       this.tagRenderer.drawResultPopup(
         popup.mainLine,
         popup.sideLine,
-        [popup.totalLine],
+        popup.detailLines,
         point.x,
         point.y,
         popup.result,
@@ -482,7 +493,7 @@ export class PixiTable {
     return `${profit >= 0 ? '+' : '-'}£${Math.abs(profit)}`;
   }
 
-  private static settlementPopupForSummary(snapshot: GameSnapshot, summary: RoundSummary) {
+  private static settlementPopupForSummary(snapshot: GameSnapshot, summary: RoundSummary, settlementMetadata: readonly PixiTableSettlementMetadata[] = []) {
     const mainStake = snapshot.bets[summary.handId].main;
     const sideStake = (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).reduce(
       (total, betType) => total + snapshot.bets[summary.handId][betType],
@@ -490,11 +501,23 @@ export class PixiTable {
     );
     const mainProfit = PixiTable.mainProfitForSummary(summary.mainResult, mainStake);
     const sideProfit = summary.profit - mainProfit;
+    const houseAdvanceRepayment = Math.max(
+      0,
+      Math.floor(settlementMetadata.find((metadata) => metadata.handId === summary.handId)?.houseAdvanceRepayment ?? 0),
+    );
+    const netProfit = summary.profit - houseAdvanceRepayment;
     return {
       mainLine: `Main ${summary.mainResult.toUpperCase()} ${PixiTable.formatProfit(mainProfit)}`,
       sideLine: `Side bets ${sideStake > 0 ? PixiTable.netLabel(sideProfit, 'EVEN') : 'NONE'} ${PixiTable.formatProfit(sideProfit)}`,
-      totalLine: `Total ${PixiTable.netLabel(summary.profit, 'PUSH')} ${PixiTable.formatProfit(summary.profit)}`,
-      result: PixiTable.resultForProfit(summary.profit),
+      detailLines:
+        houseAdvanceRepayment > 0
+          ? [
+              `Gross ${PixiTable.netLabel(summary.profit, 'PUSH')} ${PixiTable.formatProfit(summary.profit)}`,
+              `House Advance payment -£${houseAdvanceRepayment}`,
+              `Net ${PixiTable.netLabel(netProfit, 'PUSH')} ${PixiTable.formatProfit(netProfit)}`,
+            ]
+          : [`Total ${PixiTable.netLabel(summary.profit, 'PUSH')} ${PixiTable.formatProfit(summary.profit)}`],
+      result: PixiTable.resultForProfit(netProfit),
     };
   }
 

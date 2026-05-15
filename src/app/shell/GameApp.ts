@@ -6,6 +6,7 @@ import type { BetType } from '../../game/types/BetType';
 import type { HandId } from '../../game/types/HandId';
 import type { ChipValue } from '../../ui/chips/ChipValue';
 import { PixiTable } from '../../ui/PixiTable/PixiTable';
+import type { PixiTableSettlementMetadata } from '../../ui/PixiTable/PixiTableSettlementMetadata';
 import { mountRadixChrome } from '../../ui/radixChrome';
 import { CardRenderer } from '../../ui/renderers/CardRenderer';
 import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
@@ -50,6 +51,7 @@ import { RoomSeatsView } from '../views/RoomSeatsView';
 import { RulesMenuView } from '../views/RulesMenuView';
 import { SlotsView } from '../views/SlotsView';
 import { WalletView } from '../views/WalletView';
+import { BeatSettlementMetadataCache } from './BeatSettlementMetadataCache';
 import { GameAppSession } from './GameAppSession';
 
 export class GameApp extends GameAppSession {
@@ -76,6 +78,7 @@ export class GameApp extends GameAppSession {
   protected readonly walletView: WalletView;
   protected readonly multiplayer: MultiplayerClient;
   protected players: CasinoPlayer[] = [];
+  private readonly beatSettlementMetadata = new BeatSettlementMetadataCache();
   protected profileState: CasinoSaveState = { version: currentProfileStoreVersion, profiles: [] };
   protected readonly ownedProfileIds = new Set<string>();
   protected profileAccessReceived = false;
@@ -425,18 +428,24 @@ export class GameApp extends GameAppSession {
     this.refreshMultiplayerRooms();
   }
 
-  private applyRoomSettlements(settlements: readonly RoomSettlement[], _roomId: string, _sessionId: string): void {
+  protected beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: string | undefined): readonly PixiTableSettlementMetadata[] {
+    return this.beatSettlementMetadata.get(room, profileId);
+  }
+
+  private applyRoomSettlements(settlements: readonly RoomSettlement[], roomId: string, sessionId: string): void {
     const profileId = this.currentPlayer?.profileId;
     if (!profileId) {
       return;
     }
-    settlements
-      .filter((settlement) => settlement.profileId === profileId)
-      .forEach((settlement) => {
-        if (settlement.wagered > 0) {
-          this.recordSessionWager(settlement.wagered);
-        }
-      });
+    const profileSettlements = settlements.filter((settlement) => settlement.profileId === profileId);
+    if (this.activeRoomForGame()?.gameId === 'beat-the-house' && profileSettlements.length > 0) {
+      this.beatSettlementMetadata.set(roomId, sessionId, profileId, profileSettlements);
+    }
+    profileSettlements.forEach((settlement) => {
+      if (settlement.wagered > 0) {
+        this.recordSessionWager(settlement.wagered);
+      }
+    });
     this.renderCasino();
   }
 

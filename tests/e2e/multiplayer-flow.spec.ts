@@ -1,6 +1,12 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import type { AddressInfo } from 'node:net';
-import { createCasinoServer, type CasinoServer } from '../../src/multiplayer/serverEntry';
+import type { Card } from '../../src/game/cards/Card';
+import { rigDeck } from '../../src/game/cards/rigDeck';
+import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer } from '../../src/multiplayer/serverEntry';
+import { RoomAuthority } from '../../src/multiplayer/roomAuthority';
+import type { ClientMessage } from '../../src/multiplayer/protocol/ClientMessage';
+import type { AuthorityResult } from '../../src/multiplayer/roomAuthorityModel/AuthorityResult';
+import type { RoomState } from '../../src/multiplayer/roomAuthorityModel/RoomState';
 import { createMemoryServerDataStore } from '../../src/state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../../src/state/serverDataStore/ServerDataStore';
 import { createSessionState } from '../../src/state/session/createSessionState';
@@ -314,6 +320,48 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
   }
 });
 
+test('Beat the House win popup includes House Advance repayment from authoritative settlement data', async ({ browser, baseURL }) => {
+  test.setTimeout(60_000);
+  const { dataStore, profileAuthByName } = seedDataStore(['Advance Popup QA']);
+  const profileAuth = profileAuthByName.get('Advance Popup QA');
+  if (!profileAuth) {
+    throw new Error('Expected seeded House Advance profile auth.');
+  }
+  dataStore.setProfileBankroll(profileAuth.profileId, 0);
+  dataStore.acceptHouseAdvance(profileAuth.profileId);
+  const authority = new RiggedBeatRoundAuthority(dataStore, [
+    { rank: 'A', suit: 'spades' },
+    { rank: 'A', suit: 'hearts' },
+  ]);
+  const wsUrl = await startRealtimeServerWithStore(dataStore, 0, authority);
+  const context = await newPlayerContext(browser, wsUrl, profileAuth);
+  try {
+    const page = await newPlayerPage(context, baseURL, 'Advance Popup QA');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('#houseAdvancePill')).toContainText('House Advance owed: £100 · 1/3 active');
+    await page.locator('[data-lobby-game="beat-the-house"]').click();
+    await page.locator('#roomNameInput').fill('Advance Popup Room');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await expect(page.locator('#tableHost')).toBeVisible();
+    await claimRoomSeat(page, 'Left');
+
+    await page.getByLabel('£25 chip').click();
+    await dropChipPercent(page, 19.25, 70.55, 25);
+    await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left')).toBe(true);
+    await page.locator('#dealBtn').click();
+
+    await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
+    await expect
+      .poll(async () => flatPopupLines(page))
+      .toEqual(expect.arrayContaining(['Main WIN +£25', 'Side bets NONE +£0', 'Gross WIN +£25', 'House Advance payment -£2', 'Net WIN +£23']));
+    await page.locator('.stats-menu > summary').click();
+    await expect(page.locator('#auditLog')).toContainText('House Advance repayment withheld from beat-the-house net winnings.');
+    await expect(page.locator('#auditLog')).toContainText('Withheld £2; owed £98.');
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+});
+
 test('multiplayer Slots exposes shared readiness, spin result, spectating, and no duplicate settlement from repeated spin attempts', async ({
   browser,
   baseURL,
@@ -407,8 +455,8 @@ const seedDataStore = (profileNames: readonly string[]): SeededDataStore => {
   return { dataStore, profileAuthByName };
 };
 
-const startRealtimeServerWithStore = async (dataStore: ServerDataStore, port = 0): Promise<string> => {
-  realtimeServer = createCasinoServer({ dataStore, heartbeatTimeoutMs: 300_000 });
+const startRealtimeServerWithStore = async (dataStore: ServerDataStore, port = 0, authority?: CasinoRoomAuthority): Promise<string> => {
+  realtimeServer = createCasinoServer({ dataStore, authority, heartbeatTimeoutMs: 300_000 });
   await new Promise<void>((resolve) => realtimeServer?.listen(port, '127.0.0.1', resolve));
   const address = realtimeServer.address() as AddressInfo;
   return `ws://127.0.0.1:${address.port}/ws`;
@@ -506,6 +554,9 @@ const parsedDataset = async (page: Page, key: string): Promise<unknown[]> =>
     return Array.isArray(parsed) ? parsed : [];
   }, key);
 
+const flatPopupLines = async (page: Page): Promise<string[]> =>
+  (await parsedDataset(page, 'settlementPopupLines')).flatMap((popup) => (Array.isArray(popup) ? popup.map(String) : [String(popup)]));
+
 const tableAmount = async (page: Page): Promise<number> => {
   const text = await page.locator('#onTable').textContent();
   return Number((text ?? '').replace(/[£,]/g, '')) || 0;
@@ -571,3 +622,31 @@ const expectSlotReelsUseSymbolImages = async (page: Page): Promise<void> => {
       ]),
     );
 };
+
+class RiggedBeatRoundAuthority extends RoomAuthority {
+  public constructor(
+    dataStore: ServerDataStore,
+    private readonly dealOrder: readonly Card[],
+  ) {
+    super(dataStore);
+  }
+
+  public override handle(connectionId: string, message: ClientMessage): AuthorityResult {
+    if (message.type !== 'start-round') {
+      return super.handle(connectionId, message);
+    }
+    const room = this.roomForConnection(connectionId);
+    if (room?.model.kind !== 'beat-the-house') {
+      return super.handle(connectionId, message);
+    }
+    const before = room.model.game.snapshot();
+    const snapshot = room.model.game.deal(rigDeck([...this.dealOrder]));
+    room.lastBeatEvents = snapshot.lastEvents;
+    const settlements = snapshot.phase === 'roundOver' && before.phase !== 'roundOver' ? this.settleBeat(room, snapshot) : [];
+    return this.broadcast(room, settlements);
+  }
+
+  private roomForConnection(connectionId: string): RoomState | undefined {
+    return [...this.rooms.values()].find((room) => room.connectionToMember.has(connectionId));
+  }
+}
