@@ -265,6 +265,94 @@ describe('Codex launcher scripts', () => {
     }
   });
 
+  it('activates a long generated goal through the shared helper', () => {
+    const binDir = mkdtempSync(join(tmpdir(), 'casino-launcher-codex-'));
+
+    try {
+      const codexShim = join(binDir, 'codex');
+      writeFileSync(
+        codexShim,
+        `#!/usr/bin/env node
+process.stdout.write('OpenAI Codex\\n');
+process.stdout.write('gpt-5.5 xhigh fast · /tmp/casino\\n');
+
+let buffer = '';
+const timeout = setTimeout(() => {
+  process.stderr.write('fake codex timed out waiting for the generated goal\\n');
+  process.exit(5);
+}, 10_000);
+
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+}
+
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => {
+  buffer += chunk;
+  if (!buffer.includes('\\r') && !buffer.includes('\\n')) {
+    return;
+  }
+
+  clearTimeout(timeout);
+  const line = buffer.replace(/[\\r\\n][\\s\\S]*$/, '');
+  if (!line.startsWith('/goal ')) {
+    process.stderr.write('fake codex received ordinary chat instead of a /goal command\\n');
+    process.exit(6);
+  }
+
+  if (!line.includes('Run a Casino Warehouse multiplayer regression review for pull request #123')) {
+    process.stderr.write('fake codex received the wrong generated goal\\n');
+    process.exit(7);
+  }
+
+  if (!line.includes('using the casino-multiplayer-regression skill + AGENTS.md')) {
+    process.stderr.write('fake codex received an unsafe skill-reference form\\n');
+    process.exit(8);
+  }
+
+  if (line.includes('$casino-multiplayer-regression')) {
+    process.stderr.write('fake codex received a raw TUI skill-reference token\\n');
+    process.exit(9);
+  }
+
+  process.stdout.write('Goal active Objective: fake multiplayer regression\\n');
+  setTimeout(() => process.exit(0), 25);
+});
+process.stdin.resume();
+`,
+      );
+      chmodSync(codexShim, 0o755);
+
+      const result = runLauncher('start-codex.sh', ['multiplayer-check', 'pull request #123'], {
+        env: { CODEX_BIN: 'codex', CODEX_GOAL_KEY_DELAY_MS: '1', PATH: `${binDir}:${process.env.PATH}` },
+      });
+
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe('');
+    } finally {
+      rmSync(binDir, { force: true, recursive: true });
+    }
+  }, 15_000);
+
+  it('rejects invalid generated-goal key delay values', () => {
+    const binDir = mkdtempSync(join(tmpdir(), 'casino-launcher-delay-'));
+
+    try {
+      const codexShim = join(binDir, 'codex');
+      writeFileSync(codexShim, '#!/bin/sh\nexit 0\n');
+      chmodSync(codexShim, 0o755);
+
+      const result = runLauncher('start-codex.sh', ['issue', '128'], {
+        env: { CODEX_BIN: 'codex', CODEX_GOAL_KEY_DELAY_MS: 'fast', PATH: `${binDir}:${process.env.PATH}` },
+      });
+
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('error: CODEX_GOAL_KEY_DELAY_MS must be a non-negative integer.');
+    } finally {
+      rmSync(binDir, { force: true, recursive: true });
+    }
+  });
+
   it('keeps the expect flow and readiness pattern in the shared helper', () => {
     const issueLauncher = readFileSync(join(repoRoot, launcherScript('start-codex-issue.sh')), 'utf8');
     const triageLauncher = readFileSync(join(repoRoot, launcherScript('start-codex-triage-issue.sh')), 'utf8');
@@ -281,6 +369,11 @@ describe('Codex launcher scripts', () => {
     expect(securityLauncher).not.toContain('cat >"$expect_script"');
     expect(centralLauncher).not.toContain('cat >"$expect_script"');
     expect(helper).toContain('-re {·[^\\r\\n]*(~|/)}');
+    expect(helper).toContain('CODEX_GOAL_KEY_DELAY_MS');
+    expect(helper).toContain('make_goal_tui_safe');
+    expect(helper).toContain('the \\1 skill');
+    expect(helper).toContain('send_goal_text [make_goal_tui_safe $goal] $key_delay_ms');
+    expect(helper).not.toContain('send -s -- "$goal"');
   });
 
   it('keeps launcher scripts syntactically valid bash', () => {

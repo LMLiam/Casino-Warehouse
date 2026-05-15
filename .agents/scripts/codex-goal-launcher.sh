@@ -11,6 +11,8 @@ interactive TUI, and send the generated /goal.
 Environment:
   CODEX_BIN    Codex executable to launch. Default: codex
   CODEX_ARGS   Extra arguments passed to Codex before the generated /goal.
+  CODEX_GOAL_KEY_DELAY_MS
+               Delay between generated /goal keystrokes. Default: 15.
 EOF
 }
 
@@ -61,7 +63,14 @@ if [ -n "${CODEX_ARGS:-}" ]; then
   codex_args=(${CODEX_ARGS})
 fi
 
+key_delay_ms="${CODEX_GOAL_KEY_DELAY_MS:-15}"
+if ! [[ "$key_delay_ms" =~ ^[0-9]+$ ]]; then
+  echo "error: CODEX_GOAL_KEY_DELAY_MS must be a non-negative integer." >&2
+  exit 2
+fi
+
 export CASINO_CODEX_GOAL="$goal"
+export CASINO_CODEX_GOAL_KEY_DELAY_MS="$key_delay_ms"
 
 expect_script="$(mktemp "${TMPDIR:-/tmp}/casino-codex-goal.XXXXXX")"
 cleanup() {
@@ -75,8 +84,24 @@ trap 'exit 143' TERM
 cat >"$expect_script" <<'EXPECT'
 set timeout 60
 set goal $env(CASINO_CODEX_GOAL)
+set key_delay_ms $env(CASINO_CODEX_GOAL_KEY_DELAY_MS)
 set ready 0
 set seen_main 0
+
+proc make_goal_tui_safe {goal} {
+  regsub -all {\$([[:alnum:]_][[:alnum:]_:-]*)} $goal {the \1 skill} safe_goal
+  return $safe_goal
+}
+
+proc send_goal_text {goal delay_ms} {
+  foreach character [split $goal ""] {
+    send -- $character
+
+    if {$delay_ms > 0} {
+      after $delay_ms
+    }
+  }
+}
 
 spawn {*}$argv
 
@@ -128,8 +153,7 @@ while {1} {
 }
 
 after 200
-set send_slow {1 .002}
-send -s -- "$goal"
+send_goal_text [make_goal_tui_safe $goal] $key_delay_ms
 after 100
 send -- "\r"
 set timeout 10
@@ -149,4 +173,8 @@ after 750
 interact
 EXPECT
 
-expect "$expect_script" -- "$codex_bin" "${codex_args[@]}"
+if [ "${#codex_args[@]}" -gt 0 ]; then
+  expect "$expect_script" -- "$codex_bin" "${codex_args[@]}"
+else
+  expect "$expect_script" -- "$codex_bin"
+fi
