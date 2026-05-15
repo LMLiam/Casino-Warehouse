@@ -1,13 +1,9 @@
 import type { BetType } from '../../game/types/BetType';
-import type { HandId } from '../../game/types/HandId';
 import { handLayouts } from '../../ui/layout/handLayouts';
 import { tableSize } from '../../ui/layout/tableSize';
+import type { BetZoneHitTarget } from './BetZoneHitTarget';
 
-export const hitTestBetZone = (
-  host: HTMLElement,
-  clientX: number,
-  clientY: number,
-): { readonly handId: HandId; readonly betType: BetType } | { readonly handId: HandId; readonly dealerTip: true } | undefined => {
+export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: number): BetZoneHitTarget | undefined => {
   const contains = (
     zone: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
     xPercent: number,
