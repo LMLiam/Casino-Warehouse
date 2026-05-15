@@ -39,6 +39,7 @@ Primary references:
 - `npm run dev:cloudflared`: alias for `npm run dev:cloudflare`.
 - `./start-codex-create-issue.sh --print "issue topic"`: preview the Codex `/goal` for researching and creating a new GitHub issue.
 - `./start-codex-ci-failure.sh --print 123`: preview the Codex `/goal` for diagnosing failing checks on a pull request.
+- `./start-codex-triage-issue.sh --print 121`: preview the Codex `/goal` for triaging an existing GitHub issue.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -144,6 +145,14 @@ After any new commit, rebase, merge from the target branch, force-push, PR body 
 When asked to create, open, draft, file, or prepare a new GitHub issue from a user request, use the Casino Warehouse issue-creation skill at `.agents/skills/casino-issue-creation/SKILL.md`. For interactive launches, use `start-codex-create-issue.sh`; `start-codex-issue.sh` remains for completing an existing issue number.
 
 The issue-creation workflow must inspect relevant repository context, search existing open and closed issues and pull requests for duplicates or related work, choose repository-compliant title/labels/status/milestone, create the issue through GitHub, then verify the created issue number, URL, metadata, and body before reporting success.
+
+## Issue Triage Workflow
+
+When asked to triage, groom, clarify, label, milestone, de-duplicate, decline, block, or ready an existing GitHub issue without implementing it, use the Casino Warehouse issue-triage skill at `.agents/skills/casino-issue-triage/SKILL.md`. For interactive launches, use `start-codex-triage-issue.sh`.
+
+Use issue creation for new issue drafting, issue triage for improving an existing issue into a repo-compliant state, and issue completion for implementation work that opens or updates a pull request.
+
+The issue-triage workflow must inspect the issue, search existing issues and pull requests for duplicates or related work, read relevant repository context, update labels/milestone/body/comments only when evidence supports the change, then verify and report the issue URL, labels/milestone before and after, duplicate-search terms, files inspected, and unresolved questions.
 
 ## CI Failure Review Workflow
 

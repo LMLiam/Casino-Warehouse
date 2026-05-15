@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Casino Issue Triage'
+  short_description: 'Triage existing Casino Warehouse GitHub issues'
+  default_prompt: 'Use $casino-issue-triage to triage issue #121, search for duplicates, inspect repository context, update labels or body only when evidence supports it, and report the before/after metadata.'
+
+policy:
+  allow_implicit_invocation: false
