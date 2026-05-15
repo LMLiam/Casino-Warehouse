@@ -12,6 +12,7 @@ import type { RoomGameId } from './protocol/RoomGameId';
 import type { RoomPlayer } from './protocol/RoomPlayer';
 import type { RoomRole } from './protocol/RoomRole';
 import type { RoomSeatId } from './protocol/RoomSeatId';
+import type { RoomSettlement } from './protocol/RoomSettlement';
 import type { RoomSnapshot } from './protocol/RoomSnapshot';
 import type { RoomSummary } from './protocol/RoomSummary';
 import { normalizeRoomMaxPlayers } from './roomLimits/normalizeRoomMaxPlayers';
@@ -391,13 +392,17 @@ export class RoomAuthority extends RoomAuthorityBase {
     this.syncBeatBankroll(room);
     const model = room.model;
     const before = model.game.snapshot();
-    const result = this.ownerAction(room, () => (room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot()));
-    const after = model.game.snapshot();
+    const after = room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot();
+    room.lastBeatEvents = after.lastEvents;
+    let settlements: readonly RoomSettlement[] = [];
     if (before.phase === 'betting' && after.phase !== 'betting') {
       this.recordBeatBetOwners(room, before);
       this.recordBeatDealerTips(room, before);
     }
-    return result;
+    if (after.phase === 'roundOver' && before.phase !== 'roundOver') {
+      settlements = this.settleBeat(room, after);
+    }
+    return this.broadcast(room, settlements);
   }
 
   private recordBeatBetOwners(room: RoomState, snapshot: GameSnapshot): void {

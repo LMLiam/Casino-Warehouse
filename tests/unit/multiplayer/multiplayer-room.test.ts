@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mainBeatRoomId, RoomAuthority } from '../../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
 import type { Card } from '../../../src/game/cards/Card';
@@ -542,6 +542,44 @@ describe('per-game room authority', () => {
         .profileState.profiles.find((profile) => profile.id === 'alice')
         ?.transactions.filter((transaction) => transaction.type === 'dealer_tip'),
     ).toHaveLength(1);
+  });
+
+  it('records Beat dealer tip debits before immediate start-round settlement side effects', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = authority.handle('a', create('beat-the-house', 'alice', 100)).direct!.roomId;
+    authority.handle('a', claimSeat('left'));
+    authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    authority.handle('a', { version: 1, type: 'place-tip', seatId: 'left', amount: 10 });
+    const roomState = roomStateForTest(authority, roomId);
+    if (roomState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House test room.');
+    }
+    const originalDeal = roomState.model.game.deal.bind(roomState.model.game);
+    vi.spyOn(roomState.model.game, 'deal').mockImplementation(() =>
+      originalDeal(
+        rigDeck([
+          { rank: 'A', suit: 'spades' },
+          { rank: 'K', suit: 'hearts' },
+        ] satisfies Card[]),
+      ),
+    );
+
+    const started = authority.handle('a', { version: 1, type: 'start-round' });
+
+    expect(beat(started.broadcasts[0]).phase).toBe('roundOver');
+    expect(started.settlements).toEqual([expect.objectContaining({ kind: 'gameplay', returned: 50, profit: 25 })]);
+    const transactions = store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.transactions ?? [];
+    expect(transactions).toContainEqual(
+      expect.objectContaining({
+        type: 'dealer_tip',
+        amount: -10,
+        balanceBefore: 75,
+        balanceAfter: 65,
+        metadata: { handId: 'left', dealerTip: 10 },
+      }),
+    );
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.bankroll).toBe(115);
   });
 
   it('covers additional room authority validation edges without trusting malformed client state', () => {
