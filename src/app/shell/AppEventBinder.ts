@@ -16,6 +16,7 @@ export class AppEventBinder {
     this.elements.leaveRoomButton.addEventListener('click', () => this.callbacks.leaveMultiplayerRoom());
     this.elements.backToLobbyButton.addEventListener('click', () => this.callbacks.backToLobby());
     this.elements.switchProfileButton.addEventListener('click', () => this.callbacks.switchProfiles());
+    this.elements.houseAdvanceButton.addEventListener('click', () => this.callbacks.acceptHouseAdvance());
     this.elements.sessionLimitInput.addEventListener('change', () => this.callbacks.updateSessionLimit());
     this.bindGameTabs();
     this.bindChips();

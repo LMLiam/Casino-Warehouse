@@ -1,6 +1,8 @@
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
+import type { GameplaySettlementContext } from './GameplaySettlementContext';
+import type { GameplaySettlementResult } from './GameplaySettlementResult';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
 
@@ -18,6 +20,8 @@ export interface ServerDataStore {
   deleteProfileTokenHash(profileId: string): void;
   clearProfileTokenHashes(): void;
   setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined;
+  acceptHouseAdvance(profileId: string): CasinoProfile | undefined;
+  applyGameplaySettlement(profileId: string, returned: number, profit: number, context: GameplaySettlementContext): GameplaySettlementResult | undefined;
   recordTransaction(
     profileId: string,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,

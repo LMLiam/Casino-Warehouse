@@ -1,6 +1,7 @@
 import type { CasinoProfile } from './CasinoProfile';
 import type { CasinoSaveState } from './CasinoSaveState';
 import { createStateId } from './createStateId';
+import { defaultHouseAdvanceState } from './defaultHouseAdvanceState';
 import { emptyStats } from './emptyStats';
 import { normalizeProfileName } from './normalizeProfileName';
 import { profileColorFromName } from './profileColorFromName';
@@ -20,6 +21,7 @@ export const createProfile = (
     name: profileName,
     color: profileColorFromName(profileName),
     bankroll: Math.max(0, Math.floor(bankroll)),
+    houseAdvance: defaultHouseAdvanceState,
     stats: emptyStats(),
     transactions: [],
     createdAt: at,

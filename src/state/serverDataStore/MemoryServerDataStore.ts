@@ -1,17 +1,23 @@
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
+import { acceptHouseAdvance } from '../profiles/acceptHouseAdvance';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSaveState } from '../profiles/CasinoSaveState';
 import { createProfile as createProfileRecord } from '../profiles/createProfile';
+import { defaultHouseAdvanceState } from '../profiles/defaultHouseAdvanceState';
 import { deleteProfile } from '../profiles/deleteProfile';
 import { emptySaveState } from '../profiles/emptySaveState';
 import { emptyStats } from '../profiles/emptyStats';
+import { houseAdvanceRepaymentForProfit } from '../profiles/houseAdvanceRepaymentForProfit';
 import { parseProfileStoreJson } from '../profiles/parseProfileStoreJson';
 import { recordTransaction } from '../profiles/recordTransaction';
+import { reduceHouseAdvanceBalance } from '../profiles/reduceHouseAdvanceBalance';
 import { renameProfile } from '../profiles/renameProfile';
 import { replaceProfile } from '../profiles/replaceProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
 import { createSessionState } from '../session/createSessionState';
 import { parseSessionState } from '../session/parseSessionState';
+import type { GameplaySettlementContext } from './GameplaySettlementContext';
+import type { GameplaySettlementResult } from './GameplaySettlementResult';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
 import type { ServerDataStore } from './ServerDataStore';
@@ -77,6 +83,7 @@ export class MemoryServerDataStore implements ServerDataStore {
       name: profileName.trim().replace(/\s+/g, ' ').slice(0, 32) || 'Player',
       color: '#7dd3fc',
       bankroll: MemoryServerDataStore.safeMoney(bankroll),
+      houseAdvance: defaultHouseAdvanceState,
       stats: emptyStats(),
       transactions: [],
       createdAt: at,
@@ -123,6 +130,65 @@ export class MemoryServerDataStore implements ServerDataStore {
     const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(bankroll), updatedAt: new Date().toISOString() };
     this.profileState = replaceProfile(this.profileState, updated);
     return updated;
+  }
+
+  public acceptHouseAdvance(profileId: string): CasinoProfile | undefined {
+    const profile = this.findProfile(profileId);
+    if (!profile) {
+      return undefined;
+    }
+    const updated = acceptHouseAdvance(profile);
+    if (!updated) {
+      return undefined;
+    }
+    this.profileState = replaceProfile(this.profileState, updated);
+    return updated;
+  }
+
+  public applyGameplaySettlement(
+    profileId: string,
+    returned: number,
+    profit: number,
+    context: GameplaySettlementContext,
+  ): GameplaySettlementResult | undefined {
+    const profile = this.findProfile(profileId);
+    if (!profile) {
+      return undefined;
+    }
+    const grossReturned = MemoryServerDataStore.safeMoney(returned);
+    const repayment = Math.min(grossReturned, houseAdvanceRepaymentForProfit(profile.houseAdvance, profit));
+    if (repayment <= 0) {
+      const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(profile.bankroll + grossReturned), updatedAt: new Date().toISOString() };
+      this.profileState = replaceProfile(this.profileState, updated);
+      return { profile: updated, houseAdvanceRepayment: 0 };
+    }
+
+    const outstandingBefore = profile.houseAdvance.outstandingBalance;
+    const houseAdvance = reduceHouseAdvanceBalance(profile.houseAdvance, repayment);
+    const updated = recordTransaction(
+      {
+        ...profile,
+        bankroll: MemoryServerDataStore.safeMoney(profile.bankroll + grossReturned),
+        houseAdvance,
+      },
+      {
+        gameId: context.gameId,
+        roomId: context.roomId,
+        sessionId: context.sessionId,
+        type: 'house_advance_repayment',
+        amount: -repayment,
+        description: `House Advance repayment withheld from ${context.gameId} net winnings.`,
+        metadata: {
+          grossReturned,
+          netWinnings: Math.max(0, Math.floor(profit)),
+          houseAdvanceRepayment: repayment,
+          outstandingBefore,
+          outstandingAfter: houseAdvance.outstandingBalance,
+        },
+      },
+    );
+    this.profileState = replaceProfile(this.profileState, updated);
+    return { profile: updated, houseAdvanceRepayment: repayment };
   }
 
   public recordTransaction(

@@ -211,6 +211,7 @@ export class GameApp extends GameAppSession {
       leaveMultiplayerRoom: () => this.leaveMultiplayerRoom(),
       backToLobby: () => this.goHome(),
       switchProfiles: () => this.switchProfiles(),
+      acceptHouseAdvance: () => this.acceptHouseAdvance(),
       updateSessionLimit: () => {
         this.sessionWagerLimit = readCreditInput(this.elements.sessionLimitInput);
         this.saveSession();
@@ -585,6 +586,15 @@ export class GameApp extends GameAppSession {
       return;
     }
     this.multiplayer.adjustBankroll(profile.id, action, readPositiveCreditInput(this.elements.moneyInput));
+  }
+
+  private acceptHouseAdvance(): void {
+    const profile = this.currentProfile();
+    if (!profile || !this.canUseServer()) {
+      return;
+    }
+    this.elements.houseAdvanceButton.disabled = true;
+    this.multiplayer.acceptHouseAdvance(profile.id);
   }
 
   private authorizeAdmin(): void {

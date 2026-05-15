@@ -106,6 +106,36 @@
   line-height: 1.35;
 }
 
+.house-advance-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  width: min(720px, 100%);
+  padding: 14px 16px;
+  border: 1px solid rgba(117, 255, 146, 0.38);
+  border-radius: 8px;
+  background: rgba(6, 13, 10, 0.88);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36);
+}
+
+.house-advance-panel b {
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.house-advance-panel p {
+  margin-top: 4px;
+  color: #ded6ba;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.house-advance-panel button {
+  min-width: 168px;
+}
+
 .game-lobby-tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));

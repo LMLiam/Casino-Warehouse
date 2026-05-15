@@ -21,6 +21,8 @@ export interface AppElements {
   readonly gameTabs: HTMLButtonElement[];
   readonly playerStrip: HTMLDivElement;
   readonly gameLobby: HTMLDivElement;
+  readonly houseAdvancePanel: HTMLDivElement;
+  readonly houseAdvanceButton: HTMLButtonElement;
   readonly gameLobbyTiles: HTMLDivElement;
   readonly roomLobby: HTMLDivElement;
   readonly roomGameTitle: HTMLElement;
@@ -48,6 +50,7 @@ export interface AppElements {
   readonly status: HTMLDivElement;
   readonly bankroll: HTMLElement;
   readonly bankrollDelta: HTMLElement;
+  readonly houseAdvancePill: HTMLElement;
   readonly profileStats: HTMLElement;
   readonly auditLog: HTMLDivElement;
   readonly onTable: HTMLElement;

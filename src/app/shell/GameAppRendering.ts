@@ -180,7 +180,7 @@ export abstract class GameAppRendering {
   }
 
   protected renderGameLobby(): void {
-    this.gameLobbyView.render((gameId) => this.openRoomLobby(gameId));
+    this.gameLobbyView.render(this.currentProfile(), (gameId) => this.openRoomLobby(gameId));
   }
 
   protected renderBeatControls(snapshot: GameSnapshot, controlsAvailable = true, activeRoom?: RoomSnapshot, profileId?: string, bankroll?: number): void {

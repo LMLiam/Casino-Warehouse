@@ -59,6 +59,7 @@ export const clientMessageSchema = (() => {
     baseClientMessageSchema.extend({ type: z.literal('create-profile'), profileName: profileNameSchema }),
     baseClientMessageSchema.extend({ type: z.literal('rename-profile'), profileId: profileIdSchema, profileName: profileNameSchema }),
     baseClientMessageSchema.extend({ type: z.literal('delete-profile'), profileId: profileIdSchema }),
+    baseClientMessageSchema.extend({ type: z.literal('house-advance'), profileId: profileIdSchema }),
     baseClientMessageSchema.extend({ type: z.literal('save-session'), session: clientSessionStateSchema }),
     baseClientMessageSchema.extend({
       type: z.literal('admin-bankroll'),

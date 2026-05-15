@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { bankrollTransactionSchema } from './bankrollTransactionSchema';
 import { creditSchema } from './creditSchema';
+import { houseAdvanceStateSchema } from './houseAdvanceStateSchema';
 import { profileNameSchema } from './profileNameSchema';
 import { profileStatsSchema } from './profileStatsSchema';
 
@@ -9,6 +10,7 @@ export const casinoProfileSchema = z.object({
   name: profileNameSchema,
   color: z.string().optional(),
   bankroll: creditSchema.default(0),
+  houseAdvance: houseAdvanceStateSchema.default({ outstandingBalance: 0, activeCount: 0 }),
   stats: profileStatsSchema.default({
     totalWagered: 0,
     totalWon: 0,

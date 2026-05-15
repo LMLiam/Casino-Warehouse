@@ -141,6 +141,52 @@ test('admin bankroll adjustments update wallet and audit ledger without corrupti
   expectConsoleClean(page);
 });
 
+test('House Advance offer, owed balance, and capped-state messaging render in the lobby and wallet', async ({ page }) => {
+  await createSession(page);
+  await page.locator('.admin-panel > summary').click();
+  await page.locator('#moneyInput').fill('1000');
+  await page.getByRole('button', { name: 'Subtract' }).click();
+
+  await expect(page.locator('#bankroll')).toContainText('£0');
+  await expect(page.locator('#houseAdvancePanel')).toBeVisible();
+  await expect(page.locator('#houseAdvancePanel')).toContainText('House Advance available');
+  await expect(page.locator('#houseAdvancePanel')).toContainText('Future net wins repay 10%');
+
+  await page.getByRole('button', { name: 'Take House Advance' }).click();
+  await expect(page.locator('#bankroll')).toContainText('£100');
+  await expect(page.locator('#houseAdvancePill')).toContainText('House Advance owed: £100 · 1/3 active');
+  await page.locator('.stats-menu > summary').click();
+  await expect(page.locator('#profileStats')).toContainText('House Advance owed £100');
+  await expect(page.locator('#auditLog')).toContainText('House Advance accepted');
+
+  for (let count = 2; count <= 3; count += 1) {
+    await page.locator('#moneyInput').fill('100');
+    await page.getByRole('button', { name: 'Subtract' }).click();
+    await expect(page.locator('#bankroll')).toContainText('£0');
+    await page.getByRole('button', { name: 'Take House Advance' }).click();
+    await expect(page.locator('#houseAdvancePill')).toContainText(`House Advance owed: £${count}00 · ${count}/3 active`);
+  }
+
+  await page.locator('#moneyInput').fill('100');
+  await page.getByRole('button', { name: 'Subtract' }).click();
+  await expect(page.locator('#bankroll')).toContainText('£0');
+  await expect(page.locator('#houseAdvancePanel')).toContainText('House Advance unavailable');
+  await expect(page.locator('#houseAdvancePanel')).toContainText('unavailable until the current £300 balance is repaid');
+  await expect(page.getByRole('button', { name: 'Take House Advance' })).toBeHidden();
+
+  const serverData = await requestServerData(page);
+  const savedProfile = serverData.profileState.profiles.find((profile) => profile.name === 'QA Player');
+  expect(savedProfile).toMatchObject({
+    bankroll: 0,
+    houseAdvance: { outstandingBalance: 300, activeCount: 3 },
+    transactions: expect.arrayContaining([
+      expect.objectContaining({ type: 'admin_adjustment', amount: -100 }),
+      expect.objectContaining({ type: 'house_advance_credit', amount: 100 }),
+    ]),
+  });
+  expectConsoleClean(page);
+});
+
 test('blackjack has its own table rendering', async ({ page }) => {
   await createSession(page);
   await page.locator('[data-lobby-game="blackjack"]').click();
@@ -313,7 +359,19 @@ const expectConsoleClean = (page: Page): void => {
 type E2EServerProfile = {
   readonly name?: string;
   readonly bankroll?: number;
-  readonly transactions?: readonly { readonly type?: string; readonly amount?: number; readonly description?: string }[];
+  readonly houseAdvance?: E2EServerHouseAdvance;
+  readonly transactions?: readonly E2EServerTransaction[];
+};
+
+type E2EServerHouseAdvance = {
+  readonly outstandingBalance?: number;
+  readonly activeCount?: number;
+};
+
+type E2EServerTransaction = {
+  readonly type?: string;
+  readonly amount?: number;
+  readonly description?: string;
 };
 
 type E2EServerData = {

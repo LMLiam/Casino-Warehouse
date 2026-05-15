@@ -9,6 +9,7 @@ export interface AppEventCallbacks {
   readonly leaveMultiplayerRoom: () => void;
   readonly backToLobby: () => void;
   readonly switchProfiles: () => void;
+  readonly acceptHouseAdvance: () => void;
   readonly updateSessionLimit: () => void;
   readonly openRoomLobby: (gameId: CasinoGameId) => void;
   readonly selectChip: (button: HTMLButtonElement) => void;
