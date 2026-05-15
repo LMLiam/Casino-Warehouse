@@ -7,12 +7,12 @@ import { money } from '../format/appMoney';
 export class ProfileSetupView {
   private pendingDeleteProfileId = '';
   private pendingRenameProfileId = '';
-  private readonly selectedProfileIds = new Set<string>();
+  private selectedProfileId = '';
 
   public constructor(private readonly elements: AppElements) {}
 
   public clearSelection(): void {
-    this.selectedProfileIds.clear();
+    this.selectedProfileId = '';
     this.pendingDeleteProfileId = '';
     this.pendingRenameProfileId = '';
   }
@@ -26,17 +26,17 @@ export class ProfileSetupView {
   ): void {
     this.rememberCheckedProfiles();
     this.pruneDeletedSelections(profileState);
+    this.pruneUnownedSelection(ownedProfileIds);
+    this.selectFirstOwnedProfile(profileState, ownedProfileIds);
     this.elements.profileList.innerHTML =
       profileState.profiles.length === 0
         ? '<p class="empty-state">Create a profile to save bankroll, stats, and history.</p>'
         : profileState.profiles.map((profile) => this.renderRow(profile, ownedProfileIds.has(profile.id))).join('');
 
-    this.elements.profileList.querySelectorAll<HTMLInputElement>('[data-profile-select]').forEach((checkbox) => {
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          this.selectedProfileIds.add(checkbox.value);
-        } else {
-          this.selectedProfileIds.delete(checkbox.value);
+    this.elements.profileList.querySelectorAll<HTMLInputElement>('[data-profile-select]').forEach((input) => {
+      input.addEventListener('change', () => {
+        if (input.checked) {
+          this.selectedProfileId = input.value;
         }
       });
     });
@@ -100,7 +100,7 @@ export class ProfileSetupView {
   private renderRow(profile: CasinoProfile, owned: boolean): string {
     const isRenaming = this.pendingRenameProfileId === profile.id;
     const isDeleting = this.pendingDeleteProfileId === profile.id;
-    const selected = this.selectedProfileIds.has(profile.id) ? 'checked' : '';
+    const selected = this.selectedProfileId === profile.id ? 'checked' : '';
     const disabled = owned ? '' : 'disabled';
     const ownershipNote = owned ? '' : '<em>Profile is on this server, but this browser does not own it.</em>';
     const actionPrompt = isRenaming
@@ -123,7 +123,7 @@ export class ProfileSetupView {
     return `
       <article class="profile-row">
         <label>
-          <input type="checkbox" data-profile-select value="${escapeHtml(profile.id)}" ${selected} ${disabled} />
+          <input type="radio" name="profile-session" data-profile-select value="${escapeHtml(profile.id)}" ${selected} ${disabled} />
           <span>
             <b>${escapeHtml(profile.name)}</b>
             <small>${money(profile.bankroll)} • ${profile.stats.gamesPlayed} games • biggest ${money(profile.stats.biggestWin)}</small>
@@ -140,21 +140,26 @@ export class ProfileSetupView {
   }
 
   private rememberCheckedProfiles(): void {
-    this.elements.profileList.querySelectorAll<HTMLInputElement>('[data-profile-select]').forEach((checkbox) => {
-      if (checkbox.checked) {
-        this.selectedProfileIds.add(checkbox.value);
-      } else {
-        this.selectedProfileIds.delete(checkbox.value);
-      }
-    });
+    this.selectedProfileId = this.elements.profileList.querySelector<HTMLInputElement>('[data-profile-select]:checked')?.value ?? this.selectedProfileId;
   }
 
   private pruneDeletedSelections(profileState: CasinoSaveState): void {
     const currentProfileIds = new Set(profileState.profiles.map((profile) => profile.id));
-    [...this.selectedProfileIds].forEach((profileId) => {
-      if (!currentProfileIds.has(profileId)) {
-        this.selectedProfileIds.delete(profileId);
-      }
-    });
+    if (this.selectedProfileId && !currentProfileIds.has(this.selectedProfileId)) {
+      this.selectedProfileId = '';
+    }
+  }
+
+  private pruneUnownedSelection(ownedProfileIds: ReadonlySet<string>): void {
+    if (this.selectedProfileId && !ownedProfileIds.has(this.selectedProfileId)) {
+      this.selectedProfileId = '';
+    }
+  }
+
+  private selectFirstOwnedProfile(profileState: CasinoSaveState, ownedProfileIds: ReadonlySet<string>): void {
+    if (this.selectedProfileId) {
+      return;
+    }
+    this.selectedProfileId = profileState.profiles.find((profile) => ownedProfileIds.has(profile.id))?.id ?? '';
   }
 }

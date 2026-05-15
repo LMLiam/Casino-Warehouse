@@ -1,1 +1,1 @@
-export const currentSessionStateVersion = 1;
+export const currentSessionStateVersion = 2;

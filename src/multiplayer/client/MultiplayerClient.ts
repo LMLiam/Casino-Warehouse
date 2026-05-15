@@ -83,9 +83,8 @@ export class MultiplayerClient {
   }
 
   public saveSession(session: Omit<CasinoSessionState, 'version' | 'updatedAt'>): void {
-    const profileIds = [...new Set([...session.profileIds, ...Object.keys(session.gameSnapshots)])];
-    if (!this.ownsEveryProfile(profileIds)) {
-      this.events.onError('This browser does not own every profile in this session.');
+    if (!this.ownsProfile(session.profileId)) {
+      this.events.onError('This browser does not own this session profile.');
       return;
     }
     this.send({
@@ -93,8 +92,7 @@ export class MultiplayerClient {
       type: 'save-session',
       session: {
         ...session,
-        profileIds: [...session.profileIds],
-        gameSnapshots: Object.fromEntries(Object.entries(session.gameSnapshots).map(([profileId, snapshots]) => [profileId, { ...snapshots }])),
+        gameSnapshot: session.gameSnapshot ? { ...session.gameSnapshot } : undefined,
       },
     });
   }
@@ -371,10 +369,6 @@ export class MultiplayerClient {
     if (adminToken) {
       this.send({ version: currentProtocolVersion, type: 'authorize-admin', adminToken });
     }
-  }
-
-  private ownsEveryProfile(profileIds: readonly string[]): boolean {
-    return profileIds.every((profileId) => this.ownsProfile(profileId));
   }
 
   private storeProfileToken(profileId: string, profileToken: string): void {

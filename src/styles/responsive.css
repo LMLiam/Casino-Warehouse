@@ -25,10 +25,6 @@
     font-size: 12px;
   }
 
-  .player-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .game-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

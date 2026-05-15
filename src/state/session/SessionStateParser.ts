@@ -32,29 +32,16 @@ export class SessionStateParser {
     return Number.isNaN(date.getTime()) ? new Date() : date;
   }
 
-  public static parseGameSnapshots(value: unknown): Readonly<Record<string, PlayerGameSnapshots>> {
+  public static parseGameSnapshot(value: unknown): PlayerGameSnapshots | undefined {
     if (!SessionStateParser.isRecord(value)) {
-      return {};
+      return undefined;
     }
 
-    return Object.fromEntries(
-      Object.entries(value).flatMap(([profileId, snapshots]) => {
-        if (!SessionStateParser.isRecord(snapshots)) {
-          return [];
-        }
-
-        return [
-          [
-            profileId,
-            {
-              beatTheHouse: SessionStateParser.parseSnapshotRecord<BeatTheHouseSaveState>(snapshots.beatTheHouse),
-              blackjack: SessionStateParser.parseSnapshotRecord<BlackjackSnapshot>(snapshots.blackjack),
-              slots: SessionStateParser.parseSlotSnapshots(snapshots.slots),
-            },
-          ],
-        ];
-      }),
-    );
+    return {
+      beatTheHouse: SessionStateParser.parseSnapshotRecord<BeatTheHouseSaveState>(value.beatTheHouse),
+      blackjack: SessionStateParser.parseSnapshotRecord<BlackjackSnapshot>(value.blackjack),
+      slots: SessionStateParser.parseSlotSnapshots(value.slots),
+    };
   }
 
   private static isRecord(value: unknown): value is Record<string, unknown> {

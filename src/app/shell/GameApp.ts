@@ -12,7 +12,6 @@ import { CardRenderer } from '../../ui/renderers/CardRenderer';
 import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
 import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
-import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
 import { currentProfileStoreVersion } from '../../state/profiles/currentProfileStoreVersion';
 import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
@@ -59,7 +58,6 @@ export class GameApp extends GameAppSession {
   protected readonly table: PixiTable;
   protected readonly elements: AppElements;
   private readonly beatChipSelection: BeatChipSelection;
-  protected selectedPlayerIndex = 0;
   protected activeGame: CasinoGameId = 'beat-the-house';
   protected showingGameLobby = true;
   protected sessionWagerLimit = 0;
@@ -78,7 +76,7 @@ export class GameApp extends GameAppSession {
   protected readonly slotsView: SlotsView;
   protected readonly walletView: WalletView;
   protected readonly multiplayer: MultiplayerClient;
-  protected players: CasinoPlayer[] = [];
+  protected player: CasinoPlayer | undefined;
   private readonly beatSettlementMetadata = new BeatSettlementMetadataCache();
   protected profileState: CasinoSaveState = { version: currentProfileStoreVersion, profiles: [] };
   protected readonly ownedProfileIds = new Set<string>();
@@ -381,8 +379,7 @@ export class GameApp extends GameAppSession {
     if (this.multiplayer.room && this.multiplayer.connected) {
       this.multiplayer.leaveRoom();
     }
-    this.players = [];
-    this.selectedPlayerIndex = 0;
+    this.player = undefined;
     this.activeGame = 'beat-the-house';
     this.showingGameLobby = true;
     this.sessionWagered = 0;
@@ -467,23 +464,17 @@ export class GameApp extends GameAppSession {
       return;
     }
 
-    const selectedIds = [...this.elements.profileList.querySelectorAll<HTMLInputElement>('[data-profile-select]:checked')].map((checkbox) => checkbox.value);
+    const selectedId = this.elements.profileList.querySelector<HTMLInputElement>('[data-profile-select]:checked')?.value ?? '';
     const ownedIds = this.profileState.profiles.filter((profile) => this.ownedProfileIds.has(profile.id)).map((profile) => profile.id);
-    const ids = selectedIds.filter((profileId) => this.ownedProfileIds.has(profileId));
-    if (ids.length === 0 && selectedIds.length === 0 && ownedIds.length > 0) {
-      ids.push(ownedIds[0]);
-    }
-    if (ids.length === 0) {
+    const profileId = selectedId ? (this.ownedProfileIds.has(selectedId) ? selectedId : '') : (ownedIds[0] ?? '');
+    const profile = profileId ? this.profileState.profiles.find((candidate) => candidate.id === profileId) : undefined;
+    if (!profile) {
       this.lastSaveError = 'Create or unlock a profile in this browser before starting a session.';
       this.renderProfileSetup();
       return;
     }
 
-    this.players = ids
-      .map((id) => this.profileState.profiles.find((profile) => profile.id === id))
-      .filter((profile): profile is CasinoProfile => Boolean(profile))
-      .map((profile) => createPlayerFromProfile(profile));
-    this.selectedPlayerIndex = 0;
+    this.player = createPlayerFromProfile(profile);
     this.activeGame = 'beat-the-house';
     this.showingGameLobby = true;
     this.sessionWagered = 0;
@@ -492,7 +483,7 @@ export class GameApp extends GameAppSession {
     this.elements.setup.classList.add('hidden');
     this.elements.shell.classList.remove('hidden');
     this.table.resize();
-    this.renderPlayerButtons();
+    this.renderPlayerProfile();
     this.renderGameLobby();
     this.saveSession();
     this.renderCasino();
@@ -626,7 +617,7 @@ export class GameApp extends GameAppSession {
     if (!this.canUseServer() || !window.confirm('Clear all saved profiles and session data?')) {
       return;
     }
-    this.players = [];
+    this.player = undefined;
     this.profileState = { version: currentProfileStoreVersion, profiles: [] };
     this.pendingRoomRestore = undefined;
     this.clearClientSession();
@@ -641,19 +632,20 @@ export class GameApp extends GameAppSession {
     this.profileAccessReceived = true;
     this.ownedProfileIds.clear();
     ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));
-    this.players = this.players.filter((player) => this.ownedProfileIds.has(player.profileId));
-    if (this.players.length === 0) {
+    if (this.player && !this.ownedProfileIds.has(this.player.profileId)) {
+      this.player = undefined;
+    }
+    if (!this.player) {
       const clientSession = this.loadClientSession();
-      if (clientSession?.profileIds.some((profileId) => this.ownedProfileIds.has(profileId))) {
+      if (clientSession && this.ownedProfileIds.has(clientSession.profileId)) {
         this.restoreSavedSession(clientSession);
       }
     }
-    this.selectedPlayerIndex = Math.min(this.selectedPlayerIndex, Math.max(0, this.players.length - 1));
     this.renderProfileSetup();
-    if (this.players.length > 0) {
+    if (this.player) {
       this.elements.setup.classList.add('hidden');
       this.elements.shell.classList.remove('hidden');
-      this.renderPlayerButtons();
+      this.renderPlayerProfile();
       this.renderGameLobby();
       this.renderCasino();
     }

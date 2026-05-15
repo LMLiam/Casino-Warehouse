@@ -5,13 +5,12 @@ import type { PlayerGameSnapshots } from './PlayerGameSnapshots';
 
 export interface CasinoSessionState {
   readonly version: typeof currentSessionStateVersion;
-  readonly profileIds: readonly string[];
-  readonly selectedPlayerIndex: number;
+  readonly profileId: string;
   readonly activeGame: CasinoGameId;
   readonly showingGameLobby: boolean;
   readonly wagerLimit: number;
   readonly wagered: number;
-  readonly gameSnapshots: Readonly<Record<string, PlayerGameSnapshots>>;
+  readonly gameSnapshot?: PlayerGameSnapshots;
   readonly room?: CasinoSessionRoomState;
   readonly updatedAt: string;
 }

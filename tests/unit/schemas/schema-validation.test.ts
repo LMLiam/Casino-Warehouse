@@ -59,18 +59,16 @@ describe('Zod-backed runtime validation', () => {
     });
   });
 
-  it('validates legacy session room restore targets without trusting malformed rooms', () => {
+  it('validates session room restore targets without trusting malformed rooms', () => {
     const saved = parseClientMessage({
       version: 1,
       type: 'save-session',
       session: {
-        profileIds: ['profile-1'],
-        selectedPlayerIndex: 0,
+        profileId: 'profile-1',
         activeGame: 'beat-the-house',
         showingGameLobby: true,
         wagerLimit: 0,
         wagered: 0,
-        gameSnapshots: {},
         room: {
           roomId: 'room42',
           gameId: 'blackjack',
@@ -94,13 +92,11 @@ describe('Zod-backed runtime validation', () => {
         version: 1,
         type: 'save-session',
         session: {
-          profileIds: ['profile-1'],
-          selectedPlayerIndex: 0,
+          profileId: 'profile-1',
           activeGame: 'beat-the-house',
           showingGameLobby: true,
           wagerLimit: 0,
           wagered: 0,
-          gameSnapshots: {},
           room: {
             roomId: 'room42',
             gameId: 'blackjack',
@@ -125,7 +121,7 @@ describe('Zod-backed runtime validation', () => {
   it('rejects wrong versions independently for protocol, profile store, and session state boundaries', () => {
     expect(parseClientMessage({ version: 2, type: 'request-data' })).toEqual({ ok: false, error: 'Message version or type is invalid.' });
     expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
-    expect(() => parseSessionState({ version: 2, profileIds: [] })).toThrow('Session data version 2 is not supported.');
+    expect(() => parseSessionState({ version: 1, profileIds: [] })).toThrow('Session data version 1 is not supported.');
   });
 
   it('validates settings and game/slot configuration at runtime boundaries', () => {

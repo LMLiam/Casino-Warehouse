@@ -75,18 +75,15 @@ const blackjackSnapshotFixture = {
   status: 'Player blackjack contract snapshot.',
 } satisfies BlackjackSnapshot;
 
-const sessionStateCurrentV1Fixture = {
-  version: 1,
-  profileIds: ['profile-alice'],
-  selectedPlayerIndex: 0,
+const sessionStateCurrentV2Fixture = {
+  version: 2,
+  profileId: 'profile-alice',
   activeGame: 'blackjack',
   showingGameLobby: false,
   wagerLimit: 500,
   wagered: 25,
-  gameSnapshots: {
-    'profile-alice': {
-      blackjack: blackjackSnapshotFixture,
-    },
+  gameSnapshot: {
+    blackjack: blackjackSnapshotFixture,
   },
   room: {
     roomId: 'ROOM42',
@@ -169,7 +166,7 @@ export const clientMessageContractFixtures = [
   { version: 1, type: 'rename-profile', profileId: 'profile-alice', profileName: 'Alice Renamed' },
   { version: 1, type: 'delete-profile', profileId: 'profile-alice' },
   { version: 1, type: 'house-advance', profileId: 'profile-alice' },
-  { version: 1, type: 'save-session', session: sessionStateCurrentV1Fixture },
+  { version: 1, type: 'save-session', session: sessionStateCurrentV2Fixture },
   { version: 1, type: 'admin-bankroll', profileId: 'profile-alice', action: 'add', amount: 100 },
   { version: 1, type: 'admin-reset-all' },
   { version: 1, type: 'clear-server-data' },
@@ -221,7 +218,7 @@ export const serverMessageContractFixtures = [
   { version: 1, type: 'profile-credentials', profileId: 'profile-alice', profileToken: 'profile-token-alice' },
   { version: 1, type: 'profile-access', ownedProfileIds: ['profile-alice'] },
   { version: 1, type: 'admin-access', authorized: true },
-  { version: 1, type: 'data-state', database: 'memory', profileState: profileStoreCurrentV1Fixture, session: sessionStateCurrentV1Fixture },
+  { version: 1, type: 'data-state', database: 'memory', profileState: profileStoreCurrentV1Fixture, session: sessionStateCurrentV2Fixture },
   { version: 1, type: 'heartbeat', sentAt: 1778407320000 },
   { version: 1, type: 'room-created', room: roomSnapshotFixture, invitePath: '/?room=ROOM42' },
   { version: 1, type: 'room-closed', roomId: 'ROOM42', gameId: 'blackjack', reason: 'host-left' },
@@ -319,22 +316,19 @@ export const profileStoreContractFixtures = {
 } as const;
 
 export const sessionStateContractFixtures = {
-  currentV1: sessionStateCurrentV1Fixture,
-  roomRestoreV1: {
-    version: 1,
-    profileIds: ['profile-bob'],
-    selectedPlayerIndex: 0,
+  currentV2: sessionStateCurrentV2Fixture,
+  roomRestoreV2: {
+    version: 2,
+    profileId: 'profile-bob',
     activeGame: 'blackjack',
     showingGameLobby: false,
     wagerLimit: 200,
     wagered: 50,
-    gameSnapshots: {
-      'profile-bob': {
-        blackjack: {
-          phase: 'settled',
-          wager: 50,
-          status: 'Representative restored Blackjack snapshot.',
-        },
+    gameSnapshot: {
+      blackjack: {
+        phase: 'settled',
+        wager: 50,
+        status: 'Representative restored Blackjack snapshot.',
       },
     },
     room: {
@@ -345,11 +339,11 @@ export const sessionStateContractFixtures = {
     },
     updatedAt: '2026-05-10T10:03:00.000Z',
   },
-  malformedV1: {
-    version: 1,
+  malformedV2: {
+    version: 2,
   },
   unsupportedVersion: {
-    version: 2,
-    profileIds: [],
+    version: 1,
+    profileIds: ['profile-old'],
   },
 } as const;

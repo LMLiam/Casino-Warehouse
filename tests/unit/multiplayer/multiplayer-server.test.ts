@@ -530,13 +530,11 @@ describe('multiplayer WebSocket server', () => {
       version: 1,
       type: 'save-session',
       session: {
-        profileIds: [aliceProfile.id],
-        selectedPlayerIndex: 0,
+        profileId: aliceProfile.id,
         activeGame: 'beat-the-house',
         showingGameLobby: true,
         wagerLimit: 0,
         wagered: 0,
-        gameSnapshots: {},
       },
     });
     intruder.send({

@@ -74,6 +74,7 @@ test('profile page hides storage internals while row actions preserve server-bac
   await page.getByPlaceholder('Player name').fill('Profile QA');
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.locator('#profileList')).toContainText('Profile QA');
+  await expect(page.locator('[data-profile-select]')).toHaveAttribute('type', 'radio');
   await page.locator('[data-profile-select]').check();
 
   await page.locator('[data-profile-action="rename"]').click();
@@ -87,7 +88,40 @@ test('profile page hides storage internals while row actions preserve server-bac
   await expect(page.getByRole('alert')).toContainText('Delete Renamed QA?');
   await page.getByRole('button', { name: 'Delete Profile' }).click();
   await expect(page.locator('#profileList')).toContainText('Create a profile');
-  await expect(page.getByRole('button', { name: 'Start Selected Session' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Start Profile Session' })).toBeDisabled();
+  expectConsoleClean(page);
+});
+
+test('profile setup starts one selected local profile', async ({ page }) => {
+  await page.getByPlaceholder('Player name').fill('First QA');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByPlaceholder('Player name').fill('Second QA');
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  const firstRow = page.locator('.profile-row').filter({ hasText: 'First QA' });
+  const secondRow = page.locator('.profile-row').filter({ hasText: 'Second QA' });
+  const firstSelect = firstRow.locator('[data-profile-select]');
+  const secondSelect = secondRow.locator('[data-profile-select]');
+  await expect(firstSelect).toHaveAttribute('type', 'radio');
+  await expect(secondSelect).toHaveAttribute('type', 'radio');
+  await firstSelect.check();
+  await secondSelect.check();
+  await expect(firstSelect).not.toBeChecked();
+  await expect(secondSelect).toBeChecked();
+  const selectedProfileId = await secondSelect.inputValue();
+
+  await page.getByRole('button', { name: 'Start Profile Session' }).click();
+  await expect(page.locator('#gameLobby')).toBeVisible();
+  await expect(page.locator('#playerStrip')).toContainText('Second QA');
+  await expect(page.locator('#playerStrip [data-player]')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const raw = localStorage.getItem('casino_warehouse_session_v2');
+        return raw ? JSON.parse(raw).profileId : '';
+      }),
+    )
+    .toBe(selectedProfileId);
   expectConsoleClean(page);
 });
 
@@ -337,7 +371,7 @@ const createSession = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page.locator('#profileList')).toContainText('QA Player');
   await page.locator('[data-profile-select]').check();
-  await page.getByRole('button', { name: 'Start Selected Session' }).click();
+  await page.getByRole('button', { name: 'Start Profile Session' }).click();
 };
 
 const expectNoHorizontalOverflow = async (locator: Locator): Promise<void> => {

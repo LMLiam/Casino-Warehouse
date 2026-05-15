@@ -1,25 +1,24 @@
-import { sessionStateV1Schema } from '../../schemas/casinoSchemas/sessionStateV1Schema';
+import { sessionStateV2Schema } from '../../schemas/casinoSchemas/sessionStateV2Schema';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSessionState } from './CasinoSessionState';
 import { createSessionState } from './createSessionState';
 import { SessionStateParser } from './SessionStateParser';
 
-export const parseSessionStateV1 = (value: unknown): CasinoSessionState => {
-  const parsed = sessionStateV1Schema.safeParse(value);
+export const parseSessionStateV2 = (value: unknown): CasinoSessionState => {
+  const parsed = sessionStateV2Schema.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`Session v1 data is not valid. ${zodErrorSummary(parsed.error)}`);
+    throw new Error(`Session v2 data is not valid. ${zodErrorSummary(parsed.error)}`);
   }
   const session = parsed.data;
 
   return createSessionState(
-    parsed.data.profileIds.filter((id): id is string => typeof id === 'string'),
+    session.profileId,
     {
-      selectedPlayerIndex: Number(session.selectedPlayerIndex),
       activeGame: SessionStateParser.isGameId(session.activeGame) ? session.activeGame : undefined,
-      showingGameLobby: Boolean(session.showingGameLobby),
+      showingGameLobby: typeof session.showingGameLobby === 'boolean' ? session.showingGameLobby : undefined,
       wagerLimit: Number(session.wagerLimit),
       wagered: Number(session.wagered),
-      gameSnapshots: SessionStateParser.parseGameSnapshots(session.gameSnapshots),
+      gameSnapshot: SessionStateParser.parseGameSnapshot(session.gameSnapshot),
       room: SessionStateParser.parseRoomState(session.room),
     },
     SessionStateParser.parseUpdatedAt(session.updatedAt),

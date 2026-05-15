@@ -28,28 +28,26 @@ export abstract class GameAppSession extends GameAppRendering {
   protected abstract realtimeUrlError: string;
 
   protected get currentPlayer(): CasinoPlayer | undefined {
-    return this.players[this.selectedPlayerIndex];
+    return this.player;
   }
 
   protected applyServerData(state: ServerDataState): void {
     this.profileState = state.profileState;
     this.lastSaveError = '';
-    this.players = this.players
-      .map((player) => {
-        const profile = this.profileState.profiles.find((candidate) => candidate.id === player.profileId);
-        if (profile && this.ownedProfileIds.has(profile.id)) {
-          player.beatTheHouse.syncBankroll(profile.bankroll);
-        }
-        return profile && this.ownedProfileIds.has(profile.id) ? player : undefined;
-      })
-      .filter((player): player is CasinoPlayer => Boolean(player));
-    if (this.players.length === 0 && this.profileAccessReceived) {
+    if (this.player) {
+      const profile = this.profileState.profiles.find((candidate) => candidate.id === this.player?.profileId);
+      if (profile && this.ownedProfileIds.has(profile.id)) {
+        this.player.beatTheHouse.syncBankroll(profile.bankroll);
+      } else {
+        this.player = undefined;
+      }
+    }
+    if (!this.player && this.profileAccessReceived) {
       const clientSession = this.loadClientSession();
-      if (clientSession?.profileIds.length) {
+      if (clientSession) {
         this.restoreSavedSession(clientSession);
       }
     }
-    this.selectedPlayerIndex = Math.min(this.selectedPlayerIndex, Math.max(0, this.players.length - 1));
     if (this.returnHomeOnServerResync && !this.multiplayer.room) {
       this.returnHomeOnServerResync = false;
       this.showingGameLobby = true;
@@ -57,10 +55,10 @@ export abstract class GameAppSession extends GameAppRendering {
       this.elements.roomStatus.textContent = 'The room could not be restored. Choose a game to start or join a new room.';
     }
     this.renderProfileSetup();
-    if (this.players.length === 0 && this.pendingInviteRoomCode && !this.pendingInviteAttempted) {
+    if (!this.player && this.pendingInviteRoomCode && !this.pendingInviteAttempted) {
       this.elements.roomStatus.textContent = `Invite loaded for room ${this.pendingInviteRoomCode}. Select a profile to join.`;
     }
-    if (this.players.length === 0) {
+    if (!this.player) {
       this.showingGameLobby = true;
       this.multiplayerRooms = [];
       this.elements.shell.classList.add('hidden');
@@ -71,38 +69,33 @@ export abstract class GameAppSession extends GameAppRendering {
       this.multiplayer.clearRoomState();
       return;
     }
-    if (this.players.length > 0) {
-      this.elements.setup.classList.add('hidden');
-      this.elements.shell.classList.remove('hidden');
-      this.renderPlayerButtons();
-      this.renderGameLobby();
-      this.renderCasino();
-      if (this.returnHomeOnServerResync) {
-        this.restoreRoomAfterReconnect();
-        return;
-      }
-      if (this.maybeRestoreSavedRoom()) {
-        return;
-      }
-      if (!this.showingGameLobby && this.multiplayer.connected) {
-        this.refreshMultiplayerRooms();
-      }
-      this.maybeAutoJoinInvite();
+
+    this.elements.setup.classList.add('hidden');
+    this.elements.shell.classList.remove('hidden');
+    this.renderPlayerProfile();
+    this.renderGameLobby();
+    this.renderCasino();
+    if (this.returnHomeOnServerResync) {
+      this.restoreRoomAfterReconnect();
+      return;
     }
+    if (this.maybeRestoreSavedRoom()) {
+      return;
+    }
+    if (!this.showingGameLobby && this.multiplayer.connected) {
+      this.refreshMultiplayerRooms();
+    }
+    this.maybeAutoJoinInvite();
   }
 
   protected restoreSavedSession(session: CasinoSessionState): void {
-    const restoredPlayers = session.profileIds.flatMap((profileId) => {
-      const profile = this.profileState.profiles.find((candidate) => candidate.id === profileId);
-      return profile && this.ownedProfileIds.has(profile.id) ? [createPlayerFromProfile(profile, session.gameSnapshots[profile.id])] : [];
-    });
-    if (restoredPlayers.length === 0) {
+    const profile = this.profileState.profiles.find((candidate) => candidate.id === session.profileId);
+    if (!profile || !this.ownedProfileIds.has(profile.id)) {
       this.clearClientSession();
       return;
     }
 
-    this.players = restoredPlayers;
-    this.selectedPlayerIndex = Math.min(session.selectedPlayerIndex, restoredPlayers.length - 1);
+    this.player = createPlayerFromProfile(profile, session.gameSnapshot);
     this.activeGame = session.activeGame;
     this.sessionWagerLimit = session.wagerLimit;
     this.sessionWagered = session.wagered;
@@ -223,7 +216,9 @@ export abstract class GameAppSession extends GameAppRendering {
   protected syncProfileBankroll(profileId: string, bankroll: number): void {
     const profile = this.profileState.profiles.find((candidate) => candidate.id === profileId);
     const nextBankroll = Math.max(0, Math.floor(bankroll));
-    this.players.find((player) => player.profileId === profileId)?.beatTheHouse.syncBankroll(nextBankroll);
+    if (this.player?.profileId === profileId) {
+      this.player.beatTheHouse.syncBankroll(nextBankroll);
+    }
     const currentBankroll = profile?.bankroll;
     if (!profile || currentBankroll === nextBankroll) {
       return;
@@ -243,33 +238,25 @@ export abstract class GameAppSession extends GameAppRendering {
   }
 
   protected saveSession(): void {
-    if (this.players.length === 0) {
+    const player = this.player;
+    if (!player) {
       return;
     }
     try {
       saveSessionState(
         localStorage,
-        createSessionState(
-          this.players.map((player) => player.profileId),
-          {
-            selectedPlayerIndex: this.selectedPlayerIndex,
-            activeGame: this.activeGame,
-            showingGameLobby: this.showingGameLobby,
-            wagerLimit: this.sessionWagerLimit,
-            wagered: this.sessionWagered,
-            room: this.currentSessionRoom(),
-            gameSnapshots: Object.fromEntries(
-              this.players.map((player) => [
-                player.profileId,
-                {
-                  blackjack: player.blackjack.snapshot(),
-                  beatTheHouse: player.beatTheHouse.saveState(),
-                  slots: Object.fromEntries(Object.entries(player.slots).map(([themeId, slots]) => [themeId, slots.snapshot()])),
-                },
-              ]),
-            ),
+        createSessionState(player.profileId, {
+          activeGame: this.activeGame,
+          showingGameLobby: this.showingGameLobby,
+          wagerLimit: this.sessionWagerLimit,
+          wagered: this.sessionWagered,
+          room: this.currentSessionRoom(),
+          gameSnapshot: {
+            blackjack: player.blackjack.snapshot(),
+            beatTheHouse: player.beatTheHouse.saveState(),
+            slots: Object.fromEntries(Object.entries(player.slots).map(([themeId, slots]) => [themeId, slots.snapshot()])),
           },
-        ),
+        }),
       );
     } catch (error) {
       console.warn('Session could not be saved in this browser.', error);
