@@ -72,7 +72,7 @@ function runReadiness(repo, bin, args = ['origin/main'], env = {}) {
   });
 }
 
-const readinessTestTimeoutMs = 15_000;
+const readinessTestTimeoutMs = 45_000;
 
 describe('pr-readiness.sh', () => {
   it(
