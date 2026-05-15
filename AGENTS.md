@@ -41,6 +41,7 @@ Primary references:
 - `./start-codex-ci-failure.sh --print 123`: preview the Codex `/goal` for diagnosing failing checks on a pull request.
 - `./start-codex-triage-issue.sh --print 121`: preview the Codex `/goal` for triaging an existing GitHub issue.
 - `./start-codex-docs-audit.sh --print "audit scope"`: preview the Codex `/goal` for auditing documentation drift.
+- `./start-codex-security-pass.sh --print "pull request #123"`: preview the Codex `/goal` for a focused security review.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -166,6 +167,12 @@ The CI failure review workflow must fetch current pull request metadata, head SH
 When asked to audit, verify, or report documentation drift without immediately implementing fixes, use the Casino Warehouse documentation audit skill at `.agents/skills/casino-docs-audit/SKILL.md`. For interactive launches, use `start-codex-docs-audit.sh`.
 
 The documentation audit workflow must compare docs, wiki pages, workflow references, npm scripts, issue and pull request templates, launcher scripts, and local agent skills against source-of-truth files, commands, GitHub metadata, and wiki evidence. It must report findings with location, evidence, severity, suggested remediation, skipped checks, and whether each finding is docs-only drift or implementation work.
+
+## Security Review Workflow
+
+When asked for a security pass, threat-model-style review, token or authorization audit, public tunnel audit, dependency security review, workflow security review, or other focused security assessment, use the Casino Warehouse security review skill at `.agents/skills/casino-security-review/SKILL.md`. For interactive launches, use `start-codex-security-pass.sh`.
+
+The security review workflow must inspect the requested target and related tests and controls before recommending changes, distinguish confirmed vulnerabilities from hardening suggestions and residual risks, verify current-info claims for advisories, CVEs, deprecations, versions, or best practices, and must not weaken CodeQL, Dependency Review, action pinning, branch protection, public-tunnel origin protections, admin-token controls, profile-token controls, or server authority.
 
 ## Pull Request Checklist
 

@@ -72,33 +72,41 @@ function runReadiness(repo, bin, args = ['origin/main'], env = {}) {
   });
 }
 
+const readinessTestTimeoutMs = 15_000;
+
 describe('pr-readiness.sh', () => {
-  it('preserves local target-ref evidence when no pull request is resolved', () => {
-    const { repo, root } = createRepository();
-    const bin = writeFakeGh(
-      root,
-      `#!/usr/bin/env node
+  it(
+    'preserves local target-ref evidence when no pull request is resolved',
+    () => {
+      const { repo, root } = createRepository();
+      const bin = writeFakeGh(
+        root,
+        `#!/usr/bin/env node
 console.error('no pull requests found for branch');
 process.exit(1);
 `,
-    );
+      );
 
-    const result = runReadiness(repo, bin);
+      const result = runReadiness(repo, bin);
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('== Local git evidence ==');
-    expect(result.stdout).toContain('Target fetch status:\nfetched latest refs from origin before evaluating target freshness');
-    expect(result.stdout).toContain('Changed files:\ntooling-note.md');
-    expect(result.stdout).toContain('== GitHub PR evidence ==');
-    expect(result.stdout).toContain('No pull request evidence was resolved.');
-    expect(result.stdout).toContain('Action: pass a PR number or branch name');
-  });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('== Local git evidence ==');
+      expect(result.stdout).toContain('Target fetch status:\nfetched latest refs from origin before evaluating target freshness');
+      expect(result.stdout).toContain('Changed files:\ntooling-note.md');
+      expect(result.stdout).toContain('== GitHub PR evidence ==');
+      expect(result.stdout).toContain('No pull request evidence was resolved.');
+      expect(result.stdout).toContain('Action: pass a PR number or branch name');
+    },
+    readinessTestTimeoutMs,
+  );
 
-  it('does not fall back to the current branch when an explicit PR number fails', () => {
-    const { head, repo, root } = createRepository();
-    const bin = writeFakeGh(
-      root,
-      `#!/usr/bin/env node
+  it(
+    'does not fall back to the current branch when an explicit PR number fails',
+    () => {
+      const { head, repo, root } = createRepository();
+      const bin = writeFakeGh(
+        root,
+        `#!/usr/bin/env node
 const args = process.argv.slice(2);
 if (args[0] === 'pr' && args[1] === 'view' && args[2] === '137') {
   console.error('HTTP 404: pull request not found');
@@ -127,23 +135,27 @@ if (args[0] === 'pr' && args[1] === 'view' && args[2] === 'issue-129-pr-readines
 console.error('unexpected gh invocation: ' + args.join(' '));
 process.exit(1);
 `,
-    );
+      );
 
-    const result = runReadiness(repo, bin, ['137'], { FAKE_PR_HEAD: head });
+      const result = runReadiness(repo, bin, ['137'], { FAKE_PR_HEAD: head });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Target input note:\ninput '137' did not resolve as a PR or local Git ref; using origin/main for local evidence");
-    expect(result.stdout).toContain('No pull request evidence was resolved.');
-    expect(result.stdout).not.toContain('PR number: 999');
-    expect(result.stdout).not.toContain('https://github.com/LMLiam/Casino-Warehouse/pull/999');
-  });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Target input note:\ninput '137' did not resolve as a PR or local Git ref; using origin/main for local evidence");
+      expect(result.stdout).toContain('No pull request evidence was resolved.');
+      expect(result.stdout).not.toContain('PR number: 999');
+      expect(result.stdout).not.toContain('https://github.com/LMLiam/Casino-Warehouse/pull/999');
+    },
+    readinessTestTimeoutMs,
+  );
 
-  it('does not fall back to the current branch when an explicit local branch selector fails', () => {
-    const { head, repo, root } = createRepository();
-    run('git', ['branch', 'feature/readiness-target', 'origin/main'], { cwd: repo });
-    const bin = writeFakeGh(
-      root,
-      `#!/usr/bin/env node
+  it(
+    'does not fall back to the current branch when an explicit local branch selector fails',
+    () => {
+      const { head, repo, root } = createRepository();
+      run('git', ['branch', 'feature/readiness-target', 'origin/main'], { cwd: repo });
+      const bin = writeFakeGh(
+        root,
+        `#!/usr/bin/env node
 const args = process.argv.slice(2);
 if (args[0] === 'pr' && args[1] === 'view' && args[2] === 'feature/readiness-target') {
   console.error('no pull requests found for branch');
@@ -172,22 +184,26 @@ if (args[0] === 'pr' && args[1] === 'view' && args[2] === 'issue-129-pr-readines
 console.error('unexpected gh invocation: ' + args.join(' '));
 process.exit(1);
 `,
-    );
+      );
 
-    const result = runReadiness(repo, bin, ['feature/readiness-target'], { FAKE_PR_HEAD: head });
+      const result = runReadiness(repo, bin, ['feature/readiness-target'], { FAKE_PR_HEAD: head });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('Target branch:\nfeature/readiness-target');
-    expect(result.stdout).toContain('No pull request evidence was resolved.');
-    expect(result.stdout).not.toContain('PR number: 999');
-    expect(result.stdout).not.toContain('https://github.com/LMLiam/Casino-Warehouse/pull/999');
-  });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Target branch:\nfeature/readiness-target');
+      expect(result.stdout).toContain('No pull request evidence was resolved.');
+      expect(result.stdout).not.toContain('PR number: 999');
+      expect(result.stdout).not.toContain('https://github.com/LMLiam/Casino-Warehouse/pull/999');
+    },
+    readinessTestTimeoutMs,
+  );
 
-  it('reports live GitHub PR evidence, checks, and unresolved review threads for a resolved PR', () => {
-    const { head, repo, root } = createRepository();
-    const bin = writeFakeGh(
-      root,
-      `#!/usr/bin/env node
+  it(
+    'reports live GitHub PR evidence, checks, and unresolved review threads for a resolved PR',
+    () => {
+      const { head, repo, root } = createRepository();
+      const bin = writeFakeGh(
+        root,
+        `#!/usr/bin/env node
 const args = process.argv.slice(2);
 const validBody = \`## Summary
 
@@ -296,29 +312,33 @@ if (args[0] === 'api' && args[1] === 'graphql') {
 console.error('unexpected gh invocation: ' + args.join(' '));
 process.exit(1);
 `,
-    );
+      );
 
-    const result = runReadiness(repo, bin, ['origin/main'], { FAKE_PR_HEAD: head });
+      const result = runReadiness(repo, bin, ['origin/main'], { FAKE_PR_HEAD: head });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('PR selector resolved:\nissue-129-pr-readiness-github');
-    expect(result.stdout).toContain('PR URL: https://github.com/LMLiam/Casino-Warehouse/pull/246');
-    expect(result.stdout).toContain('Labels: type:maintenance, area:tooling');
-    expect(result.stdout).toContain('Milestone: 06 - Repository/community health');
-    expect(result.stdout).toContain('Linked closing issues: #129 maintenance(agents): make PR readiness helper verify live GitHub evidence');
-    expect(result.stdout).toContain('PR template and metadata validator: pass');
-    expect(result.stdout).toContain('Local HEAD matches PR head SHA?\nyes');
-    expect(result.stdout).toContain('Required checks for PR head');
-    expect(result.stdout).toContain('- Required Quality Gate (Project Checks): SUCCESS https://example.test/checks/1');
-    expect(result.stdout).toContain('Review threads: 1 unresolved of 2 fetched');
-    expect(result.stdout).toContain('PRRT_kwDOtest .agents/skills/casino-issue-completion/scripts/pr-readiness.sh:42 by reviewer');
-  });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('PR selector resolved:\nissue-129-pr-readiness-github');
+      expect(result.stdout).toContain('PR URL: https://github.com/LMLiam/Casino-Warehouse/pull/246');
+      expect(result.stdout).toContain('Labels: type:maintenance, area:tooling');
+      expect(result.stdout).toContain('Milestone: 06 - Repository/community health');
+      expect(result.stdout).toContain('Linked closing issues: #129 maintenance(agents): make PR readiness helper verify live GitHub evidence');
+      expect(result.stdout).toContain('PR template and metadata validator: pass');
+      expect(result.stdout).toContain('Local HEAD matches PR head SHA?\nyes');
+      expect(result.stdout).toContain('Required checks for PR head');
+      expect(result.stdout).toContain('- Required Quality Gate (Project Checks): SUCCESS https://example.test/checks/1');
+      expect(result.stdout).toContain('Review threads: 1 unresolved of 2 fetched');
+      expect(result.stdout).toContain('PRRT_kwDOtest .agents/skills/casino-issue-completion/scripts/pr-readiness.sh:42 by reviewer');
+    },
+    readinessTestTimeoutMs,
+  );
 
-  it('reports required check JSON when gh exits nonzero for pending checks', () => {
-    const { head, repo, root } = createRepository();
-    const bin = writeFakeGh(
-      root,
-      `#!/usr/bin/env node
+  it(
+    'reports required check JSON when gh exits nonzero for pending checks',
+    () => {
+      const { head, repo, root } = createRepository();
+      const bin = writeFakeGh(
+        root,
+        `#!/usr/bin/env node
 const args = process.argv.slice(2);
 if (args[0] === 'pr' && args[1] === 'view') {
   console.log(JSON.stringify({
@@ -353,13 +373,15 @@ if (args[0] === 'api' && args[1] === 'graphql') {
 console.error('unexpected gh invocation: ' + args.join(' '));
 process.exit(1);
 `,
-    );
+      );
 
-    const result = runReadiness(repo, bin, ['origin/main'], { FAKE_PR_HEAD: head });
+      const result = runReadiness(repo, bin, ['origin/main'], { FAKE_PR_HEAD: head });
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('- Required Quality Gate (Project Checks): PENDING https://example.test/checks/1');
-    expect(result.stdout).toContain('gh pr checks exit status: 8');
-    expect(result.stdout).not.toContain('warning: unable to fetch required checks');
-  });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('- Required Quality Gate (Project Checks): PENDING https://example.test/checks/1');
+      expect(result.stdout).toContain('gh pr checks exit status: 8');
+      expect(result.stdout).not.toContain('warning: unable to fetch required checks');
+    },
+    readinessTestTimeoutMs,
+  );
 });

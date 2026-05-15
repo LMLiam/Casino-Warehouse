@@ -17,6 +17,9 @@ const triageGoal =
 const prReviewGoal =
   '/goal Review pull request #42 in full using $casino-pr-full-review, $casino-issue-completion, and AGENTS.md: use a separate worktree when local checkout is needed, inspect the full PR diff and related context, check prior comments/base freshness/CI, run relevant evidence checks, leave inline GitHub review comments for every finding or record exact comment failure, and report an evidence-backed verdict.';
 
+const securityReviewGoal =
+  '/goal Run a focused Casino Warehouse security review for pull request #123 using $casino-security-review + AGENTS.md: inspect the target and related security controls, review related tests and existing safeguards before recommending changes, cover admin token, profile token, server authority, public tunnel, WebSocket origin, persistence, dependency, workflow pinning, CodeQL, and Dependency Review risks where relevant, verify any current vulnerability, advisory, CVE, deprecation, version, or best-practice claim with current sources, avoid weakening existing controls, and report findings with locations, severity, exploit or failure mode, evidence, suggested fixes, blocking status, residual risk, commands run, sources, and unresolved assumptions.';
+
 const runLauncher = (script, args, options = {}) =>
   spawnSync(process.env.BASH ?? '/bin/bash', [join(repoRoot, script), ...args], {
     cwd: options.cwd ?? repoRoot,
@@ -49,10 +52,21 @@ describe('Codex launcher scripts', () => {
     expect(result.stderr).toBe('');
   });
 
-  it('rejects non-numeric issue, triage issue, and pull request input', () => {
+  it('prints the security-review goal without launching Codex', () => {
+    const result = runLauncher('start-codex-security-pass.sh', ['--dry-run', 'pull request #123']);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(securityReviewGoal);
+    expect(result.stderr).toBe('');
+  });
+
+  it('rejects non-numeric issue, triage issue, pull request, and empty security-review input', () => {
     const issueResult = runLauncher('start-codex-issue.sh', ['abc']);
     const triageResult = runLauncher('start-codex-triage-issue.sh', ['not-an-issue']);
     const prResult = runLauncher('start-codex-pr-review.sh', ['not-a-pr']);
+    const securityResult = runLauncher('start-codex-security-pass.sh', [], {
+      env: { CODEX_BIN: 'definitely-not-codex' },
+    });
 
     expect(issueResult.status).toBe(2);
     expect(issueResult.stderr).toContain('error: issue number must be numeric');
@@ -60,6 +74,8 @@ describe('Codex launcher scripts', () => {
     expect(triageResult.stderr).toContain('error: issue number must be numeric');
     expect(prResult.status).toBe(2);
     expect(prResult.stderr).toContain('error: pull request number must be numeric');
+    expect(securityResult.status).toBe(2);
+    expect(securityResult.stderr).toContain('error: security review target is required');
   });
 
   it('validates the Casino Warehouse repository root before print mode', () => {
@@ -70,6 +86,7 @@ describe('Codex launcher scripts', () => {
         ['start-codex-issue.sh', '128'],
         ['start-codex-triage-issue.sh', '121'],
         ['start-codex-pr-review.sh', '42'],
+        ['start-codex-security-pass.sh', 'pull request #123'],
       ]) {
         const result = runLauncher(script, ['--print', number], { cwd: outsideRepo });
 
@@ -86,6 +103,7 @@ describe('Codex launcher scripts', () => {
       ['start-codex-issue.sh', '128'],
       ['start-codex-triage-issue.sh', '121'],
       ['start-codex-pr-review.sh', '42'],
+      ['start-codex-security-pass.sh', 'pull request #123'],
     ]) {
       const result = runLauncher(script, [number], {
         env: { CODEX_BIN: 'definitely-not-codex' },
@@ -108,6 +126,7 @@ describe('Codex launcher scripts', () => {
         ['start-codex-issue.sh', '128'],
         ['start-codex-triage-issue.sh', '121'],
         ['start-codex-pr-review.sh', '42'],
+        ['start-codex-security-pass.sh', 'pull request #123'],
       ]) {
         const result = runLauncher(script, [number], {
           env: { CODEX_BIN: 'codex', PATH: binDir },
@@ -125,16 +144,24 @@ describe('Codex launcher scripts', () => {
     const issueLauncher = readFileSync(join(repoRoot, 'start-codex-issue.sh'), 'utf8');
     const triageLauncher = readFileSync(join(repoRoot, 'start-codex-triage-issue.sh'), 'utf8');
     const prLauncher = readFileSync(join(repoRoot, 'start-codex-pr-review.sh'), 'utf8');
+    const securityLauncher = readFileSync(join(repoRoot, 'start-codex-security-pass.sh'), 'utf8');
     const helper = readFileSync(join(repoRoot, '.agents/scripts/codex-goal-launcher.sh'), 'utf8');
 
     expect(issueLauncher).not.toContain('cat >"$expect_script"');
     expect(triageLauncher).not.toContain('cat >"$expect_script"');
     expect(prLauncher).not.toContain('cat >"$expect_script"');
+    expect(securityLauncher).not.toContain('cat >"$expect_script"');
     expect(helper).toContain('-re {·[^\\r\\n]*(~|/)}');
   });
 
   it('keeps launcher scripts syntactically valid bash', () => {
-    for (const script of ['start-codex-issue.sh', 'start-codex-triage-issue.sh', 'start-codex-pr-review.sh', '.agents/scripts/codex-goal-launcher.sh']) {
+    for (const script of [
+      'start-codex-issue.sh',
+      'start-codex-triage-issue.sh',
+      'start-codex-pr-review.sh',
+      'start-codex-security-pass.sh',
+      '.agents/scripts/codex-goal-launcher.sh',
+    ]) {
       const result = spawnSync(process.env.BASH ?? '/bin/bash', ['-n', join(repoRoot, script)], {
         cwd: repoRoot,
         encoding: 'utf8',
