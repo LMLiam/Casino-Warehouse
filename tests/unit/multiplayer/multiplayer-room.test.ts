@@ -7,6 +7,7 @@ import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClien
 import type { RoomGameId } from '../../../src/multiplayer/protocol/RoomGameId';
 import type { RoomSeatId } from '../../../src/multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
 import { serverMessageSchema } from '../../../src/schemas/protocol/serverMessageSchema';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable/BlackjackTableSnapshot';
@@ -39,6 +40,8 @@ const claimSeat = (seatId: RoomSeatId): ClientMessage => ({ version: 1, type: 'a
 const beat = (room: RoomSnapshot): GameSnapshot => room.game as GameSnapshot;
 const blackjack = (room: RoomSnapshot): BlackjackTableSnapshot => room.game as BlackjackTableSnapshot;
 const slots = (room: RoomSnapshot): SlotSnapshot => room.game as SlotSnapshot;
+const roomStateForTest = (authority: RoomAuthority, roomId: string): RoomState =>
+  (authority as RoomAuthority & { readonly rooms: Map<string, RoomState> }).rooms.get(roomId)!;
 
 describe('per-game multiplayer protocol', () => {
   it('requires game-scoped create, list, and join messages', () => {
@@ -460,10 +463,15 @@ describe('per-game room authority', () => {
     const authority = new RoomAuthority();
     authority.handle('a', create('beat-the-house', 'alice', 500));
     authority.handle('a', claimSeat('left'));
+    expect(authority.handle('a', { version: 1, type: 'next-round' }).error).toBe('Room phase does not allow advancing rounds.');
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
     const cleared = authority.handle('a', { version: 1, type: 'clear-bets' }).broadcasts[0];
     expect(beat(cleared).bets.left.main).toBe(0);
 
+    expect(authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'matchPush', amount: 999 }).error).toBe(
+      'Insufficient profile bankroll for that wager.',
+    );
+    expect(authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'invalid' as never, amount: 10 }).error).toBe('Bet is invalid.');
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
     authority.handle('a', { version: 1, type: 'start-round' });
     expect(authority.handle('a', { version: 1, type: 'clear-bets' }).error).toBe('Bets can only be cleared before the round starts.');
@@ -483,6 +491,49 @@ describe('per-game room authority', () => {
       'Beat the House wagers are not valid in this room.',
     );
     expect(blackjackRoom.gameId).toBe('blackjack');
+  });
+
+  it('covers additional room authority validation edges without trusting malformed client state', () => {
+    const authority = new RoomAuthority();
+    const blackjackRoom = authority.handle('host', create('blackjack', 'host', 500, 1)).direct!;
+
+    expect(
+      authority.handle('joiner', {
+        version: 1,
+        type: 'join-room',
+        gameId: 'blackjack',
+        roomId: blackjackRoom.roomId,
+        profileId: 'joiner',
+        profileName: 'JOINER',
+        bankroll: 500,
+        role: 'player',
+        seatId: 'left',
+      }).error,
+    ).toBe('Seat does not belong to this game room.');
+    authority.handle('host', claimSeat('seat-1'));
+    const roomState = roomStateForTest(authority, blackjackRoom.roomId);
+    roomState.seats.clear();
+    expect(authority.handle('host', { version: 1, type: 'blackjack-deal', wager: 25 }).error).toBe('Claim a Blackjack seat before dealing.');
+    expect(authority.handle('host', { version: 1, type: 'blackjack-action', action: 'stand' }).error).toBe('Claim a Blackjack seat before acting.');
+    expect(authority.handle('host', { version: 1, type: 'slots-pick-bonus' }).error).toBe('This action only applies to Slots rooms.');
+
+    const beatRoom = authority.handle('beat-host', create('beat-the-house', 'beat-host', 500)).direct!;
+    authority.handle('beat-host', claimSeat('left'));
+    authority.handle('beat-watch', join('beat-the-house', beatRoom.roomId, 'beat-watch', 500, 'spectator'));
+    expect(authority.handle('beat-watch', { version: 1, type: 'start-round' }).error).toBe('Spectators cannot start rounds.');
+    expect(authority.handle('beat-watch', { version: 1, type: 'next-round' }).error).toBe('Spectators cannot advance rounds.');
+    expect(authority.handle('beat-host', { version: 1, type: 'unsupported-room-action' } as never).error).toBe('Unsupported room action.');
+
+    authority.handle('beat-host', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 10 });
+    authority.handle('beat-host', { version: 1, type: 'start-round' });
+    expect(authority.handle('beat-watch', { version: 1, type: 'player-action', action: 'hit' }).error).toBe('Spectators cannot act.');
+    expect(authority.handle('beat-host', { version: 1, type: 'player-action', action: 'hit' }).broadcasts[0].gameId).toBe('beat-the-house');
+
+    const slotsRoom = authority.handle('slots-host', create('slots:thai-princess', 'slots-host', 100, 2)).direct!;
+    authority.handle('slots-host', claimSeat('seat-1'));
+    expect(authority.handle('slots-host', { version: 1, type: 'slots-ready', ready: true }).error).toBe('Set your Slots wager before readying.');
+    expect(authority.handle('slots-host', { version: 1, type: 'clear-bets' }).error).toBe('This action only applies to Beat the House rooms.');
+    expect(slotsRoom.gameId).toBe('slots:thai-princess');
   });
 
   it('covers Blackjack action branches, settlement, and reset behaviour', () => {

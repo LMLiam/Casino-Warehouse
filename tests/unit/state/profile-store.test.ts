@@ -27,6 +27,7 @@ class MemoryStorage implements StorageLike {
 describe('profile store', () => {
   it('creates, saves, and reloads persistent profiles', () => {
     const storage = new MemoryStorage();
+    expect(loadProfileStore(storage)).toMatchObject({ recovered: false, state: { profiles: [] } });
     const state = createProfile({ version: 1, profiles: [] }, 'Liam', 1500, new Date('2026-05-04T12:00:00Z'));
 
     saveProfileStore(storage, state);

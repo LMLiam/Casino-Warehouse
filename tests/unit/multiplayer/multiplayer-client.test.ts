@@ -427,6 +427,134 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.adjustBankroll('profile-a', 'add', 100);
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'admin-bankroll', profileId: 'profile-a' });
   });
+
+  it('covers client-side ownership, admin token, stale socket, and heartbeat edge cases', () => {
+    vi.useFakeTimers();
+    const localStorage = createMemoryStorage();
+    localStorage.setItem(profileTokensStorageKey, JSON.stringify({ 'profile-a': 'token-a' }));
+    localStorage.setItem(adminTokenStorageKey, 'stored-admin-token');
+    vi.stubGlobal('localStorage', localStorage);
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'http://casino.test/', host: 'casino.test', protocol: 'http:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+
+    client.saveSession({
+      profileIds: ['profile-a'],
+      selectedPlayerIndex: 0,
+      activeGame: 'beat-the-house',
+      showingGameLobby: true,
+      wagerLimit: 0,
+      wagered: 0,
+      gameSnapshots: {},
+    });
+    client.authorizeAdmin('   ');
+    expect(events.onError).toHaveBeenCalledWith('This browser does not own every profile in this session.');
+    expect(events.onError).toHaveBeenCalledWith('Enter an admin token first.');
+
+    client.connect('ws://first.casino.test/ws');
+    const staleSocket = FakeWebSocket.instances[0];
+    client.connect('ws://second.casino.test/ws');
+    staleSocket.open();
+    staleSocket.close();
+    expect(events.onConnectionState).not.toHaveBeenCalledWith('connected');
+
+    const socket = FakeWebSocket.instances[1];
+    socket.open();
+    expect(socket.sent.map((payload) => JSON.parse(payload))).toEqual([
+      { version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: 'profile-a', profileToken: 'token-a' }] },
+      { version: 1, type: 'authorize-admin', adminToken: 'stored-admin-token' },
+      { version: 1, type: 'request-data' },
+    ]);
+
+    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    const snapshot = new BeatTheHouseGame({ initialBankroll: 1000 }).saveState();
+    client.saveSession({
+      profileIds: ['profile-a'],
+      selectedPlayerIndex: 0,
+      activeGame: 'beat-the-house',
+      showingGameLobby: true,
+      wagerLimit: 0,
+      wagered: 0,
+      gameSnapshots: { 'profile-a': { beatTheHouse: snapshot } },
+    });
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({
+      session: { gameSnapshots: { 'profile-a': { beatTheHouse: expect.objectContaining({ phase: 'betting' }) } } },
+      type: 'save-session',
+    });
+
+    vi.advanceTimersByTime(61_000);
+
+    expect(events.onConnectionState).toHaveBeenCalledWith('reconnecting');
+    expect(socket.readyState).toBe(3);
+  });
+
+  it('tolerates malformed and unavailable browser credential storage', () => {
+    vi.useFakeTimers();
+    const malformedStorage = createMemoryStorage();
+    malformedStorage.setItem(profileTokensStorageKey, '{bad json');
+    vi.stubGlobal('localStorage', malformedStorage);
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'https://casino.test/play', host: 'casino.test', protocol: 'https:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const malformedEvents = createEvents();
+    const malformedClient = new MultiplayerClient(malformedEvents);
+    malformedClient.connect('wss://casino.test/ws');
+    FakeWebSocket.instances[0].open();
+    expect(JSON.parse(FakeWebSocket.instances[0].sent[0])).toEqual({ version: 1, type: 'authorize-profiles', profileTokens: [] });
+
+    vi.unstubAllGlobals();
+    FakeWebSocket.instances = [];
+    const throwingStorage = {
+      getItem: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+      removeItem: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+      setItem: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+    };
+    vi.stubGlobal('localStorage', throwingStorage);
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'https://casino.test/play', host: 'casino.test', protocol: 'https:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+    client.connect('wss://casino.test/ws');
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+
+    socket.serverMessage({ version: 1, type: 'profile-credentials', profileId: 'profile-a', profileToken: 'token-a' });
+    socket.serverMessage({ version: 1, type: 'admin-access', authorized: false });
+    socket.serverMessage({ version: 1, type: 'room-closed', roomId: 'OTHER', gameId: 'beat-the-house', reason: 'profile-deleted' });
+
+    expect(throwingStorage.getItem).toHaveBeenCalled();
+    expect(throwingStorage.setItem).toHaveBeenCalled();
+    expect(throwingStorage.removeItem).toHaveBeenCalled();
+    expect(events.onAdminAccess).toHaveBeenCalledWith(false);
+    expect(events.onRoomCleared).not.toHaveBeenCalled();
+  });
 });
 
 const createEvents = (): MultiplayerClientEvents => ({

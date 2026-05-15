@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { describe, expect, it, vi } from 'vitest';
 import {
   affectedFiles,
   buildAutofixBranchName,
@@ -447,6 +450,73 @@ describe('CodeQL Autofix automation planning', () => {
     expect(calls.some(([method, path]) => method === 'DELETE' && path.includes('/git/refs/heads%2Fsecurity%2Fautofix'))).toBe(true);
   });
 
+  it('reports missing default branch refs and branch cleanup failures clearly', async () => {
+    const candidate = {
+      alert: alert({ number: 29 }),
+      branchName: 'security/autofix/alert-29-js-insecure-randomness',
+      labels: ['security'],
+      title: 'security(codeql): autofix insecure randomness',
+    };
+    const missingDefaultRefClient = {
+      request: async (method, path) => {
+        if (method === 'POST' && path.endsWith('/autofix')) {
+          return { data: { description: 'Use stronger randomness.', status: 'success' } };
+        }
+        if (method === 'GET' && path.endsWith('/git/ref/heads/main')) {
+          return { data: { object: {} } };
+        }
+        throw new Error(`Unexpected request: ${method} ${path}`);
+      },
+    };
+
+    await expect(
+      createDraftAutofixPullRequest({
+        candidate,
+        client: missingDefaultRefClient,
+        defaultBranch: 'main',
+        options: { pollAttempts: 1, pollSeconds: 1 },
+        owner: 'LMLiam',
+        repo: 'Casino-Warehouse',
+      }),
+    ).rejects.toThrow('Could not resolve main branch SHA.');
+
+    const cleanupError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const cleanupClient = {
+      paginate: async () => [],
+      request: async (method, path, body) => {
+        if (method === 'POST' && path.endsWith('/autofix')) {
+          return { data: { description: 'Use stronger randomness.', status: 'success' } };
+        }
+        if (method === 'GET' && path.endsWith('/git/ref/heads/main')) {
+          return { data: { object: { sha: 'base-sha' } } };
+        }
+        if (method === 'POST' && path.endsWith('/git/refs')) {
+          return { data: { ref: body.ref } };
+        }
+        if (method === 'POST' && path.endsWith('/autofix/commits')) {
+          throw new Error('commit failed');
+        }
+        if (method === 'DELETE') {
+          throw new Error('delete failed');
+        }
+        throw new Error(`Unexpected request: ${method} ${path}`);
+      },
+    };
+
+    await expect(
+      createDraftAutofixPullRequest({
+        candidate,
+        client: cleanupClient,
+        defaultBranch: 'main',
+        options: { pollAttempts: 1, pollSeconds: 1 },
+        owner: 'LMLiam',
+        repo: 'Casino-Warehouse',
+      }),
+    ).rejects.toThrow('commit failed');
+    expect(cleanupError).toHaveBeenCalledWith('Could not clean up security/autofix/alert-29-js-insecure-randomness: delete failed');
+    cleanupError.mockRestore();
+  });
+
   it('skips label calls when a generated pull request has no configured labels', async () => {
     const calls = [];
     const candidate = {
@@ -655,4 +725,90 @@ describe('CodeQL Autofix automation planning', () => {
       'https://github.enterprise.test/api/v3/repos/example/project?page=2',
     ]);
   });
+
+  it('ignores unsafe, unrelated, or malformed pagination links', async () => {
+    const cases = [
+      {
+        apiUrl: 'https://api.github.com',
+        link: '<https://api.github.com/repos/example/project?page=2>; rel="prev"',
+        path: '/repos/example/project?page=1',
+      },
+      {
+        apiUrl: 'https://api.github.com',
+        link: '<https://evil.example/repos/example/project?page=2>; rel="next"',
+        path: '/repos/example/project?page=1',
+      },
+      {
+        apiUrl: 'https://github.enterprise.test/api/v3',
+        link: '<https://github.enterprise.test/unrelated?page=2>; rel="next"',
+        path: '/repos/example/project?page=1',
+      },
+      {
+        apiUrl: 'https://api.github.com',
+        link: '<http://[::1>; rel="next"',
+        path: '/repos/example/project?page=1',
+      },
+    ];
+
+    for (const paginationCase of cases) {
+      const fetchCalls = [];
+      const fetchImpl = async (url) => {
+        fetchCalls.push(url);
+        return {
+          headers: new Headers({ link: paginationCase.link }),
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify([{ id: 1 }]),
+        };
+      };
+      const client = createGitHubClient({ apiUrl: paginationCase.apiUrl, fetchImpl, token: 'token' });
+
+      await expect(client.paginate(paginationCase.path)).resolves.toEqual([{ id: 1 }]);
+      expect(fetchCalls).toEqual([`${paginationCase.apiUrl}${paginationCase.path}`]);
+    }
+  });
+
+  it('writes a GitHub step summary for dry-run plans when requested by CI', async () => {
+    const summaryDir = await mkdtemp(join(tmpdir(), 'casino-autofix-summary-'));
+    const summaryPath = join(summaryDir, 'summary.md');
+    const originalSummary = process.env.GITHUB_STEP_SUMMARY;
+    process.env.GITHUB_STEP_SUMMARY = summaryPath;
+
+    try {
+      await runAutofixAutomation({
+        client: {
+          paginate: async (path) => (path.includes('/code-scanning/alerts?') ? [alert({ number: 30 }), alert({ number: 31 })] : []),
+        },
+        defaultBranch: 'main',
+        mode: 'dry-run',
+        options: { maxAlerts: 1, minSeverity: 'high' },
+        owner: 'LMLiam',
+        repo: 'Casino-Warehouse',
+      });
+
+      const summary = await eventuallyRead(summaryPath);
+      expect(summary).toContain('## CodeQL Autofix Plan');
+      expect(summary).toContain('Candidates: 1');
+      expect(summary).toContain('- Alert 30: `js/insecure-randomness` -> `security/autofix/alert-30-js-insecure-randomness`');
+      expect(summary).toContain('- Alert 31: max-alerts-reached');
+    } finally {
+      if (originalSummary === undefined) {
+        delete process.env.GITHUB_STEP_SUMMARY;
+      } else {
+        process.env.GITHUB_STEP_SUMMARY = originalSummary;
+      }
+      await rm(summaryDir, { force: true, recursive: true });
+    }
+  });
 });
+
+const eventuallyRead = async (path) => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      return await readFile(path, 'utf8');
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  return readFile(path, 'utf8');
+};
