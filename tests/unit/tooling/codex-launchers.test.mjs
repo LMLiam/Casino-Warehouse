@@ -43,7 +43,7 @@ const runLauncher = (script, args, options = {}) =>
   spawnSync(process.env.BASH ?? '/bin/bash', [join(repoRoot, script), ...args], {
     cwd: options.cwd ?? repoRoot,
     encoding: 'utf8',
-    env: { ...process.env, ...options.env },
+    env: { ...process.env, CASINO_CODEX_GOAL_STATE_VERIFY: '0', ...options.env },
     input: options.input,
   });
 
@@ -294,7 +294,10 @@ process.stdin.on('data', (chunk) => {
   }
 
   clearTimeout(timeout);
-  const line = buffer.replace(/[\\r\\n][\\s\\S]*$/, '');
+  const line = buffer
+    .replace(/[\\r\\n][\\s\\S]*$/, '')
+    .replace(/^\\u001B\\[200~/, '')
+    .replace(/\\u001B\\[201~$/, '');
   if (!line.startsWith('/goal ')) {
     process.stderr.write('fake codex received ordinary chat instead of a /goal command\\n');
     process.exit(6);
@@ -364,7 +367,10 @@ process.stdin.on('data', (chunk) => {
   }
 
   clearTimeout(timeout);
-  const line = buffer.replace(/[\\r\\n][\\s\\S]*$/, '');
+  const line = buffer
+    .replace(/[\\r\\n][\\s\\S]*$/, '')
+    .replace(/^\\u001B\\[200~/, '')
+    .replace(/\\u001B\\[201~$/, '');
   if (!line.startsWith('/goal ')) {
     process.stderr.write('fake codex received ordinary chat instead of a /goal command\\n');
     process.exit(6);
@@ -434,7 +440,10 @@ process.stdin.on('data', (chunk) => {
   }
 
   clearTimeout(timeout);
-  const line = buffer.replace(/[\\r\\n][\\s\\S]*$/, '');
+  const line = buffer
+    .replace(/[\\r\\n][\\s\\S]*$/, '')
+    .replace(/^\\u001B\\[200~/, '')
+    .replace(/\\u001B\\[201~$/, '');
   if (!line.startsWith('/goal ')) {
     process.stderr.write('fake codex received ordinary chat instead of a /goal command\\n');
     process.exit(6);
@@ -505,6 +514,11 @@ process.stdin.resume();
     expect(helper).toContain('the \\1 skill');
     expect(helper).toContain('goal_objective_from_command');
     expect(helper).toContain('goal_confirmation_matches');
+    expect(helper).toContain('CASINO_CODEX_GOAL_STATE_VERIFY');
+    expect(helper).toContain('resize_spawn_tty $tty_rows $handoff_columns');
+    expect(helper).toContain('send -- "\\033\\[200~"');
+    expect(helper).toContain('send -- "\\033\\[201~"');
+    expect(helper).toContain('exit_interactive 130');
     expect(helper).toContain('send_goal_text $goal_command $key_delay_ms');
     expect(helper).toContain('Refusing to continue because the active goal may be truncated.');
     expect(helper).not.toContain('send -s -- "$goal"');
