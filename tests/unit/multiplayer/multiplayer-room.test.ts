@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mainBeatRoomId, RoomAuthority } from '../../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
+import type { Card } from '../../../src/game/cards/Card';
+import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
 import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
 import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
@@ -527,7 +529,19 @@ describe('per-game room authority', () => {
     expect(authority.handle('beat-host', { version: 1, type: 'unsupported-room-action' } as never).error).toBe('Unsupported room action.');
 
     authority.handle('beat-host', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 10 });
-    authority.handle('beat-host', { version: 1, type: 'start-round' });
+    const beatState = roomStateForTest(authority, beatRoom.roomId);
+    if (beatState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House test room.');
+    }
+    beatState.model.game.restoreState({
+      ...beatState.model.game.saveState(),
+      deck: rigDeck([
+        { rank: '7', suit: 'spades' },
+        { rank: '9', suit: 'hearts' },
+        { rank: 'K', suit: 'clubs' },
+      ] satisfies Card[]),
+    });
+    expect(beat(authority.handle('beat-host', { version: 1, type: 'start-round' }).broadcasts[0]).activeHand).toBe('left');
     expect(authority.handle('beat-watch', { version: 1, type: 'player-action', action: 'hit' }).error).toBe('Spectators cannot act.');
     expect(authority.handle('beat-host', { version: 1, type: 'player-action', action: 'hit' }).broadcasts[0].gameId).toBe('beat-the-house');
 
