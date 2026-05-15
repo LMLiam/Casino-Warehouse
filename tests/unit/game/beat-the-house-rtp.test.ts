@@ -25,7 +25,7 @@ type WagerProfile = {
   readonly stake: number;
   readonly expectedReturned: number;
   readonly expectedRtp: number;
-  readonly expectedRoundStandardDeviation: number;
+  readonly roundStandardDeviationEnvelope: number;
   readonly strategy: StrategyRow;
 };
 type RoundStats = {
@@ -199,11 +199,11 @@ describe('Beat the House RTP guardrails', () => {
   it('keeps production BeatTheHouseGame returns inside seeded RTP guardrails for all 16 profiles', () => {
     for (const [profileIndex, wagerProfile] of wagerProfiles.entries()) {
       const observed = simulateProductionProfile(wagerProfile, MONTE_CARLO_SEED + profileIndex);
-      const standardError = wagerProfile.expectedRoundStandardDeviation / Math.sqrt(RTP_SAMPLE_ROUNDS_PER_PROFILE);
+      const standardError = wagerProfile.roundStandardDeviationEnvelope / Math.sqrt(RTP_SAMPLE_ROUNDS_PER_PROFILE);
       const tolerance = Math.max(MIN_RETURN_TOLERANCE, standardError * MONTE_CARLO_SIGMA_TOLERANCE);
 
       expect(Math.abs(observed.mean - wagerProfile.expectedReturned), wagerProfile.name).toBeLessThanOrEqual(tolerance);
-      expect(observed.standardDeviation, wagerProfile.name).toBeLessThanOrEqual(wagerProfile.expectedRoundStandardDeviation);
+      expect(observed.standardDeviation, wagerProfile.name).toBeLessThanOrEqual(wagerProfile.roundStandardDeviationEnvelope);
       expect(observed.mean / wagerProfile.stake, wagerProfile.name).toBeCloseTo(wagerProfile.expectedRtp, 1);
     }
   }, 30_000);
@@ -214,7 +214,7 @@ function profile(
   sideBets: readonly SideBet[],
   expectedReturned: number,
   expectedRtp: number,
-  expectedRoundStandardDeviation: number,
+  roundStandardDeviationEnvelope: number,
   strategy: StrategyRow,
 ): WagerProfile {
   return {
@@ -223,7 +223,7 @@ function profile(
     stake: MAIN_STAKE + sideBets.length * SIDE_STAKE,
     expectedReturned,
     expectedRtp,
-    expectedRoundStandardDeviation,
+    roundStandardDeviationEnvelope,
     strategy,
   };
 }
