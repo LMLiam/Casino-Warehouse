@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { ZodError } from 'zod';
 import { sanitizeAudioSettings } from '../../../src/audio/casinoAudio/sanitizeAudioSettings';
 import { gameCatalog } from '../../../src/game/catalog/gameCatalog';
+import { bankrollTransactionSchema } from '../../../src/schemas/casinoSchemas/bankrollTransactionSchema';
+import { casinoProfileSchema } from '../../../src/schemas/casinoSchemas/casinoProfileSchema';
 import { gameCatalogSchema } from '../../../src/schemas/casinoSchemas/gameCatalogSchema';
+import { profileNameSchema } from '../../../src/schemas/casinoSchemas/profileNameSchema';
+import { roomNameSchema } from '../../../src/schemas/casinoSchemas/roomNameSchema';
 import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
+import { transactionTypeSchema } from '../../../src/schemas/casinoSchemas/transactionTypeSchema';
+import { zodErrorSummary } from '../../../src/schemas/casinoSchemas/zodErrorSummary';
+import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
@@ -124,5 +132,27 @@ describe('Zod-backed runtime validation', () => {
     expect(sanitizeAudioSettings({ masterVolume: 99, musicVolume: 0.4 }).masterVolume).toBe(1);
     expect(gameCatalogSchema.parse(gameCatalog)).toHaveLength(gameCatalog.length);
     expect(() => slotThemeSchema.parse({ id: 'bad', title: 'Bad', accent: 'purple', reelStrip: [], payouts: {}, jackpots: {}, bonus: {} })).toThrow();
+  });
+
+  it('covers thin schema defaults and invalid parser envelopes directly', () => {
+    const profile = casinoProfileSchema.parse({ id: 'profile-a', name: '  Alice  ' });
+
+    expect(profile).toMatchObject({
+      bankroll: 0,
+      id: 'profile-a',
+      name: 'Alice',
+      stats: { gamesPlayed: 0, netProfit: 0, perGame: {} },
+      transactions: [],
+    });
+    expect(profile.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(profile.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(bankrollTransactionSchema.parse({ id: 'tx-a', gameId: 'admin', type: 'unknown', amount: 1 }).at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(profileNameSchema.parse('   ')).toBe('Player');
+    expect(transactionTypeSchema.parse('correction')).toBe('correction');
+    expect(roomNameSchema.parse('  Late    Table  ')).toBe('Late Table');
+    expect(roomNameSchema.parse(undefined)).toBeUndefined();
+    expect(zodErrorSummary(new ZodError([]))).toBe('Payload is invalid.');
+    expect(() => parseCasinoSaveState(null)).toThrow('Save data is not a casino profile store: Invalid input: expected object, received null');
+    expect(() => parseSessionState(null)).toThrow('Session data is not valid. Invalid input: expected object, received null');
   });
 });
