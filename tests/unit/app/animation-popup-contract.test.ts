@@ -205,6 +205,95 @@ describe('Beat the House popup and animation behaviour', () => {
     );
   });
 
+  it('includes authoritative House Advance repayment and net lines in winning settlement popups', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, tagRenderer } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    game.placeBet('left', 'main', 10);
+    game.placeBet('left', 'dealerSevens', 2);
+    game.placeBet('left', 'dealerBust', 2);
+    game.deal(rigDeck([card('A', 'hearts'), card('7'), card('K')]));
+
+    table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 2 }]);
+
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main WIN +£10',
+      'Side bets WIN +£4',
+      ['Gross WIN +£14', 'House Advance payment -£2', 'Net WIN +£12'],
+      expect.any(Number),
+      expect.any(Number),
+      'win',
+      true,
+    );
+  });
+
+  it('omits the House Advance repayment line when authoritative repayment is zero', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, tagRenderer } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    game.placeBet('left', 'main', 10);
+    game.deal(rigDeck([card('A', 'spades'), card('7'), card('K')]));
+
+    table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 0 }]);
+
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main WIN +£10',
+      'Side bets NONE +£0',
+      ['Total WIN +£10'],
+      expect.any(Number),
+      expect.any(Number),
+      'win',
+      false,
+    );
+    const popupText = vi.mocked(tagRenderer.drawResultPopup).mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
+    expect(popupText).not.toContain('House Advance payment');
+  });
+
+  it('keeps House Advance metadata when the delayed settlement timer re-renders the popup', () => {
+    let revealSettlement: (() => void) | undefined;
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        revealSettlement = callback;
+        return 1;
+      }),
+    });
+    const { table, tagRenderer } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    game.placeBet('left', 'main', 10);
+    game.deal(rigDeck([card('A', 'spades'), card('7'), card('K')]));
+
+    table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 1 }]);
+    expect(tagRenderer.drawResultPopup).not.toHaveBeenCalled();
+
+    revealSettlement?.();
+
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main WIN +£10',
+      'Side bets NONE +£0',
+      ['Gross WIN +£10', 'House Advance payment -£1', 'Net WIN +£9'],
+      expect.any(Number),
+      expect.any(Number),
+      'win',
+      false,
+    );
+  });
+
   it('flips the dealer hole card in place when the player sticks', () => {
     vi.stubGlobal('window', {
       clearTimeout: vi.fn(),

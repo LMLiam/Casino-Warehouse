@@ -11,6 +11,7 @@ import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import type { RoomSummary } from '../../multiplayer/protocol/RoomSummary';
 import { PixiTable } from '../../ui/PixiTable/PixiTable';
+import type { PixiTableSettlementMetadata } from '../../ui/PixiTable/PixiTableSettlementMetadata';
 import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
 import type { CasinoPlayer } from '../state/casinoPlayer/CasinoPlayer';
@@ -62,6 +63,7 @@ export abstract class GameAppRendering {
   protected abstract currentProfile(): CasinoProfile | undefined;
   protected abstract currentSlots(): SlotsGame;
   protected abstract activeRoomForGame(): RoomSnapshot | undefined;
+  protected abstract beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: string | undefined): readonly PixiTableSettlementMetadata[];
   protected abstract claimRoomSeat(seatId: RoomSeatId): void;
   protected abstract joinMultiplayerRoom(roomId: string, role: RoomRole): void;
   protected abstract openRoomLobby(gameId: CasinoGameId): void;
@@ -78,7 +80,7 @@ export abstract class GameAppRendering {
     }
     this.roomSeatsView.render(room, this.currentPlayer?.profileId, (seatId) => this.claimRoomSeat(seatId));
     if (room.gameId === 'beat-the-house' && isBeatSnapshot(room.game)) {
-      this.table.render(room.game);
+      this.table.render(room.game, this.beatSettlementMetadataFor(room, this.currentPlayer?.profileId));
       this.renderBeatControls(room.game);
     }
     this.renderRoomBrowser();
@@ -168,7 +170,7 @@ export abstract class GameAppRendering {
     if (isBeatTheHouse) {
       this.table.resize();
     }
-    this.table.render(beatSnapshot);
+    this.table.render(beatSnapshot, this.beatSettlementMetadataFor(activeRoom, player.profileId));
     this.beatSeatStatusView.render(beatSnapshot, isBeatTheHouse ? activeRoom : undefined, player.profileId, (seatId) => this.claimRoomSeat(seatId));
     this.renderWallet(beatSnapshot, roomMember?.bankroll);
     this.renderBeatControls(beatSnapshot, canUseGameControls, activeRoom, player.profileId, roomMember?.bankroll);
