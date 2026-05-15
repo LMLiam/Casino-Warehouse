@@ -315,7 +315,8 @@ process.stdin.on('data', (chunk) => {
     process.exit(9);
   }
 
-  process.stdout.write('Goal active Objective: fake multiplayer regression\\n');
+  const activeObjective = line.replace(/^\\/goal /, '');
+  process.stdout.write('Goal active Objective: ' + activeObjective + '\\n');
   setTimeout(() => process.exit(0), 25);
 });
 process.stdin.resume();
@@ -384,7 +385,8 @@ process.stdin.on('data', (chunk) => {
     process.exit(9);
   }
 
-  process.stdout.write('Goal active Objective: fake architecture cleanup\\n');
+  const activeObjective = line.replace(/^\\/goal /, '');
+  process.stdout.write('Goal active Objective: ' + activeObjective + '\\n');
   setTimeout(() => process.exit(0), 25);
 });
 process.stdin.resume();
@@ -398,6 +400,65 @@ process.stdin.resume();
 
       expect(result.status, result.stderr).toBe(0);
       expect(result.stderr).toBe('');
+    } finally {
+      rmSync(binDir, { force: true, recursive: true });
+    }
+  }, 45_000);
+
+  it('rejects a Goal active confirmation when the visible objective is truncated', () => {
+    const binDir = mkdtempSync(join(tmpdir(), 'casino-launcher-truncated-'));
+
+    try {
+      const codexShim = join(binDir, 'codex');
+      writeFileSync(
+        codexShim,
+        `#!/usr/bin/env node
+process.stdout.write('OpenAI Codex\\n');
+process.stdout.write('gpt-5.5 xhigh fast · /tmp/casino\\n');
+
+let buffer = '';
+const timeout = setTimeout(() => {
+  process.stderr.write('fake codex timed out waiting for the generated goal\\n');
+  process.exit(5);
+}, 30_000);
+
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+}
+
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => {
+  buffer += chunk;
+  if (!buffer.includes('\\r') && !buffer.includes('\\n')) {
+    return;
+  }
+
+  clearTimeout(timeout);
+  const line = buffer.replace(/[\\r\\n][\\s\\S]*$/, '');
+  if (!line.startsWith('/goal ')) {
+    process.stderr.write('fake codex received ordinary chat instead of a /goal command\\n');
+    process.exit(6);
+  }
+
+  if (!line.includes('Create a researched GitHub issue for Casino Warehouse')) {
+    process.stderr.write('fake codex received the wrong generated goal\\n');
+    process.exit(7);
+  }
+
+  process.stdout.write('Goal active Objective: Create a researched\\n');
+  setTimeout(() => process.exit(0), 25);
+});
+process.stdin.resume();
+`,
+      );
+      chmodSync(codexShim, 0o755);
+
+      const result = runLauncher('start-codex.sh', ['create-issue', 'launcher goal truncates after generated command'], {
+        env: { CODEX_BIN: 'codex', CODEX_GOAL_KEY_DELAY_MS: '0', PATH: `${binDir}:${process.env.PATH}` },
+      });
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('error: Codex exited before exposing the complete generated /goal objective.');
     } finally {
       rmSync(binDir, { force: true, recursive: true });
     }
@@ -442,7 +503,10 @@ process.stdin.resume();
     expect(helper).toContain('make_goal_tui_safe');
     expect(helper).toContain('{\\$(casino-[[:alnum:]_-]+)}');
     expect(helper).toContain('the \\1 skill');
-    expect(helper).toContain('send_goal_text [make_goal_tui_safe $goal] $key_delay_ms');
+    expect(helper).toContain('goal_objective_from_command');
+    expect(helper).toContain('goal_confirmation_matches');
+    expect(helper).toContain('send_goal_text $goal_command $key_delay_ms');
+    expect(helper).toContain('Refusing to continue because the active goal may be truncated.');
     expect(helper).not.toContain('send -s -- "$goal"');
   });
 
