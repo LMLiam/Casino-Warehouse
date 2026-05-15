@@ -18,7 +18,7 @@ git diff --name-only "$TARGET"...HEAD | while read -r file; do
     .agents/skills/*)
       echo "- $file [agent skill/workflow]"
       ;;
-    .agents/scripts/*|start-codex-*.sh)
+    .agents/scripts/*|.agents/launchers/*|start-codex.sh)
       echo "- $file [agent launcher/tooling]"
       ;;
     scripts/*.mjs|scripts/**/*.mjs|scripts/*.js|scripts/**/*.js)

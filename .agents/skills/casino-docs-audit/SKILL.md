@@ -36,7 +36,8 @@ Inspect source-of-truth files and metadata relevant to the requested audit scope
 - `package.json` npm scripts and supported Node version files
 - `.github/workflows/` workflow names, jobs, required context names, and action pins
 - `.github/dependabot.yml`, `.github/CODEOWNERS`, and other repository metadata when referenced by docs
-- root launcher scripts such as `start-codex-*.sh`
+- root launcher scripts such as `start-codex.sh`
+- routine launcher shims under `.agents/launchers/`
 - `.agents/scripts/`
 - `.agents/skills/`
 - `scripts/` validation, dev server, tunnel, security, and code quality tooling
@@ -67,7 +68,7 @@ Inspect source-of-truth files and metadata relevant to the requested audit scope
    - Check that title, label, status, milestone, template, and testing expectations do not contradict each other.
 
 6. Verify agent workflows:
-   - Compare `AGENTS.md`, root `start-codex-*.sh` launchers, `.agents/scripts/`, and `.agents/skills/`.
+   - Compare `AGENTS.md`, root `start-codex.sh`, `.agents/launchers/`, `.agents/scripts/`, and `.agents/skills/`.
    - Check stale skill names, missing skill files, missing `agents/openai.yaml` metadata, contradictory direct invocation guidance, missing launcher preconditions, missing `--print` or `--dry-run` support where promised, and inconsistent generated `/goal` text.
 
 7. Audit the GitHub Wiki when relevant:
@@ -102,7 +103,7 @@ git ls-remote https://github.com/LMLiam/Casino-Warehouse.wiki.git
 Use repository-specific verification commands when they cover changed docs or scripts:
 
 ```bash
-bash -n start-codex-docs-audit.sh
+bash -n start-codex.sh .agents/launchers/start-codex-docs-audit.sh
 npm run format
 npm run lint
 ```
