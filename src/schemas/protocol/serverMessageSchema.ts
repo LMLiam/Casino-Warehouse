@@ -68,6 +68,9 @@ export const serverMessageSchema = (() => {
     lastSpinByProfileId: z.string().optional(),
     returnedByProfileId: z.record(z.string(), finiteNumberSchema).optional(),
   });
+  const beatRoomStateSchema = z.object({
+    rebetSeatIds: z.array(z.enum(['left', 'centre', 'right'])),
+  });
 
   const roomSnapshotShapeSchema = z.object({
     roomId: z.string(),
@@ -87,6 +90,7 @@ export const serverMessageSchema = (() => {
     spectators: z.array(roomPlayerSchema),
     seats: z.array(roomSeatSchema),
     game: z.custom<RoomGameSnapshot>((value) => gameSnapshotShapeSchema.safeParse(value).success),
+    beat: beatRoomStateSchema.optional(),
     slots: slotsRoomStateSchema.optional(),
   });
   const roomSnapshotSchema = z.custom<RoomSnapshot>((value) => roomSnapshotShapeSchema.safeParse(value).success);

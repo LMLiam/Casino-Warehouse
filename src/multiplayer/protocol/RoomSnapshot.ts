@@ -1,3 +1,4 @@
+import type { HandId } from '../../game/types/HandId';
 import type { RoomGameId } from './RoomGameId';
 import type { RoomGameSnapshot } from './RoomGameSnapshot';
 import type { RoomPlayer } from './RoomPlayer';
@@ -22,6 +23,9 @@ export interface RoomSnapshot {
   readonly spectators: readonly RoomPlayer[];
   readonly seats: readonly RoomSeat[];
   readonly game: RoomGameSnapshot;
+  readonly beat?: {
+    readonly rebetSeatIds: readonly HandId[];
+  };
   readonly slots?: {
     readonly wager: number;
     readonly wagersByProfileId: Readonly<Record<string, number>>;

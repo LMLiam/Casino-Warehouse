@@ -19,4 +19,5 @@ export interface GameSnapshot {
   readonly lastEvents: GameEvent[];
   readonly status: string;
   readonly canRebet: boolean;
+  readonly rebetAmounts: Record<HandId, number>;
 }

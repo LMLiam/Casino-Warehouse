@@ -171,7 +171,7 @@ export abstract class GameAppRendering {
     this.table.render(beatSnapshot);
     this.beatSeatStatusView.render(beatSnapshot, isBeatTheHouse ? activeRoom : undefined, player.profileId, (seatId) => this.claimRoomSeat(seatId));
     this.renderWallet(beatSnapshot, roomMember?.bankroll);
-    this.renderBeatControls(beatSnapshot, canUseGameControls);
+    this.renderBeatControls(beatSnapshot, canUseGameControls, activeRoom, player.profileId, roomMember?.bankroll);
     this.blackjackView.render(blackjackSnapshot, player.profileId);
     this.slotsView.render(slotsSnapshot, this.activeGame, activeRoom, player.profileId);
     this.renderRoomBrowser();
@@ -183,12 +183,15 @@ export abstract class GameAppRendering {
     this.gameLobbyView.render((gameId) => this.openRoomLobby(gameId));
   }
 
-  protected renderBeatControls(snapshot: GameSnapshot, controlsAvailable = true): void {
+  protected renderBeatControls(snapshot: GameSnapshot, controlsAvailable = true, activeRoom?: RoomSnapshot, profileId?: string, bankroll?: number): void {
     this.beatControlsView.render(
       snapshot,
       findGame(this.activeGame).kind === 'beat-the-house',
       () => this.multiplayer.send({ version: currentProtocolVersion, type: 'start-round' }),
       controlsAvailable,
+      activeRoom,
+      profileId,
+      bankroll,
     );
   }
 

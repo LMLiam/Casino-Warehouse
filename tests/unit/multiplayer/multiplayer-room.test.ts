@@ -9,6 +9,7 @@ import type { RoomSeatId } from '../../../src/multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
 import { serverMessageSchema } from '../../../src/schemas/protocol/serverMessageSchema';
+import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable/BlackjackTableSnapshot';
 import type { SlotSnapshot } from '../../../src/game/slots/SlotSnapshot';
@@ -132,6 +133,7 @@ describe('per-game multiplayer protocol', () => {
     expect(decodeServerMessage(JSON.stringify({ version: 1, type: 'room-state', room }))?.type).toBe('room-state');
     expect(decodeServerMessage('{"version":1,"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();
+    expect(serverMessageSchema.safeParse({ version: 1, type: 'room-state', room: { ...room, beat: { rebetSeatIds: ['seat-1'] } } }).success).toBe(false);
 
     const invalidSettlement = {
       version: 1,
@@ -534,6 +536,68 @@ describe('per-game room authority', () => {
     expect(authority.handle('slots-host', { version: 1, type: 'slots-ready', ready: true }).error).toBe('Set your Slots wager before readying.');
     expect(authority.handle('slots-host', { version: 1, type: 'clear-bets' }).error).toBe('This action only applies to Beat the House rooms.');
     expect(slotsRoom.gameId).toBe('slots:thai-princess');
+  });
+
+  it('scopes Beat the House clear and rebet to the acting player seat', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = authority.handle('a', create('beat-the-house', 'alice', 1000)).direct!.roomId;
+    authority.handle('a', claimSeat('left'));
+    authority.handle('b', join('beat-the-house', roomId, 'bob', 1000));
+    authority.handle('b', claimSeat('right'));
+    authority.handle('watch', join('beat-the-house', roomId, 'watcher', 1000, 'spectator'));
+    authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    const wagered = authority.handle('b', { version: 1, type: 'place-chip', seatId: 'right', betType: 'main', amount: 40 }).broadcasts[0];
+    expect(wagered.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(975);
+    expect(wagered.players.find((player) => player.profileId === 'bob')?.bankroll).toBe(960);
+    expect(authority.handle('watch', { version: 1, type: 'clear-bets' }).error).toBe('Spectators cannot clear bets.');
+
+    const cleared = authority.handle('a', { version: 1, type: 'clear-bets' }).broadcasts[0];
+
+    expect(beat(cleared).bets.left.main).toBe(0);
+    expect(beat(cleared).bets.right.main).toBe(40);
+    expect(cleared.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(1000);
+    expect(cleared.players.find((player) => player.profileId === 'bob')?.bankroll).toBe(960);
+    expect(authority.handle('a', { version: 1, type: 'clear-bets' }).error).toBe('You do not have bets to clear.');
+    expect(authority.handle('watch', { version: 1, type: 'rebet' }).error).toBe('Spectators cannot rebet.');
+
+    authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    let room = authority.handle('a', { version: 1, type: 'start-round' }).broadcasts[0];
+    for (let attempts = 0; beat(room).phase !== 'roundOver' && attempts < 8; attempts += 1) {
+      const activeHand = beat(room).activeHand;
+      const connectionId = activeHand === 'right' ? 'b' : 'a';
+      const acted = authority.handle(connectionId, { version: 1, type: 'player-action', action: 'stick' });
+      if (acted.error) {
+        throw new Error(acted.error);
+      }
+      room = acted.broadcasts[0];
+    }
+    expect(beat(room).phase).toBe('roundOver');
+    const nextRound = authority.handle('a', { version: 1, type: 'next-round' }).broadcasts[0];
+    expect(beat(nextRound).rebetAmounts).toMatchObject({ left: 25, right: 40 });
+    expect(nextRound.beat?.rebetSeatIds).toEqual(['left', 'right']);
+    store.setProfileBankroll('bob', 1);
+    const lowBobBankroll = authority.reconcileProfiles('test bankroll update').broadcasts[0];
+    expect(lowBobBankroll.players.find((player) => player.profileId === 'bob')?.bankroll).toBe(1);
+    expect(authority.handle('b', { version: 1, type: 'rebet' }).error).toBe('Need £40 to rebet.');
+    authority.handle('b', { version: 1, type: 'leave-room' });
+    authority.handle('c', join('beat-the-house', roomId, 'cory', 1));
+    const reseated = authority.handle('c', claimSeat('right')).broadcasts[0];
+    const aliceBeforeRebet = reseated.players.find((player) => player.profileId === 'alice')!.bankroll;
+    expect(reseated.players.find((player) => player.profileId === 'cory')?.bankroll).toBe(1);
+    expect(reseated.beat?.rebetSeatIds).toEqual(['left']);
+
+    const aliceRebet = authority.handle('a', { version: 1, type: 'rebet' }).broadcasts[0];
+
+    expect(beat(aliceRebet).bets.left.main).toBe(25);
+    expect(beat(aliceRebet).bets.right.main).toBe(0);
+    expect(aliceRebet.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(aliceBeforeRebet - 25);
+    expect(aliceRebet.players.find((player) => player.profileId === 'cory')?.bankroll).toBe(1);
+    expect(authority.handle('a', { version: 1, type: 'rebet' }).error).toBe('Clear your current bets before rebetting.');
+    expect(authority.handle('c', { version: 1, type: 'rebet' }).error).toBe('No previous bet saved for your seat.');
+    const afterBobError = authority.handle('a', { version: 1, type: 'resync' }).direct!;
+    expect(beat(afterBobError).bets.left.main).toBe(25);
+    expect(beat(afterBobError).bets.right.main).toBe(0);
   });
 
   it('covers Blackjack action branches, settlement, and reset behaviour', () => {

@@ -63,6 +63,7 @@ export class BeatTheHouseGame {
       lastEvents,
       status: this.status,
       canRebet: this.canRebet(),
+      rebetAmounts: this.rebetAmounts(),
     };
   }
 
@@ -124,6 +125,23 @@ export class BeatTheHouseGame {
     return this.emit([{ type: 'bets-cleared' }], 'Bets cleared.');
   }
 
+  public clearHandBets(handId: HandId): GameSnapshot {
+    if (this.phase !== 'betting') {
+      return this.snapshot();
+    }
+
+    const refund = BeatTheHouseGame.handStake(this.bets, handId);
+    if (refund <= 0) {
+      return this.snapshot();
+    }
+
+    this.bankroll += refund;
+    this.bets[handId] = BeatTheHouseGame.emptyHandBets();
+    this.summaries = [];
+    this.sideStates[handId] = BeatTheHouseGame.emptySideState();
+    return this.emit([{ type: 'bets-cleared', handId }], `${BeatTheHouseGame.handName[handId]} bets cleared.`);
+  }
+
   public rebet(): GameSnapshot {
     if (!this.lastBets) {
       return this.emit([{ type: 'message', message: 'No previous bet saved.' }], 'No previous bet saved.');
@@ -136,6 +154,26 @@ export class BeatTheHouseGame {
 
     this.clearBets();
     this.bets = BeatTheHouseGame.cloneBets(this.lastBets);
+    this.bankroll -= requiredBankroll;
+    return this.emit([{ type: 'message', message: `Rebet £${requiredBankroll} placed.` }], `Rebet £${requiredBankroll} placed. Press deal.`);
+  }
+
+  public rebetHand(handId: HandId): GameSnapshot {
+    if (!this.lastBets) {
+      return this.emit([{ type: 'message', message: 'No previous bet saved.' }], 'No previous bet saved.');
+    }
+
+    const requiredBankroll = BeatTheHouseGame.handStake(this.lastBets, handId);
+    if (requiredBankroll <= 0) {
+      return this.emit([{ type: 'message', message: 'No previous bet saved for this seat.' }], 'No previous bet saved for this seat.');
+    }
+
+    if (this.bankroll < requiredBankroll) {
+      return this.emit([{ type: 'message', message: `Need £${requiredBankroll} to rebet.` }], `Need £${requiredBankroll} to rebet.`);
+    }
+
+    this.clearHandBets(handId);
+    this.bets[handId] = { ...this.lastBets[handId] };
     this.bankroll -= requiredBankroll;
     return this.emit([{ type: 'message', message: `Rebet £${requiredBankroll} placed.` }], `Rebet £${requiredBankroll} placed. Press deal.`);
   }
@@ -293,13 +331,19 @@ export class BeatTheHouseGame {
   }
 
   private static emptyBets(): Bets {
-    return Object.fromEntries(handIds.map((handId) => [handId, Object.fromEntries(betTypes.map((betType) => [betType, 0]))])) as Bets;
+    return Object.fromEntries(handIds.map((handId) => [handId, BeatTheHouseGame.emptyHandBets()])) as Bets;
+  }
+
+  private static emptyHandBets(): Bets[HandId] {
+    return Object.fromEntries(betTypes.map((betType) => [betType, 0])) as Bets[HandId];
+  }
+
+  private static emptySideState(state: SideBetState = 'idle'): SideStates[HandId] {
+    return Object.fromEntries(BeatTheHouseGame.sideBetTypes.map((betType) => [betType, state])) as SideStates[HandId];
   }
 
   private static emptySideStates(state: SideBetState = 'idle'): SideStates {
-    return Object.fromEntries(
-      handIds.map((handId) => [handId, Object.fromEntries(BeatTheHouseGame.sideBetTypes.map((betType) => [betType, state]))]),
-    ) as SideStates;
+    return Object.fromEntries(handIds.map((handId) => [handId, BeatTheHouseGame.emptySideState(state)])) as SideStates;
   }
 
   private static createHand(id: HandId): PlayerHand {
@@ -529,6 +573,13 @@ export class BeatTheHouseGame {
       BeatTheHouseGame.totalBet(this.bets) === 0 &&
       BeatTheHouseGame.totalBet(this.lastBets ?? BeatTheHouseGame.emptyBets()) <= this.bankroll
     );
+  }
+
+  private rebetAmounts(): Record<HandId, number> {
+    return Object.fromEntries(handIds.map((handId) => [handId, this.lastBets ? BeatTheHouseGame.handStake(this.lastBets, handId) : 0])) as Record<
+      HandId,
+      number
+    >;
   }
 
   private static wholeChipPayout(stake: number, multiplier: number): { readonly profit: number; readonly returned: number } {

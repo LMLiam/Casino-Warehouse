@@ -1,6 +1,7 @@
 import { findGame } from '../game/catalog/findGame';
 import type { BetType } from '../game/types/BetType';
 import { betTypes } from '../game/types/betTypes';
+import type { GameSnapshot } from '../game/types/GameSnapshot';
 import type { HandId } from '../game/types/HandId';
 import { handIds } from '../game/types/handIds';
 import { canRoomFlowTransition } from '../state/roomMachines/canRoomFlowTransition';
@@ -61,9 +62,9 @@ export class RoomAuthority extends RoomAuthorityBase {
       case 'place-chip':
         return this.placeBeatChip(room, member.profileId, member.role, message.seatId, message.betType, message.amount);
       case 'clear-bets':
-        return this.beatOnly(room, () => this.clearBeatBets(room));
+        return this.beatOnly(room, () => this.clearBeatBets(room, member.profileId, member.role));
       case 'rebet':
-        return this.beatOnly(room, () => this.rebetBeat(room));
+        return this.beatOnly(room, () => this.rebetBeat(room, member.profileId, member.role));
       case 'start-round':
         return this.beatOnly(room, () => this.startBeatRound(room, member.profileId, member.role));
       case 'player-action':
@@ -145,6 +146,7 @@ export class RoomAuthority extends RoomAuthorityBase {
       serverManaged: false,
       settledSessionIds: new Set(),
       lastBeatEvents: [],
+      lastBeatBetOwners: {},
     };
     this.rooms.set(room.roomId, room);
     this.addMember(room, connectionId, 'spectator', message.profileId, message.profileName, bankroll);
@@ -268,55 +270,78 @@ export class RoomAuthority extends RoomAuthorityBase {
     return result;
   }
 
-  private clearBeatBets(room: RoomState): AuthorityResult {
+  private clearBeatBets(room: RoomState, profileId: string, role: RoomRole): AuthorityResult {
     if (room.model.kind !== 'beat-the-house') {
       return this.error('Wrong room game.');
     }
+    if (role !== 'player') {
+      return this.error('Spectators cannot clear bets.');
+    }
+    const seatId = this.profileBeatSeatId(room, profileId);
+    if (!seatId) {
+      return this.error('Claim a Beat the House seat before clearing bets.');
+    }
+    this.syncBeatBankroll(room);
     const before = room.model.game.snapshot();
     if (before.phase !== 'betting') {
       return this.error('Bets can only be cleared before the round starts.');
     }
-    const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.clearBets());
-    for (const seatId of handIds) {
-      const ownerProfileId = room.seats.get(seatId);
-      const player = ownerProfileId ? room.players.get(ownerProfileId) : undefined;
-      const refund = totalBeatStake(before, seatId);
-      if (ownerProfileId && player && refund > 0) {
-        this.setPlayerBankroll(room, ownerProfileId, player.bankroll + refund);
-      }
+    const refund = totalBeatStake(before, seatId);
+    if (refund <= 0) {
+      return this.error('You do not have bets to clear.');
+    }
+    const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.clearHandBets(seatId));
+    const player = room.players.get(profileId);
+    if (player) {
+      this.setPlayerBankroll(room, profileId, player.bankroll + refund);
     }
     this.syncBeatBankroll(room);
     return this.broadcast(room, result.settlements);
   }
 
-  private rebetBeat(room: RoomState): AuthorityResult {
+  private rebetBeat(room: RoomState, profileId: string, role: RoomRole): AuthorityResult {
     if (room.model.kind !== 'beat-the-house') {
       return this.error('Wrong room game.');
     }
-    const beforeState = room.model.game.saveState();
+    if (role !== 'player') {
+      return this.error('Spectators cannot rebet.');
+    }
+    const seatId = this.profileBeatSeatId(room, profileId);
+    if (!seatId) {
+      return this.error('Claim a Beat the House seat before rebetting.');
+    }
+    this.syncBeatBankroll(room);
     const before = room.model.game.snapshot();
     if (before.phase !== 'betting') {
       return this.error('Rebet is only available before the round starts.');
     }
-    this.syncBeatBankroll(room);
-    const playersBefore = new Map(room.players);
-    const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.rebet());
+    if (totalBeatStake(before, seatId) > 0) {
+      return this.error('Clear your current bets before rebetting.');
+    }
+    const wager = before.rebetAmounts[seatId];
+    if (wager <= 0) {
+      return this.error('No previous bet saved for your seat.');
+    }
+    if (room.lastBeatBetOwners[seatId] !== profileId) {
+      return this.error('No previous bet saved for your seat.');
+    }
+    const player = room.players.get(profileId);
+    if (!player || player.bankroll < wager) {
+      return this.error(`Need £${wager} to rebet.`);
+    }
+    const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.rebetHand(seatId));
     const after = room.model.game.snapshot();
-    for (const seatId of handIds) {
-      const ownerProfileId = room.seats.get(seatId);
-      const player = ownerProfileId ? playersBefore.get(ownerProfileId) : undefined;
-      const wager = totalBeatStake(after, seatId) - totalBeatStake(before, seatId);
-      if (ownerProfileId && player && wager > 0) {
-        if (player.bankroll < wager) {
-          room.model.game.restoreState(beforeState);
-          this.syncBeatBankroll(room);
-          return this.error('Rebet is not affordable for every occupied seat.');
-        }
-        this.setPlayerBankroll(room, ownerProfileId, player.bankroll - wager);
-      }
+    const debited = totalBeatStake(after, seatId) - totalBeatStake(before, seatId);
+    if (debited > 0) {
+      this.setPlayerBankroll(room, profileId, player.bankroll - debited);
     }
     this.syncBeatBankroll(room);
     return this.broadcast(room, result.settlements);
+  }
+
+  private profileBeatSeatId(room: RoomState, profileId: string): HandId | undefined {
+    const seatId = this.profileSeatId(room, profileId);
+    return seatId === 'left' || seatId === 'centre' || seatId === 'right' ? seatId : undefined;
   }
 
   private startBeatRound(room: RoomState, profileId: string, role: RoomRole): AuthorityResult {
@@ -334,7 +359,22 @@ export class RoomAuthority extends RoomAuthorityBase {
     }
     this.syncBeatBankroll(room);
     const model = room.model;
-    return this.ownerAction(room, () => (room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot()));
+    const before = model.game.snapshot();
+    const result = this.ownerAction(room, () => (room.seats.size > 0 && room.players.has(profileId) ? model.game.deal() : model.game.snapshot()));
+    const after = model.game.snapshot();
+    if (before.phase === 'betting' && after.phase !== 'betting') {
+      this.recordBeatBetOwners(room, before);
+    }
+    return result;
+  }
+
+  private recordBeatBetOwners(room: RoomState, snapshot: GameSnapshot): void {
+    room.lastBeatBetOwners = Object.fromEntries(
+      handIds.flatMap((handId) => {
+        const ownerProfileId = room.seats.get(handId);
+        return ownerProfileId && totalBeatStake(snapshot, handId) > 0 ? [[handId, ownerProfileId]] : [];
+      }),
+    ) as Partial<Record<HandId, string>>;
   }
 
   private activeBeatSeatAction(room: RoomState, profileId: string, role: RoomRole, action: 'hit' | 'stick'): AuthorityResult {

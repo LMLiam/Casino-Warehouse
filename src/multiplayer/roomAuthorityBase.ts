@@ -7,6 +7,7 @@ import { BeatTheHouseGame } from '../game/engine/BeatTheHouseGame';
 import { SlotsGame } from '../game/slots/SlotsGame';
 import type { SlotSnapshot } from '../game/slots/SlotSnapshot';
 import type { GameSnapshot } from '../game/types/GameSnapshot';
+import type { HandId } from '../game/types/HandId';
 import { handIds } from '../game/types/handIds';
 import type { CasinoProfile } from '../state/profiles/CasinoProfile';
 import { createMemoryServerDataStore } from '../state/serverDataStore/createMemoryServerDataStore';
@@ -39,6 +40,7 @@ export abstract class RoomAuthorityBase {
     room.settledSessionIds.clear();
     if (room.model.kind === 'beat-the-house') {
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
+      room.lastBeatBetOwners = {};
       this.syncBeatBankroll(room);
     } else if (room.model.kind === 'blackjack') {
       room.model.table.reset(this.blackjackOccupants(room));
@@ -223,6 +225,7 @@ export abstract class RoomAuthorityBase {
 
   protected snapshot(room: RoomState): RoomSnapshot {
     const game = this.gameSnapshot(room);
+    const beat = room.model.kind === 'beat-the-house' ? { rebetSeatIds: this.beatRebetSeatIds(room, game as GameSnapshot) } : undefined;
     return {
       roomId: room.roomId,
       roomName: room.roomName,
@@ -241,6 +244,7 @@ export abstract class RoomAuthorityBase {
       spectators: [...room.spectators.values()],
       seats: this.seatIds(room).map((seatId): RoomSeat => ({ seatId, profileId: room.seats.get(seatId) })),
       game,
+      beat,
       slots:
         room.model.kind === 'slots'
           ? {
@@ -346,6 +350,7 @@ export abstract class RoomAuthorityBase {
     room.seats.clear();
     room.settledSessionIds.clear();
     room.lastBeatEvents = [];
+    room.lastBeatBetOwners = {};
     room.sessionId = createId('session');
     if (room.model.kind === 'beat-the-house') {
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
@@ -422,6 +427,13 @@ export abstract class RoomAuthorityBase {
       return room.model.game.snapshot([...room.lastBeatEvents]);
     }
     return room.model.game.snapshot();
+  }
+
+  private beatRebetSeatIds(room: RoomState, snapshot: GameSnapshot): readonly HandId[] {
+    return handIds.filter((handId) => {
+      const profileId = room.seats.get(handId);
+      return Boolean(profileId && room.lastBeatBetOwners[handId] === profileId && snapshot.rebetAmounts[handId] > 0);
+    });
   }
 
   protected blackjackOccupants(room: RoomState): readonly BlackjackTableOccupant[] {

@@ -1,4 +1,5 @@
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
+import type { HandId } from '../../game/types/HandId';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { RoomPlayer } from '../protocol/RoomPlayer';
 import type { RoomRole } from '../protocol/RoomRole';
@@ -25,4 +26,5 @@ export interface RoomState {
   readonly serverManaged: boolean;
   settledSessionIds: Set<string>;
   lastBeatEvents: GameSnapshot['lastEvents'];
+  lastBeatBetOwners: Partial<Record<HandId, string>>;
 }

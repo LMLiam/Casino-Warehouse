@@ -1,7 +1,6 @@
 import type { BetType } from '../../game/types/BetType';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
-import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 import { isBeatSnapshot } from '../state/appSnapshots/isBeatSnapshot';
 import { totalOnTable } from '../state/appSnapshots/totalOnTable';
@@ -11,7 +10,19 @@ export class BeatControlsView {
   private pendingAnyBet = false;
   private pendingStartRound = false;
 
-  public constructor(private readonly elements: AppElements) {}
+  public constructor(
+    private readonly elements: {
+      readonly status: { textContent: string | null };
+      readonly onTable: { textContent: string | null };
+      readonly chipRail: { classList: Pick<DOMTokenList, 'toggle'> };
+      readonly dealButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly rebetButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly clearButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly nextButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly hitButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly stickButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+    },
+  ) {}
 
   public markPendingBet(betType: BetType): void {
     this.pendingAnyBet = true;
@@ -42,9 +53,19 @@ export class BeatControlsView {
     this.pendingStartRound = false;
   }
 
-  public render(snapshot: GameSnapshot, isBeatTheHouse: boolean, onConfirmedStartRound: () => void, controlsAvailable = true): void {
+  public render(
+    snapshot: GameSnapshot,
+    isBeatTheHouse: boolean,
+    onConfirmedStartRound: () => void,
+    controlsAvailable = true,
+    activeRoom?: RoomSnapshot,
+    profileId?: string,
+    bankroll?: number,
+  ): void {
     this.elements.status.textContent = snapshot.status;
     const wageredOnTable = totalOnTable(snapshot);
+    const activeHandId = activeRoom ? this.activeHandId(activeRoom, profileId) : undefined;
+    const currentProfileWagered = activeRoom ? (activeHandId ? this.totalHandBet(snapshot.bets[activeHandId]) : 0) : wageredOnTable;
     const hasMainBet = this.hasMainBet(snapshot);
     if (snapshot.phase !== 'betting') {
       this.clearPending();
@@ -61,8 +82,8 @@ export class BeatControlsView {
     }
     this.elements.onTable.textContent = money(wageredOnTable);
     this.setActionButton(this.elements.dealButton, controlsAvailable && snapshot.phase === 'betting' && (hasMainBet || this.pendingMainBet));
-    this.setActionButton(this.elements.rebetButton, controlsAvailable && snapshot.canRebet && !this.pendingAnyBet);
-    this.setActionButton(this.elements.clearButton, controlsAvailable && snapshot.phase === 'betting' && (wageredOnTable > 0 || this.pendingMainBet));
+    this.setActionButton(this.elements.rebetButton, controlsAvailable && this.canRebet(snapshot, activeRoom, activeHandId, bankroll) && !this.pendingAnyBet);
+    this.setActionButton(this.elements.clearButton, controlsAvailable && snapshot.phase === 'betting' && (currentProfileWagered > 0 || this.pendingMainBet));
     this.setActionButton(this.elements.nextButton, controlsAvailable && snapshot.phase === 'roundOver');
     this.setActionButton(this.elements.hitButton, controlsAvailable && snapshot.phase === 'playing');
     this.setActionButton(this.elements.stickButton, controlsAvailable && snapshot.phase === 'playing');
@@ -77,7 +98,32 @@ export class BeatControlsView {
     return Object.values(snapshotBets).reduce((sum, handBets) => sum + Object.values(handBets).reduce((handSum, amount) => handSum + amount, 0), 0);
   }
 
-  private setActionButton(button: HTMLButtonElement, visible: boolean): void {
+  private totalHandBet(handBets: GameSnapshot['bets'][keyof GameSnapshot['bets']]): number {
+    return Object.values(handBets).reduce((total, amount) => total + amount, 0);
+  }
+
+  private activeHandId(room: RoomSnapshot, profileId: string | undefined): keyof GameSnapshot['bets'] | undefined {
+    const seatId = room.seats.find((seat) => seat.profileId === profileId)?.seatId;
+    return seatId === 'left' || seatId === 'centre' || seatId === 'right' ? seatId : undefined;
+  }
+
+  private canRebet(
+    snapshot: GameSnapshot,
+    activeRoom: RoomSnapshot | undefined,
+    activeHandId: keyof GameSnapshot['bets'] | undefined,
+    bankroll: number | undefined,
+  ): boolean {
+    if (!activeRoom) {
+      return snapshot.canRebet;
+    }
+    if (!activeHandId || snapshot.phase !== 'betting' || this.totalHandBet(snapshot.bets[activeHandId]) > 0) {
+      return false;
+    }
+    const rebetAmount = snapshot.rebetAmounts[activeHandId];
+    return Boolean(activeRoom.beat?.rebetSeatIds.includes(activeHandId)) && rebetAmount > 0 && (bankroll ?? 0) >= rebetAmount;
+  }
+
+  private setActionButton(button: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> }, visible: boolean): void {
     button.disabled = !visible;
     button.classList.toggle('hidden', !visible);
   }
