@@ -143,9 +143,9 @@ h1 {
   z-index: 7;
   display: grid;
   gap: 2px;
-  width: clamp(136px, 17vw, 220px);
+  width: clamp(156px, 19vw, 240px);
   padding: 9px 12px;
-  border-radius: 999px;
+  border-radius: 8px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(10px);
 }
@@ -161,6 +161,11 @@ h1 {
   color: #ffffff;
   font-size: 24px;
   line-height: 1.1;
+}
+
+.money-pill #houseAdvancePill {
+  color: #f2e8c8;
+  line-height: 1.25;
 }
 
 .bankroll-line {

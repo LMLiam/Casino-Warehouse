@@ -57,6 +57,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .house-advance-panel {
+    grid-template-columns: 1fr;
+  }
+
   .room-create {
     grid-template-columns: 1fr;
   }
@@ -64,7 +68,7 @@
   .money-pill {
     left: 10px;
     bottom: 12px;
-    width: 136px;
+    width: 180px;
   }
 
   .money-pill strong {

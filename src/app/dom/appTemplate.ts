@@ -31,6 +31,13 @@ export const renderTemplate = (): string => `
           <h2>Casino Warehouse</h2>
           <p class="fictional-notice">Fictional currency only. No real money gambling.</p>
         </div>
+        <div id="houseAdvancePanel" class="house-advance-panel hidden" aria-live="polite">
+          <div>
+            <b id="houseAdvanceTitle">House Advance</b>
+            <p id="houseAdvanceMessage">£100 is available when this profile has no credits.</p>
+          </div>
+          <button id="houseAdvanceBtn" class="primary" type="button">Take House Advance</button>
+        </div>
         <div id="gameLobbyTiles" class="game-lobby-tiles" aria-label="Available games"></div>
       </div>
       <div id="roomLobby" class="room-lobby hidden">
@@ -157,6 +164,7 @@ export const renderTemplate = (): string => `
           <strong id="bankroll">£1,000</strong>
           <em id="bankrollDelta" aria-live="polite"></em>
         </div>
+        <small id="houseAdvancePill" class="hidden"></small>
       </div>
       <div id="actionDock" class="action-dock" aria-label="Game actions">
         <div id="beatControls" class="game-controls">
