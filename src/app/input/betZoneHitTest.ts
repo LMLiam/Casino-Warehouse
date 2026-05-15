@@ -1,14 +1,11 @@
 import type { BetType } from '../../game/types/BetType';
+import type { RectPercent } from '../../ui/layout/RectPercent';
 import { handLayouts } from '../../ui/layout/handLayouts';
 import { tableSize } from '../../ui/layout/tableSize';
-import type { BetZoneHitTarget } from './BetZoneHitTarget';
+import type { BeatTheHouseChipPlacement } from './BeatTheHouseChipPlacement';
 
-export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: number): BetZoneHitTarget | undefined => {
-  const contains = (
-    zone: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
-    xPercent: number,
-    yPercent: number,
-  ): boolean => {
+export const hitTestBetZone = (host: HTMLElement, clientX: number, clientY: number): BeatTheHouseChipPlacement | undefined => {
+  const contains = (zone: RectPercent, xPercent: number, yPercent: number): boolean => {
     const left = zone.x - zone.width / 2;
     const right = zone.x + zone.width / 2;
     const top = zone.y - zone.height / 2;

@@ -1,4 +1,4 @@
-import type { BeatTheHouseStakeTarget } from '../../game/types/BeatTheHouseStakeTarget';
+import type { BeatTheHouseChipTarget } from '../../game/types/BeatTheHouseChipTarget';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { money } from '../format/appMoney';
@@ -31,10 +31,10 @@ export class BeatControlsView {
     private readonly onChipBankrollChange: (bankroll: number | undefined, canSelectChip: boolean) => void = () => undefined,
   ) {}
 
-  public markPendingBet(stakeTarget: BeatTheHouseStakeTarget): void {
+  public markPendingBet(chipTarget: BeatTheHouseChipTarget): void {
     this.pendingAnyBet = true;
     this.setActionButton(this.elements.rebetButton, false);
-    if (stakeTarget !== 'main') {
+    if (chipTarget !== 'main') {
       return;
     }
     this.pendingMainBet = true;
