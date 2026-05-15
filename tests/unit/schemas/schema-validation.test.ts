@@ -141,6 +141,7 @@ describe('Zod-backed runtime validation', () => {
       bankroll: 0,
       id: 'profile-a',
       name: 'Alice',
+      houseAdvance: { outstandingBalance: 0, activeCount: 0 },
       stats: { gamesPlayed: 0, netProfit: 0, perGame: {} },
       transactions: [],
     });
@@ -149,6 +150,7 @@ describe('Zod-backed runtime validation', () => {
     expect(bankrollTransactionSchema.parse({ id: 'tx-a', gameId: 'admin', type: 'unknown', amount: 1 }).at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(profileNameSchema.parse('   ')).toBe('Player');
     expect(transactionTypeSchema.parse('correction')).toBe('correction');
+    expect(transactionTypeSchema.parse('house_advance_repayment')).toBe('house_advance_repayment');
     expect(roomNameSchema.parse('  Late    Table  ')).toBe('Late Table');
     expect(roomNameSchema.parse(undefined)).toBeUndefined();
     expect(zodErrorSummary(new ZodError([]))).toBe('Payload is invalid.');

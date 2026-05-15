@@ -525,6 +525,7 @@ describe('multiplayer WebSocket server', () => {
 
     intruder.send({ version: 1, type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Stolen Alice' });
     intruder.send({ version: 1, type: 'delete-profile', profileId: aliceProfile.id });
+    intruder.send({ version: 1, type: 'house-advance', profileId: aliceProfile.id });
     intruder.send({
       version: 1,
       type: 'save-session',
@@ -546,7 +547,7 @@ describe('multiplayer WebSocket server', () => {
       profileName: 'Stolen Alice',
       bankroll: 1,
     });
-    await waitForReceivedCount(intruder, unauthorizedProfileError, 4);
+    await waitForReceivedCount(intruder, unauthorizedProfileError, 5);
 
     alice.send({
       version: 1,
@@ -570,7 +571,7 @@ describe('multiplayer WebSocket server', () => {
       profileName: 'Stolen Alice',
       bankroll: 1,
     });
-    await waitForReceivedCount(intruder, unauthorizedProfileError, 5);
+    await waitForReceivedCount(intruder, unauthorizedProfileError, 6);
 
     intruder.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 500 });
     intruder.send({ version: 1, type: 'admin-reset-all' });
@@ -589,6 +590,90 @@ describe('multiplayer WebSocket server', () => {
         message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.name === 'Protected Alice' && profile.bankroll === 1075),
     );
     expect(updated.type === 'data-state' ? updated.profileState.profiles.find((profile) => profile.id === aliceProfile.id)?.bankroll : 0).toBe(1075);
+  });
+
+  it('authorizes House Advance at zero balance, prevents duplicate accepts, and reconciles active rooms before data-state', async () => {
+    const baseUrl = await startServer('.', undefined, { adminToken: 'server-admin-secret' });
+    const alice = await connect(baseUrl.ws);
+    const aliceTab = await connect(baseUrl.ws);
+    const admin = await connect(baseUrl.ws);
+    const aliceProfile = await createServerProfile(alice, 'Advance Alice');
+    const credentials = await alice.waitFor((message) => message.type === 'profile-credentials');
+    if (credentials.type !== 'profile-credentials') {
+      throw new Error('Expected profile credentials.');
+    }
+    aliceTab.send({ version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: aliceProfile.id, profileToken: credentials.profileToken }] });
+    await expect(aliceTab.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(aliceProfile.id))).resolves.toMatchObject({
+      type: 'profile-access',
+    });
+    await authorizeAdmin(admin, 'server-admin-secret');
+
+    admin.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'subtract', amount: 1000 });
+    await alice.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.bankroll === 0),
+    );
+    alice.send({
+      version: 1,
+      type: 'create-room',
+      gameId: 'beat-the-house',
+      profileId: aliceProfile.id,
+      profileName: aliceProfile.name,
+      bankroll: 0,
+    });
+    const created = await alice.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected room-created.');
+    }
+
+    const checkpoint = alice.checkpoint();
+    const tabCheckpoint = aliceTab.checkpoint();
+    alice.send({ version: 1, type: 'house-advance', profileId: aliceProfile.id });
+    aliceTab.send({ version: 1, type: 'house-advance', profileId: aliceProfile.id });
+
+    const roomUpdate = await waitForMessageSince(
+      alice,
+      checkpoint,
+      (message) =>
+        message.type === 'room-state' &&
+        message.room.roomId === created.room.roomId &&
+        roomMembers(message.room).some((member) => member.profileId === aliceProfile.id && member.bankroll === 100),
+    );
+    const dataUpdate = await waitForMessageSince(
+      alice,
+      checkpoint,
+      (message) =>
+        message.type === 'data-state' &&
+        message.profileState.profiles.some(
+          (profile) =>
+            profile.id === aliceProfile.id &&
+            profile.bankroll === 100 &&
+            profile.houseAdvance.outstandingBalance === 100 &&
+            profile.houseAdvance.activeCount === 1,
+        ),
+    );
+    await waitForMessageSince(
+      aliceTab,
+      tabCheckpoint,
+      (message) =>
+        message.type === 'error' && message.code === 'rejected' && message.message === 'House Advance is available only when this profile has no credits.',
+    );
+
+    if (roomUpdate.type !== 'room-state' || dataUpdate.type !== 'data-state') {
+      throw new Error('Expected room-state and data-state.');
+    }
+    expect(messageIndexSince(alice, checkpoint, (message) => message.type === 'room-state' && message.room.roomId === created.room.roomId)).toBeLessThan(
+      messageIndexSince(
+        alice,
+        checkpoint,
+        (message) =>
+          message.type === 'data-state' &&
+          message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.houseAdvance.outstandingBalance === 100),
+      ),
+    );
+    expect(dataUpdate.profileState.profiles.find((profile) => profile.id === aliceProfile.id)?.transactions[0]).toMatchObject({
+      type: 'house_advance_credit',
+      amount: 100,
+    });
   });
 
   it('reconciles active rooms before data-state when an active profile is deleted', async () => {

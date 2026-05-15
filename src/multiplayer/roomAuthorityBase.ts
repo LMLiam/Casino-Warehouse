@@ -82,10 +82,8 @@ export abstract class RoomAuthorityBase {
       const wagered = totalBeatStake(snapshot, summary.handId);
       const returned = wagered + summary.profit;
       const player = room.players.get(profileId);
-      if (player && returned > 0) {
-        this.setPlayerBankroll(room, profileId, player.bankroll + returned);
-      }
-      return [{ id: createId('settlement'), profileId, seatId: summary.handId, wagered, returned, profit: summary.profit }];
+      const houseAdvanceRepayment = player && returned > 0 ? this.applyPlayerSettlement(room, profileId, returned, summary.profit) : 0;
+      return [{ id: createId('settlement'), profileId, seatId: summary.handId, wagered, returned, profit: summary.profit, houseAdvanceRepayment }];
     });
   }
 
@@ -99,9 +97,7 @@ export abstract class RoomAuthorityBase {
         return [];
       }
       const player = room.players.get(profileId);
-      if (player && settlement.returned > 0) {
-        this.setPlayerBankroll(room, profileId, player.bankroll + settlement.returned);
-      }
+      const houseAdvanceRepayment = player && settlement.returned > 0 ? this.applyPlayerSettlement(room, profileId, settlement.returned, settlement.profit) : 0;
       return [
         {
           id: createId('settlement'),
@@ -110,6 +106,7 @@ export abstract class RoomAuthorityBase {
           wagered: settlement.wagered,
           returned: settlement.returned,
           profit: settlement.profit,
+          houseAdvanceRepayment,
         },
       ];
     });
@@ -130,9 +127,7 @@ export abstract class RoomAuthorityBase {
       const wager = before.freeSpinsRemaining > 0 ? 0 : (model.wagersByProfileId.get(player.profileId) ?? 0);
       const returned = Math.floor(snapshot.returned * (baseWager > 0 ? Math.max(1, wager || baseWager) / baseWager : 1));
       model.returnedByProfileId.set(player.profileId, returned);
-      if (returned > 0) {
-        this.setPlayerBankroll(room, player.profileId, player.bankroll + returned);
-      }
+      const houseAdvanceRepayment = returned > 0 ? this.applyPlayerSettlement(room, player.profileId, returned, returned - wager) : 0;
       return {
         id: createId('settlement'),
         profileId: player.profileId,
@@ -140,6 +135,7 @@ export abstract class RoomAuthorityBase {
         wagered: wager,
         returned,
         profit: returned - wager,
+        houseAdvanceRepayment,
       };
     });
   }
@@ -314,6 +310,21 @@ export abstract class RoomAuthorityBase {
     const nextBankroll = safeBankroll(bankroll);
     const updated = this.dataStore.setProfileBankroll(profileId, nextBankroll);
     room.players.set(profileId, { ...player, bankroll: updated?.bankroll ?? nextBankroll });
+  }
+
+  protected applyPlayerSettlement(room: RoomState, profileId: string, returned: number, profit: number): number {
+    const player = room.players.get(profileId);
+    if (!player) {
+      return 0;
+    }
+    const result = this.dataStore.applyGameplaySettlement(profileId, returned, profit, {
+      gameId: room.gameId,
+      roomId: room.roomId,
+      sessionId: room.sessionId,
+    });
+    const nextBankroll = result?.profile.bankroll ?? safeBankroll(player.bankroll + returned);
+    room.players.set(profileId, { ...player, bankroll: nextBankroll });
+    return result?.houseAdvanceRepayment ?? 0;
   }
 
   protected syncBeatBankroll(room: RoomState): void {

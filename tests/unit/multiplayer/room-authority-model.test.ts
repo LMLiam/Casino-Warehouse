@@ -16,6 +16,7 @@ import { createServerManagedBeatRoom } from '../../../src/multiplayer/roomAuthor
 import { roomPhase } from '../../../src/multiplayer/roomAuthorityModel/roomPhase';
 import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
 import { safeBankroll } from '../../../src/multiplayer/roomAuthorityModel/safeBankroll';
+import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
 
 const player = (profileId: string): RoomPlayer => ({
   connectionId: `conn-${profileId}`,
@@ -59,6 +60,10 @@ class AuthorityHarness extends RoomAuthorityBase {
 
   public settleSlotsFor(room: RoomState, before: SlotSnapshot, snapshot: SlotSnapshot) {
     return this.settleSlots(room, before, snapshot);
+  }
+
+  public applySettlementFor(room: RoomState, profileId: string, returned: number, profit: number): number {
+    return this.applyPlayerSettlement(room, profileId, returned, profit);
   }
 }
 
@@ -186,5 +191,23 @@ describe('room authority model helpers', () => {
     target.model.settledSpinKeys.add(`${target.sessionId}:10:princess-lotus-elephant:0`);
 
     expect(harness.settleSlotsFor(target, before, snapshot)).toEqual([]);
+  });
+
+  it('withholds House Advance repayments through the authoritative settlement path', () => {
+    const store = createMemoryServerDataStore();
+    const profile = store.createProfile('House Advance Player', 0).profileState.profiles[0];
+    store.acceptHouseAdvance(profile.id);
+    const harness = new AuthorityHarness(store);
+    const target = room({ players: new Map([[profile.id, { ...player(profile.id), bankroll: 100 }]]) });
+
+    const repayment = harness.applySettlementFor(target, profile.id, 50, 50);
+
+    expect(repayment).toBe(5);
+    expect(target.players.get(profile.id)?.bankroll).toBe(145);
+    expect(store.snapshot().profileState.profiles[0]).toMatchObject({
+      bankroll: 145,
+      houseAdvance: { outstandingBalance: 95, activeCount: 1 },
+      transactions: expect.arrayContaining([expect.objectContaining({ type: 'house_advance_repayment', amount: -5 })]),
+    });
   });
 });

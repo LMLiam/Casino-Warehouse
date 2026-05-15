@@ -102,6 +102,7 @@ export const serverMessageSchema = (() => {
     wagered: finiteNumberSchema,
     returned: finiteNumberSchema,
     profit: finiteNumberSchema,
+    houseAdvanceRepayment: finiteNumberSchema.optional(),
   });
   const roomSettlementSchema = z.custom<RoomSettlement>((value) => roomSettlementShapeSchema.safeParse(value).success);
   const roomSettlementsSchema = z.custom<readonly RoomSettlement[]>((value) => z.array(roomSettlementSchema).safeParse(value).success);

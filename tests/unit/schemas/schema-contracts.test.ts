@@ -51,6 +51,10 @@ describe('schema contract fixtures', () => {
       id: 'legacy-profile',
       name: 'Legacy Player',
       bankroll: 75,
+      houseAdvance: {
+        outstandingBalance: 100,
+        activeCount: 1,
+      },
       stats: {
         netProfit: 10,
       },

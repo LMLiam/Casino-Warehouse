@@ -230,6 +230,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
           sendProfileAccess(peer);
           emitAuthorityResult(peer, authority.removeProfile(message.profileId, 'profile-deleted'), { forceDataState: true });
           return true;
+        case 'house-advance':
+          acceptHouseAdvance(peer, message.profileId);
+          emitAuthorityResult(peer, authority.reconcileProfiles('house-advance-accepted'), { forceDataState: true });
+          return true;
         case 'save-session':
           requireKnownProfiles(profileIdsInSession(message.session));
           requireOwnedProfiles(peer, profileIdsInSession(message.session));
@@ -330,7 +334,8 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         : action === 'subtract'
           ? -Math.min(profile.bankroll, Math.max(0, Math.floor(amount)))
           : 1000 - profile.bankroll;
-    if (delta !== 0) {
+    const clearsHouseAdvance = action === 'reset' && (profile.houseAdvance.outstandingBalance > 0 || profile.houseAdvance.activeCount > 0);
+    if (delta !== 0 || clearsHouseAdvance) {
       dataStore.recordTransaction(profileId, {
         gameId: 'admin',
         type: action === 'reset' ? 'reset' : 'admin_adjustment',
@@ -344,9 +349,23 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const resetAllBankrolls = (): void => {
     for (const profile of dataStore.snapshot().profileState.profiles) {
       const delta = 1000 - profile.bankroll;
-      if (delta !== 0) {
+      if (delta !== 0 || profile.houseAdvance.outstandingBalance > 0 || profile.houseAdvance.activeCount > 0) {
         dataStore.recordTransaction(profile.id, { gameId: 'admin', type: 'reset', amount: delta, description: 'Admin reset all profiles', metadata: {} });
       }
+    }
+  };
+
+  const acceptHouseAdvance = (peer: Peer, profileId: string): void => {
+    const profile = requireOwnedProfile(peer, profileId);
+    const updated = dataStore.acceptHouseAdvance(profile.id);
+    if (!updated) {
+      if (profile.bankroll > 0) {
+        throw new Error('House Advance is available only when this profile has no credits.');
+      }
+      if (profile.houseAdvance.activeCount >= 3 && profile.houseAdvance.outstandingBalance > 0) {
+        throw new Error('House Advance is unavailable until the current balance is repaid.');
+      }
+      throw new Error('House Advance could not be accepted for this profile.');
     }
   };
 

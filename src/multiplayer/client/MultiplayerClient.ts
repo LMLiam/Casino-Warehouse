@@ -78,6 +78,10 @@ export class MultiplayerClient {
     }
   }
 
+  public acceptHouseAdvance(profileId: string): void {
+    this.sendOwnedProfileMessage(profileId, { version: currentProtocolVersion, type: 'house-advance', profileId });
+  }
+
   public saveSession(session: Omit<CasinoSessionState, 'version' | 'updatedAt'>): void {
     const profileIds = [...new Set([...session.profileIds, ...Object.keys(session.gameSnapshots)])];
     if (!this.ownsEveryProfile(profileIds)) {

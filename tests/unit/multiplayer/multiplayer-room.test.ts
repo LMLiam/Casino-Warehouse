@@ -55,6 +55,7 @@ describe('per-game multiplayer protocol', () => {
     });
     expect(parseClientMessage({ version: 1, type: 'authorize-admin', adminToken: 'admin-token' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'create-profile', profileName: 'Ada' })).toMatchObject({ ok: true });
+    expect(parseClientMessage({ version: 1, type: 'house-advance', profileId: 'a' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'admin-bankroll', profileId: 'a', action: 'add', amount: 50 })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'list-rooms', gameId: 'blackjack' })).toMatchObject({ ok: true });
     expect(parseClientMessage({ version: 1, type: 'create-room', profileId: 'a', profileName: 'A', bankroll: 50 })).toMatchObject({ ok: false });

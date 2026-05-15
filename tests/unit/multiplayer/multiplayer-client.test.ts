@@ -224,6 +224,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.clearServerData();
     client.listRooms('blackjack');
     socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    client.acceptHouseAdvance('profile-a');
     client.createRoom('beat-the-house', 'QA Room', 3, 'profile-a', 'Alice', 1000);
     client.joinRoom('beat-the-house', 'ROOM42', 'player', 'profile-a', 'Alice', 1000);
     client.deleteProfile('profile-a');
@@ -234,6 +235,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
         'request-data',
         'create-profile',
         'rename-profile',
+        'house-advance',
         'delete-profile',
         'save-session',
         'admin-bankroll',
@@ -402,6 +404,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
     expect(socket.sent.map((payload) => JSON.parse(payload).type)).toEqual(['authorize-profiles', 'request-data']);
 
     client.createRoom('beat-the-house', 'Blocked Room', 3, 'profile-a', 'Alice', 1000);
+    client.acceptHouseAdvance('profile-a');
     client.adjustBankroll('profile-a', 'add', 100);
     expect(events.onError).toHaveBeenCalledWith('This browser does not own that server profile.');
     expect(events.onError).toHaveBeenCalledWith('Admin controls are locked for this browser.');
@@ -414,6 +417,8 @@ describe('multiplayer realtime client reconnect reloads', () => {
     expect(events.onProfileAccess).toHaveBeenCalledWith(['profile-a']);
     client.createRoom('beat-the-house', 'Allowed Room', 3, 'profile-a', 'Alice', 1000);
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'create-room', profileId: 'profile-a' });
+    client.acceptHouseAdvance('profile-a');
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'house-advance', profileId: 'profile-a' });
 
     client.authorizeAdmin(' admin-secret ');
     expect(localStorage.getItem(adminTokenStorageKey)).toBe('admin-secret');

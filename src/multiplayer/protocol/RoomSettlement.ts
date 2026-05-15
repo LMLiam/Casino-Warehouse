@@ -7,4 +7,5 @@ export interface RoomSettlement {
   readonly wagered: number;
   readonly returned: number;
   readonly profit: number;
+  readonly houseAdvanceRepayment?: number;
 }

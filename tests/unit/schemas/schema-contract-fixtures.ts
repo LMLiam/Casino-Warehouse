@@ -14,6 +14,10 @@ const profileStoreCurrentV1Fixture = {
       name: 'Alice',
       color: '#6ee7b7',
       bankroll: 1200,
+      houseAdvance: {
+        outstandingBalance: 0,
+        activeCount: 0,
+      },
       stats: {
         totalWagered: 25,
         totalWon: 50,
@@ -164,6 +168,7 @@ export const clientMessageContractFixtures = [
   { version: 1, type: 'create-profile', profileName: 'Alice' },
   { version: 1, type: 'rename-profile', profileId: 'profile-alice', profileName: 'Alice Renamed' },
   { version: 1, type: 'delete-profile', profileId: 'profile-alice' },
+  { version: 1, type: 'house-advance', profileId: 'profile-alice' },
   { version: 1, type: 'save-session', session: sessionStateCurrentV1Fixture },
   { version: 1, type: 'admin-bankroll', profileId: 'profile-alice', action: 'add', amount: 100 },
   { version: 1, type: 'admin-reset-all' },
@@ -272,6 +277,10 @@ export const profileStoreContractFixtures = {
         id: 'legacy-profile',
         name: ' Legacy Player ',
         bankroll: 75.9,
+        houseAdvance: {
+          outstandingBalance: 100,
+          activeCount: 1,
+        },
         stats: {
           totalWagered: 10,
           totalWon: 20,
