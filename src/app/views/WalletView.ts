@@ -1,4 +1,5 @@
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
+import type { BankrollTransactionMetadata } from '../../state/profiles/BankrollTransactionMetadata';
 import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements/AppElements';
@@ -41,7 +42,7 @@ export class WalletView {
     }
   }
 
-  private transactionDescription(description: string, metadata: Readonly<Record<string, string | number | boolean>>): string {
+  private transactionDescription(description: string, metadata: BankrollTransactionMetadata): string {
     if (typeof metadata.houseAdvanceRepayment === 'number') {
       return `${description} Withheld ${money(metadata.houseAdvanceRepayment)}; owed ${money(Number(metadata.outstandingAfter ?? 0))}.`;
     }

@@ -1,4 +1,5 @@
 import type { BankrollTransaction } from './BankrollTransaction';
+import type { BankrollTransactionMetadata } from './BankrollTransactionMetadata';
 import type { CasinoProfile } from './CasinoProfile';
 import { emptyStats } from './emptyStats';
 import { favouriteGame } from './favouriteGame';
@@ -128,16 +129,17 @@ export class CasinoProfileParser {
     );
   }
 
-  private static parseMetadata(value: unknown): Readonly<Record<string, string | number | boolean>> {
+  private static parseMetadata(value: unknown): BankrollTransactionMetadata {
     if (!CasinoProfileParser.isRecord(value)) {
       return {};
     }
 
-    return Object.fromEntries(
-      Object.entries(value).filter((entry): entry is [string, string | number | boolean] => {
-        const metadataValue = entry[1];
-        return typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean';
-      }),
-    );
+    const metadata: Record<string, BankrollTransactionMetadata[string]> = {};
+    for (const [key, metadataValue] of Object.entries(value)) {
+      if (typeof metadataValue === 'string' || typeof metadataValue === 'number' || typeof metadataValue === 'boolean') {
+        metadata[key] = metadataValue;
+      }
+    }
+    return metadata;
   }
 }

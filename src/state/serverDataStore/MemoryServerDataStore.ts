@@ -16,6 +16,8 @@ import { replaceProfile } from '../profiles/replaceProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
 import { createSessionState } from '../session/createSessionState';
 import { parseSessionState } from '../session/parseSessionState';
+import type { GameplaySettlementContext } from './GameplaySettlementContext';
+import type { GameplaySettlementResult } from './GameplaySettlementResult';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
 import type { ServerDataStore } from './ServerDataStore';
@@ -147,12 +149,8 @@ export class MemoryServerDataStore implements ServerDataStore {
     profileId: string,
     returned: number,
     profit: number,
-    context: {
-      readonly gameId: string;
-      readonly roomId?: string;
-      readonly sessionId?: string;
-    },
-  ): { readonly profile: CasinoProfile; readonly houseAdvanceRepayment: number } | undefined {
+    context: GameplaySettlementContext,
+  ): GameplaySettlementResult | undefined {
     const profile = this.findProfile(profileId);
     if (!profile) {
       return undefined;

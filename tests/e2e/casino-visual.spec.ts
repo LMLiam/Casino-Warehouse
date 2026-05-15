@@ -359,8 +359,19 @@ const expectConsoleClean = (page: Page): void => {
 type E2EServerProfile = {
   readonly name?: string;
   readonly bankroll?: number;
-  readonly houseAdvance?: { readonly outstandingBalance?: number; readonly activeCount?: number };
-  readonly transactions?: readonly { readonly type?: string; readonly amount?: number; readonly description?: string }[];
+  readonly houseAdvance?: E2EServerHouseAdvance;
+  readonly transactions?: readonly E2EServerTransaction[];
+};
+
+type E2EServerHouseAdvance = {
+  readonly outstandingBalance?: number;
+  readonly activeCount?: number;
+};
+
+type E2EServerTransaction = {
+  readonly type?: string;
+  readonly amount?: number;
+  readonly description?: string;
 };
 
 type E2EServerData = {

@@ -1,3 +1,4 @@
+import type { BankrollTransactionMetadata } from './BankrollTransactionMetadata';
 import type { TransactionType } from './TransactionType';
 
 export interface BankrollTransaction {
@@ -12,5 +13,5 @@ export interface BankrollTransaction {
   readonly balanceBefore: number;
   readonly balanceAfter: number;
   readonly description: string;
-  readonly metadata: Readonly<Record<string, string | number | boolean>>;
+  readonly metadata: BankrollTransactionMetadata;
 }
