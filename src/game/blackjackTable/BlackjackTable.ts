@@ -15,6 +15,11 @@ import type { BlackjackTableSettlement } from './BlackjackTableSettlement';
 import type { BlackjackTableSnapshot } from './BlackjackTableSnapshot';
 
 export class BlackjackTable {
+  private static readonly blackjackTargetTotal = 21;
+  private static readonly blackjackPayoutMultiplier = 1.5;
+  private static readonly maxPlayerCards = 5;
+  private static readonly insuranceReturnMultiplier = 3;
+
   private deck: Card[] = [];
   private dealerCards: Card[] = [];
   private dealerHoleHidden = false;
@@ -132,9 +137,9 @@ export class BlackjackTable {
     const settlements: BlackjackTableSettlement[] = [];
     if (action === 'hit') {
       seat.playerCards = [...seat.playerCards, this.draw()];
-      if (bestTotal(seat.playerCards) > 21) {
+      if (bestTotal(seat.playerCards) > BlackjackTable.blackjackTargetTotal) {
         settlements.push(this.settleSeat(seatId, seat, 'lose', 0, `Busts with ${bestTotal(seat.playerCards)}.`));
-      } else if (seat.playerCards.length >= 5) {
+      } else if (seat.playerCards.length >= BlackjackTable.maxPlayerCards) {
         seat.phase = 'stood';
         seat.status = `Stands on ${handText(seat.playerCards)}.`;
       } else {
@@ -150,7 +155,7 @@ export class BlackjackTable {
       debit = seat.wager;
       seat.wager *= 2;
       seat.playerCards = [...seat.playerCards, this.draw()];
-      if (bestTotal(seat.playerCards) > 21) {
+      if (bestTotal(seat.playerCards) > BlackjackTable.blackjackTargetTotal) {
         settlements.push(this.settleSeat(seatId, seat, 'lose', 0, `Double busts with ${bestTotal(seat.playerCards)}.`));
       } else {
         seat.phase = 'stood';
@@ -198,7 +203,7 @@ export class BlackjackTable {
         if (!seat || seat.settled) {
           continue;
         }
-        const returned = isBlackjack(seat.playerCards) ? seat.wager : seat.insuranceWager * 3;
+        const returned = isBlackjack(seat.playerCards) ? seat.wager : seat.insuranceWager * BlackjackTable.insuranceReturnMultiplier;
         settlements.push(
           this.settleSeat(
             seatId,
@@ -216,7 +221,9 @@ export class BlackjackTable {
     for (const seatId of occupiedSeatIds) {
       const seat = this.seats.get(seatId);
       if (seat && isBlackjack(seat.playerCards)) {
-        settlements.push(this.settleSeat(seatId, seat, 'blackjack', seat.wager + Math.floor(seat.wager * 1.5), 'Blackjack pays 3:2.'));
+        settlements.push(
+          this.settleSeat(seatId, seat, 'blackjack', seat.wager + Math.floor(seat.wager * BlackjackTable.blackjackPayoutMultiplier), 'Blackjack pays 3:2.'),
+        );
       }
     }
     settlements.push(...this.advanceTurn(occupants));
@@ -273,7 +280,7 @@ export class BlackjackTable {
       return this.settleSeat(seatId, seat, result, Math.floor(returned), `Split hands settle against dealer ${dealerTotal}.`);
     }
     const playerTotal = bestTotal(seat.playerCards);
-    if (dealerTotal > 21) {
+    if (dealerTotal > BlackjackTable.blackjackTargetTotal) {
       return this.settleSeat(seatId, seat, 'win', seat.wager * 2, `Dealer busts with ${dealerTotal}.`);
     }
     if (playerTotal > dealerTotal) {
@@ -335,10 +342,10 @@ export class BlackjackTable {
 
   private static settleHandReturn(cards: readonly Card[], dealerTotal: number, wager: number): number {
     const total = bestTotal(cards);
-    if (total > 21) {
+    if (total > BlackjackTable.blackjackTargetTotal) {
       return 0;
     }
-    if (dealerTotal > 21 || total > dealerTotal) {
+    if (dealerTotal > BlackjackTable.blackjackTargetTotal || total > dealerTotal) {
       return wager * 2;
     }
     return total === dealerTotal ? wager : 0;

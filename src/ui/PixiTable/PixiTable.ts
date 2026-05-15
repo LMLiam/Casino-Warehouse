@@ -31,6 +31,11 @@ import type { PixiTableSettlementMetadata } from './PixiTableSettlementMetadata'
 import { roundStartAnimationKey } from './roundStartAnimationKey';
 
 export class PixiTable {
+  private static readonly sideWinTagVerticalScale = 0.14;
+  private static readonly liveBetChipRadius = 22;
+  private static readonly settlementRevealPauseSeconds = 0.2;
+  private static readonly millisecondsPerSecond = 1000;
+
   private readonly app = new Application();
   private readonly root = new Container();
   private readonly dynamicLayer = new Container();
@@ -192,7 +197,13 @@ export class PixiTable {
           const isWagered = snapshot.bets[hand.id][betType] > 0;
           if (sideWin) {
             this.effectRenderer.drawSideBetWin(centerX, centerY, px.width, px.height, isWagered);
-            this.tagRenderer.drawPayoutTag(sideWin.label, centerX, px.y + px.height * 0.14, 'win', isWagered ? 1 : SIDE_WIN_EFFECT.unwageredTagAlpha);
+            this.tagRenderer.drawPayoutTag(
+              sideWin.label,
+              centerX,
+              px.y + px.height * PixiTable.sideWinTagVerticalScale,
+              'win',
+              isWagered ? 1 : SIDE_WIN_EFFECT.unwageredTagAlpha,
+            );
           }
         }
 
@@ -217,7 +228,7 @@ export class PixiTable {
 
         const amount = snapshot.bets[hand.id][betType];
         if (amount > 0 && this.shouldShowLiveBet(snapshot, hand.id, betType)) {
-          this.chipRenderer?.drawStack(amount, centerX, centerY, 22, `bet-${hand.id}-${betType}-${amount}`);
+          this.chipRenderer?.drawStack(amount, centerX, centerY, PixiTable.liveBetChipRadius, `bet-${hand.id}-${betType}-${amount}`);
         }
       }
     }
@@ -564,7 +575,7 @@ export class PixiTable {
 
   private static settlementRevealDelay(queue: ReadonlyMap<string, number>): number {
     const maxOrder = Math.max(0, ...queue.values());
-    return (maxOrder * CARD_ANIMATION.delayStep + CARD_ANIMATION.duration + 0.2) * 1000;
+    return (maxOrder * CARD_ANIMATION.delayStep + CARD_ANIMATION.duration + PixiTable.settlementRevealPauseSeconds) * PixiTable.millisecondsPerSecond;
   }
 
   private static betTypeLabel(betType: Exclude<BetType, 'main'>): string {

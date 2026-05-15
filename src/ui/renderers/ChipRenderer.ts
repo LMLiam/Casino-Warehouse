@@ -8,6 +8,13 @@ import { COLORS } from './renderingConstants/COLORS';
 import { TAG_RENDERING } from './renderingConstants/TAG_RENDERING';
 
 export class ChipRenderer {
+  private static readonly defaultStackRadius = 22;
+  private static readonly stackIntroScale = 0.72;
+  private static readonly stackIntroLift = 22;
+  private static readonly stackIntroDuration = 0.3;
+  private static readonly tagMinimumWidth = 64;
+  private static readonly tagTextWidthFactor = 8;
+
   private readonly animatedStacks = new Set<string>();
 
   public constructor(
@@ -19,7 +26,7 @@ export class ChipRenderer {
     this.animatedStacks.clear();
   }
 
-  public drawStack(amount: number, x: number, y: number, radius = 22, animation?: string | ChipStackAnimation): void {
+  public drawStack(amount: number, x: number, y: number, radius = ChipRenderer.defaultStackRadius, animation?: string | ChipStackAnimation): void {
     const { roundedAmount, chips } = toChipBreakdown(amount);
     const visibleChips = chips.slice(0, CHIP_RENDERING.maxVisibleStackChips);
     const stack = new Container();
@@ -65,9 +72,9 @@ export class ChipRenderer {
       return;
     }
 
-    stack.scale.set(0.72);
-    gsap.fromTo(stack, { alpha: 0, y: y - 22 }, { alpha: 1, y, duration: 0.3, ease: 'back.out(1.5)' });
-    gsap.to(stack.scale, { x: 1, y: 1, duration: 0.3, ease: 'back.out(1.5)' });
+    stack.scale.set(ChipRenderer.stackIntroScale);
+    gsap.fromTo(stack, { alpha: 0, y: y - ChipRenderer.stackIntroLift }, { alpha: 1, y, duration: ChipRenderer.stackIntroDuration, ease: 'back.out(1.5)' });
+    gsap.to(stack.scale, { x: 1, y: 1, duration: ChipRenderer.stackIntroDuration, ease: 'back.out(1.5)' });
   }
 
   private drawChip(value: ChipValue, x: number, y: number, radius: number, layer: Container): void {
@@ -85,7 +92,7 @@ export class ChipRenderer {
   }
 
   private drawAmountTag(text: string, x: number, y: number, layer: Container): void {
-    const width = Math.max(64, text.length * 8);
+    const width = Math.max(ChipRenderer.tagMinimumWidth, text.length * ChipRenderer.tagTextWidthFactor);
     const group = new Container();
     group.position.set(x, y);
     const backing = new Graphics()

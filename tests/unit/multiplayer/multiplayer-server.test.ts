@@ -136,6 +136,21 @@ class SocketProbe {
 }
 
 class RawSocketProbe {
+  private static readonly minimumFrameHeaderLength = 2;
+  private static readonly opcodeMask = 0x0f;
+  private static readonly maskBit = 0x80;
+  private static readonly payloadLengthMask = 0x7f;
+  private static readonly extended16PayloadLength = 126;
+  private static readonly extended64PayloadLength = 127;
+  private static readonly shortHeaderLength = 2;
+  private static readonly extended16HeaderLength = 4;
+  private static readonly extended64HeaderLength = 10;
+  private static readonly maskingKeyBytes = 4;
+  private static readonly lengthHighWordMultiplier = 2 ** 32;
+  private static readonly textFrameOpcode = 0x01;
+  private static readonly closeFrameOpcode = 0x08;
+  private static readonly noStatusCloseCode = 1005;
+
   private readonly messages: ServerMessage[] = [];
   private readonly closeCodes: number[] = [];
   private buffer = Buffer.alloc(0);
@@ -184,29 +199,29 @@ class RawSocketProbe {
 
   private readFrames(): void {
     let offset = 0;
-    while (offset + 2 <= this.buffer.length) {
+    while (offset + RawSocketProbe.minimumFrameHeaderLength <= this.buffer.length) {
       const first = this.buffer[offset];
       const second = this.buffer[offset + 1];
-      const opcode = first & 0x0f;
-      const masked = Boolean(second & 0x80);
-      let length = second & 0x7f;
-      let headerLength = 2;
-      if (length === 126) {
-        if (offset + 4 > this.buffer.length) {
+      const opcode = first & RawSocketProbe.opcodeMask;
+      const masked = Boolean(second & RawSocketProbe.maskBit);
+      let length = second & RawSocketProbe.payloadLengthMask;
+      let headerLength = RawSocketProbe.shortHeaderLength;
+      if (length === RawSocketProbe.extended16PayloadLength) {
+        if (offset + RawSocketProbe.extended16HeaderLength > this.buffer.length) {
           break;
         }
         length = this.buffer.readUInt16BE(offset + 2);
-        headerLength = 4;
-      } else if (length === 127) {
-        if (offset + 10 > this.buffer.length) {
+        headerLength = RawSocketProbe.extended16HeaderLength;
+      } else if (length === RawSocketProbe.extended64PayloadLength) {
+        if (offset + RawSocketProbe.extended64HeaderLength > this.buffer.length) {
           break;
         }
         const high = this.buffer.readUInt32BE(offset + 2);
-        const low = this.buffer.readUInt32BE(offset + 6);
-        length = high * 2 ** 32 + low;
-        headerLength = 10;
+        const low = this.buffer.readUInt32BE(offset + RawSocketProbe.extended16HeaderLength + 2);
+        length = high * RawSocketProbe.lengthHighWordMultiplier + low;
+        headerLength = RawSocketProbe.extended64HeaderLength;
       }
-      const maskLength = masked ? 4 : 0;
+      const maskLength = masked ? RawSocketProbe.maskingKeyBytes : 0;
       const payloadOffset = offset + headerLength + maskLength;
       const frameLength = headerLength + maskLength + length;
       if (offset + frameLength > this.buffer.length) {
@@ -214,9 +229,9 @@ class RawSocketProbe {
       }
       const payload = Buffer.from(this.buffer.subarray(payloadOffset, payloadOffset + length));
       if (masked) {
-        const mask = this.buffer.subarray(offset + headerLength, offset + headerLength + 4);
+        const mask = this.buffer.subarray(offset + headerLength, offset + headerLength + RawSocketProbe.maskingKeyBytes);
         for (let index = 0; index < payload.length; index += 1) {
-          payload[index] ^= mask[index % 4];
+          payload[index] ^= mask[index % RawSocketProbe.maskingKeyBytes];
         }
       }
       this.recordFrame(opcode, payload);
@@ -226,13 +241,13 @@ class RawSocketProbe {
   }
 
   private recordFrame(opcode: number, payload: Buffer): void {
-    if (opcode === 0x01) {
+    if (opcode === RawSocketProbe.textFrameOpcode) {
       const message = decodeServerMessage(payload.toString('utf8'));
       if (message) {
         this.messages.push(message);
       }
-    } else if (opcode === 0x08) {
-      this.closeCodes.push(payload.length >= 2 ? payload.readUInt16BE(0) : 1005);
+    } else if (opcode === RawSocketProbe.closeFrameOpcode) {
+      this.closeCodes.push(payload.length >= RawSocketProbe.minimumFrameHeaderLength ? payload.readUInt16BE(0) : RawSocketProbe.noStatusCloseCode);
     }
   }
 }

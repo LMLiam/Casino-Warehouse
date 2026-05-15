@@ -16,6 +16,10 @@ import type { RealtimeConnectionState } from './RealtimeConnectionState';
 
 export class MultiplayerClient {
   private static readonly webSocketConnectTimeoutMs = 10_000;
+  private static readonly reconnectDelayMs = 1_000;
+  private static readonly heartbeatTimeoutMs = 60_000;
+  private static readonly heartbeatIntervalMs = 1_000;
+
   private socket?: WebSocket;
   private lastRoom?: RoomSnapshot;
   private readonly ownedProfileIds = new Set<string>();
@@ -237,7 +241,10 @@ export class MultiplayerClient {
 
   private scheduleReconnect(): void {
     window.clearTimeout(this.reconnectTimer);
-    this.reconnectTimer = window.setTimeout(() => this.openSocket(this.reconnectUrl || defaultRealtimeUrl(), 'reconnecting'), 1_000);
+    this.reconnectTimer = window.setTimeout(
+      () => this.openSocket(this.reconnectUrl || defaultRealtimeUrl(), 'reconnecting'),
+      MultiplayerClient.reconnectDelayMs,
+    );
   }
 
   private clearRoom(): void {
@@ -254,11 +261,11 @@ export class MultiplayerClient {
       if (!this.connected) {
         return;
       }
-      if (Date.now() - this.lastHeartbeatAt > 60_000) {
+      if (Date.now() - this.lastHeartbeatAt > MultiplayerClient.heartbeatTimeoutMs) {
         this.events.onConnectionState('reconnecting');
         this.socket?.close();
       }
-    }, 1_000);
+    }, MultiplayerClient.heartbeatIntervalMs);
   }
 
   private receive(data: string): void {

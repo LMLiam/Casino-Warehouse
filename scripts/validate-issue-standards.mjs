@@ -9,6 +9,11 @@ export const issueStandardsSuccessReaction = '+1';
 const titleTypes = ['bug', 'feature', 'maintenance', 'docs', 'test', 'ci', 'security', 'deps', 'question'];
 const titlePattern = new RegExp(`^(${titleTypes.join('|')})\\([a-z0-9][a-z0-9-]*\\): .{5,}$`);
 const planningTypes = ['feature', 'maintenance', 'docs', 'test', 'ci', 'security', 'deps'];
+const acceptanceCriteriaMinLength = 20;
+const issueBodyMinLength = 30;
+const questionSummaryMinLength = 20;
+const readyProposedSolutionMinLength = 40;
+const noContentStatus = 204;
 const placeholderPatterns = [
   /^\s*(?:n\/a|none|no response|todo|tbd|placeholder)\s*$/i,
   /\[Feature\]:|\[Bug\]:/i,
@@ -47,7 +52,7 @@ function meaningful(value, minLength = 12) {
 function hasAcceptanceCriteria(body) {
   const sections = extractSections(body);
   const acceptance = sections.get('acceptance criteria');
-  return meaningful(acceptance, 20) || /\bacceptance criteria\b/i.test(body);
+  return meaningful(acceptance, acceptanceCriteriaMinLength) || /\bacceptance criteria\b/i.test(body);
 }
 
 function validateRequiredSections(sections, requiredSections, issueKind) {
@@ -89,7 +94,7 @@ export function validateIssue(issue) {
     failures.push('Add one status label, for example "status:needs-triage" or "status:ready".');
   }
 
-  if (!body || !meaningful(body, 30)) {
+  if (!body || !meaningful(body, issueBodyMinLength)) {
     failures.push('Fill in the issue body with concrete, non-placeholder detail.');
   }
 
@@ -97,7 +102,10 @@ export function validateIssue(issue) {
     failures.push(...validateRequiredSections(sections, ['Summary', 'Steps to reproduce', 'Expected behaviour', 'Actual behaviour'], 'Bug'));
   } else if (planningTypes.includes(issueTitleType ?? '') || labels.includes('type:feature') || labels.includes('type:maintenance')) {
     failures.push(...validateRequiredSections(sections, ['Problem or opportunity', 'Proposed solution'], 'Planning'));
-  } else if (issueTitleType === 'question' && !meaningful(sections.get('summary') ?? sections.get('problem or opportunity') ?? body, 20)) {
+  } else if (
+    issueTitleType === 'question' &&
+    !meaningful(sections.get('summary') ?? sections.get('problem or opportunity') ?? body, questionSummaryMinLength)
+  ) {
     failures.push('Question issues must include a meaningful "## Summary" or "## Problem or opportunity" section.');
   }
 
@@ -105,7 +113,7 @@ export function validateIssue(issue) {
     if (!issue.milestone) {
       failures.push('Issues marked "status:ready" must be assigned to a milestone.');
     }
-    if (!hasAcceptanceCriteria(body) && !meaningful(sections.get('proposed solution'), 40)) {
+    if (!hasAcceptanceCriteria(body) && !meaningful(sections.get('proposed solution'), readyProposedSolutionMinLength)) {
       failures.push('Issues marked "status:ready" must include a clear next action or acceptance criteria.');
     }
   }
@@ -148,7 +156,7 @@ async function githubRequest({ fetchImpl, method = 'GET', repository, token, pat
     throw new Error(`GitHub API ${method} ${path} failed with ${response.status}: ${text}`);
   }
 
-  return response.status === 204 ? undefined : response.json();
+  return response.status === noContentStatus ? undefined : response.json();
 }
 
 export async function upsertIssueStandardsComment({ fetchImpl = fetch, repository, token, issueNumber, failures }) {

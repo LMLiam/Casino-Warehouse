@@ -9,6 +9,8 @@ import { money } from '../format/appMoney';
 import { capitalize } from '../format/appText';
 
 export class BeatSeatStatusView {
+  private static readonly seatPillVerticalOffsetPercent = 2.5;
+
   public constructor(private readonly elements: AppElements) {}
 
   public clear(): void {
@@ -58,13 +60,13 @@ export class BeatSeatStatusView {
           `;
         if (!owner && currentProfileCanClaimSeat && room.players.length < room.maxPlayers) {
           return `
-            <button type="button" class="seat-status-pill claimable" data-claim-seat="${hand.id}" style="left: ${hand.zones.main.x}%; top: ${hand.zones.main.y + hand.zones.main.height / 2 + 2.5}%" aria-label="Claim ${capitalize(hand.id)} seat">
+            <button type="button" class="seat-status-pill claimable" data-claim-seat="${hand.id}" style="left: ${hand.zones.main.x}%; top: ${hand.zones.main.y + hand.zones.main.height / 2 + BeatSeatStatusView.seatPillVerticalOffsetPercent}%" aria-label="Claim ${capitalize(hand.id)} seat">
               ${content}
             </button>
           `;
         }
         return `
-          <span class="seat-status-pill${occupied}${mine}" style="left: ${hand.zones.main.x}%; top: ${hand.zones.main.y + hand.zones.main.height / 2 + 2.5}%">
+          <span class="seat-status-pill${occupied}${mine}" style="left: ${hand.zones.main.x}%; top: ${hand.zones.main.y + hand.zones.main.height / 2 + BeatSeatStatusView.seatPillVerticalOffsetPercent}%">
             ${content}
           </span>
         `;

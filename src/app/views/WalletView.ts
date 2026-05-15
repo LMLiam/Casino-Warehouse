@@ -6,6 +6,9 @@ import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 
 export class WalletView {
+  private static readonly auditLogEntryLimit = 8;
+  private static readonly bankrollDeltaFlashMs = 2200;
+
   private previousBankroll: number | undefined;
   private bankrollDeltaTimer: number | undefined;
 
@@ -33,7 +36,7 @@ export class WalletView {
           : '';
       this.elements.houseAdvancePill.classList.toggle('hidden', profile.houseAdvance.outstandingBalance <= 0);
       this.elements.auditLog.innerHTML = profile.transactions
-        .slice(0, 8)
+        .slice(0, WalletView.auditLogEntryLimit)
         .map(
           (tx) =>
             `<p><b>${escapeHtml(tx.gameId)}</b> ${escapeHtml(this.transactionDescription(tx.description, tx.metadata))} ${money(tx.amount)} → ${money(tx.balanceAfter)}</p>`,
@@ -70,6 +73,6 @@ export class WalletView {
       this.elements.bankrollDelta.textContent = '';
       this.elements.bankrollDelta.className = '';
       this.elements.bankroll.classList.remove('gain-flash', 'loss-flash');
-    }, 2200);
+    }, WalletView.bankrollDeltaFlashMs);
   }
 }

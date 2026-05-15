@@ -8,6 +8,9 @@ import { CARD_SIZE } from './renderingConstants/CARD_SIZE';
 import { COLORS } from './renderingConstants/COLORS';
 
 export class CardRenderer {
+  private static readonly entryScaleX = 0.08;
+  private static readonly entryDurationScale = 0.65;
+
   private readonly animatedCards = new Set<string>();
   private readonly activeAnimations = new Set<string>();
   private readonly cards = new Map<string, Container>();
@@ -203,11 +206,11 @@ export class CardRenderer {
     displayObject.position.set(targetX, targetY);
     displayObject.alpha = 1;
     displayObject.rotation = 0;
-    displayObject.scale.set(0.08, 1);
+    displayObject.scale.set(CardRenderer.entryScaleX, 1);
 
     gsap.to(displayObject.scale, {
       x: 1,
-      duration: CARD_ANIMATION.duration * 0.65,
+      duration: CARD_ANIMATION.duration * CardRenderer.entryDurationScale,
       delay: animationOrder * CARD_ANIMATION.delayStep,
       ease: 'power2.out',
       onComplete: () => {

@@ -34,35 +34,47 @@ const pngDimensions = (assetPath: string): string => {
 const pngAlphaSummary = (
   assetPath: string,
 ): { readonly alphaMin: number; readonly alphaMax: number; readonly opaqueChromaPixels: number; readonly transparentCorners: number } => {
+  const pngSignatureStart = 1;
+  const pngSignatureEnd = 4;
+  const pngWidthOffset = 16;
+  const pngHeightOffset = 20;
+  const pngBitDepthOffset = 24;
+  const pngColorTypeOffset = 25;
+  const pngChunkInitialOffset = 8;
+  const pngChunkTypeStartOffset = 4;
+  const pngChunkTypeEndOffset = 8;
+  const pngChunkDataStartOffset = 8;
+  const pngChunkByteLength = 12;
+  const rgbaChannelCount = 4;
+  const maxChannelValue = 255;
   const buffer = readFileSync(assetFilePath(assetPath));
-  expect(buffer.subarray(1, 4).toString('ascii')).toBe('PNG');
-  const width = buffer.readUInt32BE(16);
-  const height = buffer.readUInt32BE(20);
-  const bitDepth = buffer[24];
-  const colorType = buffer[25];
+  expect(buffer.subarray(pngSignatureStart, pngSignatureEnd).toString('ascii')).toBe('PNG');
+  const width = buffer.readUInt32BE(pngWidthOffset);
+  const height = buffer.readUInt32BE(pngHeightOffset);
+  const bitDepth = buffer[pngBitDepthOffset];
+  const colorType = buffer[pngColorTypeOffset];
   expect(bitDepth).toBe(8);
   expect(colorType).toBe(6);
 
   const chunks: Buffer[] = [];
-  let offset = 8;
+  let offset = pngChunkInitialOffset;
   while (offset < buffer.length) {
     const length = buffer.readUInt32BE(offset);
-    const type = buffer.subarray(offset + 4, offset + 8).toString('ascii');
+    const type = buffer.subarray(offset + pngChunkTypeStartOffset, offset + pngChunkTypeEndOffset).toString('ascii');
     if (type === 'IDAT') {
-      chunks.push(buffer.subarray(offset + 8, offset + 8 + length));
+      chunks.push(buffer.subarray(offset + pngChunkDataStartOffset, offset + pngChunkDataStartOffset + length));
     }
     if (type === 'IEND') {
       break;
     }
-    offset += length + 12;
+    offset += length + pngChunkByteLength;
   }
 
   const bytes = inflateSync(Buffer.concat(chunks));
-  const channels = 4;
-  const stride = width * channels;
+  const stride = width * rgbaChannelCount;
   let byteIndex = 0;
   let previousRow = Buffer.alloc(stride);
-  let alphaMin = 255;
+  let alphaMin = maxChannelValue;
   let alphaMax = 0;
   let opaqueChromaPixels = 0;
   let transparentCorners = 0;
@@ -72,15 +84,15 @@ const pngAlphaSummary = (
     byteIndex += 1;
     const row = Buffer.alloc(stride);
     for (let x = 0; x < stride; x += 1) {
-      const left = x >= channels ? row[x - channels] : 0;
+      const left = x >= rgbaChannelCount ? row[x - rgbaChannelCount] : 0;
       const up = previousRow[x];
-      const upperLeft = x >= channels ? previousRow[x - channels] : 0;
+      const upperLeft = x >= rgbaChannelCount ? previousRow[x - rgbaChannelCount] : 0;
       row[x] = reconstructPngByte(filter, bytes[byteIndex], left, up, upperLeft);
       byteIndex += 1;
     }
 
     for (let x = 0; x < width; x += 1) {
-      const pixel = x * channels;
+      const pixel = x * rgbaChannelCount;
       const red = row[pixel];
       const green = row[pixel + 1];
       const blue = row[pixel + 2];

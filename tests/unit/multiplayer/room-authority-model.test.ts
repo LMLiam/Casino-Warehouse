@@ -42,12 +42,15 @@ const randomIdPartSpace = 36 ** 6;
 const generatedId = (value: number): string => value.toString(36).padStart(6, '0').toUpperCase();
 
 class AuthorityHarness extends RoomAuthorityBase {
+  private static readonly addedPlayerBankroll = 100;
+  private static readonly missingPlayerBankroll = 50;
+
   public addPlayer(room: RoomState): void {
-    this.addMember(room, 'conn-alice', 'player', 'alice', 'ALICE', 100);
+    this.addMember(room, 'conn-alice', 'player', 'alice', 'ALICE', AuthorityHarness.addedPlayerBankroll);
   }
 
   public setMissingPlayerBankroll(room: RoomState): void {
-    this.setPlayerBankroll(room, 'missing', 50);
+    this.setPlayerBankroll(room, 'missing', AuthorityHarness.missingPlayerBankroll);
   }
 
   public settleBeatFor(room: RoomState, snapshot: GameSnapshot) {

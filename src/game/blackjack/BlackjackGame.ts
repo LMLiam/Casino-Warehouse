@@ -13,6 +13,11 @@ import { isBlackjack } from './isBlackjack';
 import { isCard } from './isCard';
 
 export class BlackjackGame {
+  private static readonly blackjackTargetTotal = 21;
+  private static readonly blackjackPayoutMultiplier = 1.5;
+  private static readonly maxPlayerCards = 5;
+  private static readonly insuranceReturnMultiplier = 3;
+
   private deck: Card[];
   private phase: BlackjackPhase = 'idle';
   private wager = 0;
@@ -84,7 +89,7 @@ export class BlackjackGame {
         return this.settle('push', this.wager, 'Both players have Blackjack. Push.');
       }
       if (playerBlackjack) {
-        return this.settle('blackjack', this.wager + Math.floor(this.wager * 1.5), 'Blackjack pays 3:2.');
+        return this.settle('blackjack', this.wager + Math.floor(this.wager * BlackjackGame.blackjackPayoutMultiplier), 'Blackjack pays 3:2.');
       }
       return this.settle('lose', 0, `Dealer has Blackjack with ${cardLabel(this.dealerCards[1])}.`);
     }
@@ -100,12 +105,12 @@ export class BlackjackGame {
 
     this.playerCards = [...this.playerCards, this.draw()];
     const total = bestTotal(this.playerCards);
-    if (total > 21) {
+    if (total > BlackjackGame.blackjackTargetTotal) {
       this.dealerHoleHidden = false;
       return this.settle('lose', 0, `Player busts with ${total}.`);
     }
 
-    if (this.playerCards.length >= 5) {
+    if (this.playerCards.length >= BlackjackGame.maxPlayerCards) {
       return this.stand();
     }
 
@@ -119,7 +124,7 @@ export class BlackjackGame {
     }
     this.wager *= 2;
     this.playerCards = [...this.playerCards, this.draw()];
-    if (bestTotal(this.playerCards) > 21) {
+    if (bestTotal(this.playerCards) > BlackjackGame.blackjackTargetTotal) {
       this.dealerHoleHidden = false;
       return this.settle('lose', 0, `Double busts with ${bestTotal(this.playerCards)}.`);
     }
@@ -142,10 +147,10 @@ export class BlackjackGame {
     const dealerTotal = bestTotal(this.dealerCards);
     const returned = this.splitHands.reduce((sum, hand) => {
       const total = bestTotal(hand);
-      if (total > 21) {
+      if (total > BlackjackGame.blackjackTargetTotal) {
         return sum;
       }
-      if (dealerTotal > 21 || total > dealerTotal) {
+      if (dealerTotal > BlackjackGame.blackjackTargetTotal || total > dealerTotal) {
         return sum + this.wager;
       }
       if (total === dealerTotal) {
@@ -164,7 +169,7 @@ export class BlackjackGame {
     this.insuranceWager = Math.max(0, Math.floor(amount));
     if (isBlackjack(this.dealerCards)) {
       this.dealerHoleHidden = false;
-      return this.settle('lose', this.insuranceWager * 3, 'Insurance pays 2:1 against dealer Blackjack.');
+      return this.settle('lose', this.insuranceWager * BlackjackGame.insuranceReturnMultiplier, 'Insurance pays 2:1 against dealer Blackjack.');
     }
     this.status = 'Insurance placed. Dealer does not have Blackjack.';
     return this.snapshot();
@@ -185,7 +190,7 @@ export class BlackjackGame {
 
     const playerTotal = bestTotal(this.playerCards);
     const dealerTotal = bestTotal(this.dealerCards);
-    if (dealerTotal > 21) {
+    if (dealerTotal > BlackjackGame.blackjackTargetTotal) {
       return this.settle('win', this.wager * 2, `Dealer busts with ${dealerTotal}.`);
     }
     if (playerTotal > dealerTotal) {

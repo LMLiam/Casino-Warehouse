@@ -2,15 +2,20 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { magicNumberErrors } from './magic-number-check.mjs';
 import { mathRandomErrors } from './math-random-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
 const sourceRoot = join(workspaceRoot, 'src');
 const testRoot = join(workspaceRoot, 'tests');
+const scriptRoot = join(workspaceRoot, 'scripts');
+const maxSourceFileLines = 700;
 const trackedTypeScriptFiles = gitTrackedTypeScriptFiles();
 const sourceFiles = listFiles(sourceRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
+const scriptFiles = listFiles(scriptRoot).filter((file) => extname(file) === '.mjs');
+const magicNumberFiles = [...sourceFiles, ...testFiles, ...scriptFiles];
 const relativeSourceFiles = new Set(sourceFiles.map(toWorkspacePath));
 const errors = [];
 const appModuleFolders = new Set(['actions', 'dom', 'format', 'input', 'rooms', 'shell', 'state', 'views']);
@@ -34,6 +39,7 @@ function main() {
 
   checkDirectUnknownCasts();
   checkTestFolderLayout();
+  checkMagicNumbers();
   checkCycles();
 
   if (errors.length > 0) {
@@ -112,10 +118,10 @@ function checkTopLevelElementCount(relativePath, source) {
 
 function checkFileSize(relativePath, source) {
   const lines = source.split('\n').length;
-  if (lines <= 700) {
+  if (lines <= maxSourceFileLines) {
     return;
   }
-  errors.push(`${relativePath} has ${lines} lines. Split files above 700 lines.`);
+  errors.push(`${relativePath} has ${lines} lines. Split files above ${maxSourceFileLines} lines.`);
 }
 
 function checkVagueFilename(relativePath) {
@@ -130,9 +136,17 @@ function checkAppFolderLayout(relativePath) {
   }
 
   const parts = relativePath.split('/');
-  const folder = parts[2];
-  if (parts.length < 4 || !appModuleFolders.has(folder)) {
+  const appRoleSegmentIndex = 2;
+  const appModulePathSegments = 4;
+  const folder = parts[appRoleSegmentIndex];
+  if (parts.length < appModulePathSegments || !appModuleFolders.has(folder)) {
     errors.push(`${relativePath} is not in an approved app folder. Use one of: ${[...appModuleFolders].sort().join(', ')}.`);
+  }
+}
+
+function checkMagicNumbers() {
+  for (const file of magicNumberFiles) {
+    errors.push(...magicNumberErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
   }
 }
 

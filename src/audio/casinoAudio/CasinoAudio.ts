@@ -4,6 +4,12 @@ import { defaultAudioSettings } from './defaultAudioSettings';
 import { sanitizeAudioSettings } from './sanitizeAudioSettings';
 
 export class CasinoAudio {
+  private static readonly audibleGainFloor = 0.0001;
+  private static readonly cueAttackSeconds = 0.015;
+  private static readonly cueStopPaddingSeconds = 0.02;
+  private static readonly musicFrequency = 110;
+  private static readonly musicVolumeScale = 0.18;
+
   private static readonly cueConfig: Record<
     Exclude<AudioCue, 'music'>,
     { readonly type: OscillatorType; readonly startFrequency: number; readonly endFrequency: number; readonly duration: number; readonly volume: number }
@@ -52,12 +58,12 @@ export class CasinoAudio {
     oscillator.type = config.type;
     oscillator.frequency.setValueAtTime(config.startFrequency, now);
     oscillator.frequency.exponentialRampToValueAtTime(config.endFrequency, now + config.duration);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(this.cueLevel(cue) * config.volume, now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + config.duration);
+    gain.gain.setValueAtTime(CasinoAudio.audibleGainFloor, now);
+    gain.gain.exponentialRampToValueAtTime(this.cueLevel(cue) * config.volume, now + CasinoAudio.cueAttackSeconds);
+    gain.gain.exponentialRampToValueAtTime(CasinoAudio.audibleGainFloor, now + config.duration);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start(now);
-    oscillator.stop(now + config.duration + 0.02);
+    oscillator.stop(now + config.duration + CasinoAudio.cueStopPaddingSeconds);
   }
 
   public toggleMusic(enabled: boolean): void {
@@ -79,7 +85,7 @@ export class CasinoAudio {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     oscillator.type = 'triangle';
-    oscillator.frequency.value = 110;
+    oscillator.frequency.value = CasinoAudio.musicFrequency;
     gain.gain.value = this.musicLevel();
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
@@ -113,7 +119,7 @@ export class CasinoAudio {
   }
 
   private musicLevel(): number {
-    return this.settings.masterVolume * this.settings.musicVolume * 0.18;
+    return this.settings.masterVolume * this.settings.musicVolume * CasinoAudio.musicVolumeScale;
   }
 
   private effectLevel(): number {
