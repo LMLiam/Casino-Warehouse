@@ -51,13 +51,14 @@ import { RoomSeatsView } from '../views/RoomSeatsView';
 import { RulesMenuView } from '../views/RulesMenuView';
 import { SlotsView } from '../views/SlotsView';
 import { WalletView } from '../views/WalletView';
+import { BeatChipSelection } from './BeatChipSelection';
 import { BeatSettlementMetadataCache } from './BeatSettlementMetadataCache';
 import { GameAppSession } from './GameAppSession';
 
 export class GameApp extends GameAppSession {
   protected readonly table: PixiTable;
   protected readonly elements: AppElements;
-  private selectedChip = 0;
+  private readonly beatChipSelection: BeatChipSelection;
   protected selectedPlayerIndex = 0;
   protected activeGame: CasinoGameId = 'beat-the-house';
   protected showingGameLobby = true;
@@ -93,14 +94,13 @@ export class GameApp extends GameAppSession {
   protected returnHomeOnServerResync = false;
   protected restoringRoomAfterReconnect = false;
   protected pendingRoomRestore: CasinoSessionRoomState | undefined;
-
   public constructor(root: HTMLElement) {
     super();
     root.innerHTML = renderTemplate();
     mountRadixChrome();
     this.elements = collectElements();
     this.audioControls = new AudioControls(this.elements, this.audio);
-    this.beatControlsView = new BeatControlsView(this.elements);
+    this.beatControlsView = new BeatControlsView(this.elements, (bankroll, canSelectChip) => this.beatChipSelection.syncBankroll(bankroll, canSelectChip));
     this.beatSeatStatusView = new BeatSeatStatusView(this.elements);
     this.blackjackView = new BlackjackView(this.elements);
     this.gameLobbyView = new GameLobbyView(this.elements);
@@ -161,8 +161,12 @@ export class GameApp extends GameAppSession {
       this.elements.tableHost,
       {
         onBet: (handId: HandId, betType: BetType) => {
-          if (this.selectedChip > 0 && this.currentPlayer) {
-            if (!this.canWager(this.selectedChip)) {
+          if (this.beatChipSelection.value > 0 && this.currentPlayer) {
+            if (!this.beatChipSelection.ensureSelectedAffordable()) {
+              return;
+            }
+            const selectedChip = this.beatChipSelection.value;
+            if (!this.canWager(selectedChip)) {
               this.elements.status.textContent = 'Session wager limit reached.';
               return;
             }
@@ -170,7 +174,7 @@ export class GameApp extends GameAppSession {
               return;
             }
             if (this.activeRoomForGame()) {
-              this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType, amount: this.selectedChip });
+              this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType, amount: selectedChip });
               this.beatControlsView.markPendingBet(betType);
             }
             this.audio.play('chip');
@@ -184,6 +188,7 @@ export class GameApp extends GameAppSession {
         createTagRenderer: (layer: Container) => new TagRenderer(layer),
       },
     );
+    this.beatChipSelection = new BeatChipSelection(this.elements.chipButtons, this.table, this.elements.status);
   }
 
   public async start(): Promise<void> {
@@ -270,10 +275,7 @@ export class GameApp extends GameAppSession {
   }
 
   private selectChip(button: HTMLButtonElement): void {
-    this.selectedChip = Number(button.dataset.chip);
-    this.elements.chipButtons.forEach((chipButton) => chipButton.classList.toggle('selected', chipButton === button));
-    this.table.setSelectedChip(this.selectedChip);
-    this.elements.status.textContent = `Selected £${this.selectedChip}. Click a betting circle on the table.`;
+    this.beatChipSelection.select(button);
   }
 
   private dropChipOnTable(event: DragEvent): void {
@@ -285,6 +287,9 @@ export class GameApp extends GameAppSession {
       return;
     }
     if (!this.canUseServer()) {
+      return;
+    }
+    if (!this.beatChipSelection.ensureAmountAffordable(amount)) {
       return;
     }
     const activeRoom = this.activeRoomForGame();

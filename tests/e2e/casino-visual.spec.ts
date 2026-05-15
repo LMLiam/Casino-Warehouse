@@ -237,6 +237,16 @@ test('Beat the House selection opens the multiplayer room lobby before table pla
   await page.locator('#roomSeats').getByRole('button', { name: 'Left: open' }).click();
   await expect(page.locator('#roomSeats')).toContainText('Left: QA Player');
   await expect(page.locator('#chipRail')).toBeVisible();
+  await expect(page.getByLabel('£1000 chip')).toBeVisible();
+  await expect(page.getByLabel('£5000 chip')).toBeHidden();
+  await expect(page.getByLabel('£10000 chip')).toBeHidden();
+
+  await page.getByLabel('£1000 chip').click();
+  await expect(page.getByLabel('£1000 chip')).toHaveClass(/selected/);
+  await dropChipPercent(page, 19.25, 70.55, 1000);
+  await expect(page.locator('#bankroll')).toContainText('£0');
+  await expect(page.locator('#chipRail')).toBeHidden();
+  await expect(page.locator('.chip-button.selected')).toHaveCount(0);
   expectConsoleClean(page);
 });
 
@@ -350,6 +360,29 @@ const boundingBox = async (locator: Locator): Promise<{ readonly x: number; read
     throw new Error('Expected locator to have a bounding box.');
   }
   return box;
+};
+
+const dropChipPercent = async (page: Page, xPercent: number, yPercent: number, amount: number): Promise<void> => {
+  await page.locator('#tableHost').evaluate(
+    (host, point) => {
+      const box = host.getBoundingClientRect();
+      const scale = Math.min(box.width / 1672, box.height / 941);
+      const xOffset = (box.width - 1672 * scale) / 2;
+      const yOffset = (box.height - 941 * scale) / 2;
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData('text/plain', String(point.amount));
+      host.dispatchEvent(
+        new DragEvent('drop', {
+          bubbles: true,
+          cancelable: true,
+          clientX: box.left + xOffset + 1672 * scale * (point.xPercent / 100),
+          clientY: box.top + yOffset + 941 * scale * (point.yPercent / 100),
+          dataTransfer,
+        }),
+      );
+    },
+    { xPercent, yPercent, amount },
+  );
 };
 
 const expectConsoleClean = (page: Page): void => {
