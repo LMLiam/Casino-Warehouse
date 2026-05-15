@@ -162,6 +162,10 @@ describe('BeatTheHouseGame', () => {
     game.placeBet('left', 'main', 10);
     expect(game.placeBet('left', 'aceFlash', 5).bets.left.aceFlash).toBe(5);
     expect(game.placeBet('right', 'aceFlash', 5).status).toBe('Side bets need a main bet on the same hand.');
+    game.placeBet('right', 'main', 5);
+    const handCleared = game.clearHandBets('left');
+    expect(handCleared.bets.left.main).toBe(0);
+    expect(handCleared.bets.right.main).toBe(5);
     game.clearBets();
     game.placeBet('left', 'main', 10);
     expect(game.clearBets().bets.left.main).toBe(0);
@@ -173,6 +177,22 @@ describe('BeatTheHouseGame', () => {
     expect(next.canRebet).toBe(true);
     expect(game.rebet().bets.left.main).toBe(10);
     expect(game.snapshot().canRebet).toBe(false);
+  });
+
+  it('clears and rebets individual hands without changing other hands', () => {
+    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.placeBet('left', 'main', 10);
+    game.placeBet('right', 'main', 15);
+    game.deal(rigDeck([card('A', 'spades'), card('2', 'hearts'), card('K', 'clubs')]));
+    const next = game.nextRound();
+    expect(next.rebetAmounts).toMatchObject({ left: 10, right: 15 });
+
+    const rebet = game.rebetHand('left');
+
+    expect(rebet.bets.left.main).toBe(10);
+    expect(rebet.bets.right.main).toBe(0);
+    expect(rebet.rebetAmounts.right).toBe(15);
+    expect(game.rebetHand('centre').status).toBe('No previous bet saved for this seat.');
   });
 
   it('covers invalid bankroll withdrawals, invalid rebet affordability, and exhausted decks', () => {
