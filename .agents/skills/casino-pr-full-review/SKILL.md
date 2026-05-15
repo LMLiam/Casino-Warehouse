@@ -7,9 +7,11 @@ description: Review Casino Warehouse pull requests end to end. Use when Codex is
 
 ## Overview
 
-Use this skill for maintainer-style Casino Warehouse PR reviews. It complements `.agents/skills/casino-issue-completion/SKILL.md`; load that skill too whenever the user asks whether a PR is complete, ready, mergeable, fixed, updated, or otherwise finished.
+Use this skill for maintainer-style Casino Warehouse PR reviews. It complements `.agents/skills/casino-issue-completion/SKILL.md`; load and satisfy that skill too whenever the user asks whether a PR is complete, ready, mergeable, fixed, updated, or otherwise finished.
 
 The output of this skill is a real PR review: changed files inspected, related context checked, local/CI evidence recorded, inline review comments left when possible, and a clear verdict.
+
+Use this skill alone for a pure review verdict. Use it with `casino-issue-completion` for any readiness or completion verdict, and do not say `Ready` unless the issue-completion evidence checklist is satisfied on the current PR head.
 
 ## Workflow
 
@@ -24,10 +26,11 @@ The output of this skill is a real PR review: changed files inspected, related c
    - Preserve unrelated user changes and report any local dirty state that affects the review.
 
 3. Load required repository context:
-   - Read `AGENTS.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, `docs/code-quality.md`, `docs/supply-chain-security.md`, and `.github/PULL_REQUEST_TEMPLATE.md`.
+   - Read `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, `docs/code-quality.md`, `docs/supply-chain-security.md`, and `.github/PULL_REQUEST_TEMPLATE.md`.
    - For readiness or completion claims, run the issue-completion evidence scripts after the PR exists:
      - `bash .agents/skills/casino-issue-completion/scripts/pr-readiness.sh <target>`
      - `bash .agents/skills/casino-issue-completion/scripts/pr-review-files.sh <target>`
+   - Treat the scripts as evidence collectors, not substitutes for inspecting the PR diff and related context.
 
 4. Review the full changed surface:
    - Inspect every changed source, test, script, config, workflow, dependency, and documentation file.
@@ -53,6 +56,12 @@ The output of this skill is a real PR review: changed files inspected, related c
    - If GitHub rejects approval or request-changes on the user's own PR, submit a `COMMENT` review and record the exact rejection.
    - If inline comments cannot be created, record the attempted tool or command and exact failure, then report file/line findings in the final response.
 
+8. For readiness or completion reviews:
+   - Collect every required evidence item from `casino-issue-completion`: current branch, target branch, target commit, current head SHA, issue number, PR number, changed files, working tree status, commands run, files inspected, risks checked, findings, review verdict, current-info verification, PR comments or exact comment failure, fix commit SHAs and resolution replies for findings, fixes after review, latest CI/check status, and base freshness.
+   - Repeat the review loop after every new commit, rebase, merge from target, force-push, PR body edit that reruns checks, or resolved-comment action.
+   - Keep per-finding review comment/fix tracking mandatory after a PR exists. Record a PR comment URL or ID before fixing each self-review finding when permissions allow; if comment creation fails, record the attempted tool or command and exact failure before editing the fix.
+   - Use `APPROVE`, `REQUEST_CHANGES`, or `NEEDS_DISCUSSION` for the review verdict, and use `Ready`, `Not ready`, or `Blocked` only for the readiness status.
+
 ## Finding Shape
 
 Use this structure for review findings:
@@ -66,9 +75,25 @@ Use this structure for review findings:
 
 Avoid vague review comments such as "consider simplifying this" unless they explain the actual failure mode or maintenance cost.
 
+Use the same finding fields when this skill feeds a readiness or issue-completion review so each finding can be mapped to a PR comment URL or ID, fix commit SHA if fixed, and resolution reply URL or ID when available.
+
+## Evidence Checklist
+
+For every PR review, collect and report:
+
+- PR number, title, base branch, head branch, base SHA, and current head SHA
+- changed files inspected, plus related context files inspected
+- commands run with pass/fail status, including any skipped checks and why
+- current CI/check status for the current PR head
+- unresolved review threads or comments when available
+- current-info verification used, or a statement that no review claim depended on current external facts
+- inline review comments created with URLs or IDs, or the exact attempted command/tool and failure
+
+For readiness, completion, mergeability, stale-branch, fixed, or updated claims, also satisfy `casino-issue-completion` and report its extra evidence: target commit freshness, working tree status, linked issue, PR labels and metadata, per-finding comment/fix tracking, fixes after review, remaining risks, and final `Ready` / `Not ready` / `Blocked` status.
+
 ## Final Response
 
-For a completed PR review, report:
+For a pure PR review, report:
 
 - PR number and title
 - Issue number when known
@@ -80,5 +105,27 @@ For a completed PR review, report:
 - Current-info verification used, or why none was needed
 - Inline comments created with URLs or IDs, or exact failure
 - Remaining blockers, non-blocking notes, and residual risk
+
+For a readiness or completion review, use the exact final response format from `casino-issue-completion` instead of the shorter pure-review summary:
+
+```txt
+PR:
+Issue:
+Current branch:
+Current HEAD:
+Target branch:
+Target commit:
+Changed files reviewed:
+Commands run:
+CI/check status:
+Review verdict:
+Current-info verification:
+Review comments:
+Fixes after review:
+Remaining risks:
+Status:
+```
+
+`Review verdict` must be `APPROVE`, `REQUEST_CHANGES`, or `NEEDS_DISCUSSION`. `Status` must be `Ready`, `Not ready`, or `Blocked`; use `Ready` only when base freshness, required checks, PR metadata, review comments, and the latest self-review all satisfy `casino-issue-completion`.
 
 Lead with findings when the user asked for a review. Keep the summary short after the issues.

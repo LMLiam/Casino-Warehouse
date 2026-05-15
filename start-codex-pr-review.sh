@@ -73,6 +73,7 @@ goal="/goal Review pull request #${pr_number} in full using \$casino-pr-full-rev
 goal+="\$casino-issue-completion, and AGENTS.md: use a separate worktree when local checkout is needed, "
 goal+="inspect the full PR diff and related context, check prior comments/base freshness/CI, "
 goal+="run relevant evidence checks, leave inline GitHub review comments for every finding or record exact comment failure, "
+goal+="use the issue-completion evidence and status rules for any readiness claim, "
 goal+="and report an evidence-backed verdict."
 
 if [ "$print_only" = "true" ]; then

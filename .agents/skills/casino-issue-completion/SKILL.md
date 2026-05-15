@@ -9,6 +9,8 @@ You may not describe an issue or pull request as complete, ready, ready to merge
 
 This skill is mandatory for issue completion, PR updates, stale branch updates, review-fix requests, resumed goals, and "is this ready?" checks.
 
+Use `.agents/skills/casino-pr-full-review/SKILL.md` as the maintainer-style PR review workflow when the user asks for a full PR review. If that review includes readiness, completion, mergeability, fixed, updated, or stale-branch claims, this issue-completion workflow still controls the required evidence, review repetition, per-finding comment/fix tracking, final status vocabulary, and `Ready` threshold.
+
 ## Core Rule
 
 No evidence, no readiness.
