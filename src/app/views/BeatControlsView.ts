@@ -120,7 +120,7 @@ export class BeatControlsView {
       return false;
     }
     const rebetAmount = snapshot.rebetAmounts[activeHandId];
-    return rebetAmount > 0 && (bankroll ?? 0) >= rebetAmount;
+    return Boolean(activeRoom.beat?.rebetSeatIds.includes(activeHandId)) && rebetAmount > 0 && (bankroll ?? 0) >= rebetAmount;
   }
 
   private setActionButton(button: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> }, visible: boolean): void {

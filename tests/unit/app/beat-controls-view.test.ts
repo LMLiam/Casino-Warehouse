@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
+import type { HandId } from '../../../src/game/types/HandId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import { BeatControlsView } from '../../../src/app/views/BeatControlsView';
 
@@ -44,7 +45,14 @@ const createElements = () => ({
   stickButton: createButton(),
 });
 
-const createRoom = (game: GameSnapshot): RoomSnapshot => ({
+const createRoom = (
+  game: GameSnapshot,
+  options: {
+    readonly players?: RoomSnapshot['players'];
+    readonly seats?: RoomSnapshot['seats'];
+    readonly rebetSeatIds?: readonly HandId[];
+  } = {},
+): RoomSnapshot => ({
   roomId: 'ROOM42',
   roomName: 'Beat Room',
   hostProfileId: 'alice',
@@ -58,13 +66,14 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
   allowSpectators: true,
   createdAt: 1,
   updatedAt: 1,
-  players: [
+  players: options.players ?? [
     { connectionId: 'a', profileId: 'alice', profileName: 'Alice', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
     { connectionId: 'b', profileId: 'bob', profileName: 'Bob', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
   ],
   spectators: [],
-  seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'right', profileId: 'bob' }, { seatId: 'centre' }],
+  seats: options.seats ?? [{ seatId: 'left', profileId: 'alice' }, { seatId: 'right', profileId: 'bob' }, { seatId: 'centre' }],
   game,
+  beat: { rebetSeatIds: options.rebetSeatIds ?? ['left'] },
 });
 
 describe('BeatControlsView', () => {
@@ -137,5 +146,33 @@ describe('BeatControlsView', () => {
     expect(aliceElements.clearButton.classList.contains('hidden')).toBe(true);
     expect(bobElements.rebetButton.disabled).toBe(true);
     expect(bobElements.clearButton.disabled).toBe(false);
+  });
+
+  it('keeps rebet disabled when a replacement player claims a seat with another profile saved wager', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      canRebet: false,
+      rebetAmounts: { ...base.rebetAmounts, left: 25, right: 40 },
+    };
+    const room = createRoom(snapshot, {
+      players: [
+        { connectionId: 'a', profileId: 'alice', profileName: 'Alice', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
+        { connectionId: 'c', profileId: 'cory', profileName: 'Cory', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
+      ],
+      seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'right', profileId: 'cory' }, { seatId: 'centre' }],
+      rebetSeatIds: ['left'],
+    });
+    const aliceElements = createElements();
+    const coryElements = createElements();
+    const missingEligibilityElements = createElements();
+
+    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
+    new BeatControlsView(coryElements).render(snapshot, true, () => undefined, true, room, 'cory', 100);
+    new BeatControlsView(missingEligibilityElements).render(snapshot, true, () => undefined, true, { ...room, beat: undefined }, 'alice', 100);
+
+    expect(aliceElements.rebetButton.disabled).toBe(false);
+    expect(coryElements.rebetButton.disabled).toBe(true);
+    expect(missingEligibilityElements.rebetButton.disabled).toBe(true);
   });
 });

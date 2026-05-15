@@ -133,6 +133,7 @@ describe('per-game multiplayer protocol', () => {
     expect(decodeServerMessage(JSON.stringify({ version: 1, type: 'room-state', room }))?.type).toBe('room-state');
     expect(decodeServerMessage('{"version":1,"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();
+    expect(serverMessageSchema.safeParse({ version: 1, type: 'room-state', room: { ...room, beat: { rebetSeatIds: ['seat-1'] } } }).success).toBe(false);
 
     const invalidSettlement = {
       version: 1,
@@ -574,6 +575,7 @@ describe('per-game room authority', () => {
     expect(beat(room).phase).toBe('roundOver');
     const nextRound = authority.handle('a', { version: 1, type: 'next-round' }).broadcasts[0];
     expect(beat(nextRound).rebetAmounts).toMatchObject({ left: 25, right: 40 });
+    expect(nextRound.beat?.rebetSeatIds).toEqual(['left', 'right']);
     store.setProfileBankroll('bob', 1);
     const lowBobBankroll = authority.reconcileProfiles('test bankroll update').broadcasts[0];
     expect(lowBobBankroll.players.find((player) => player.profileId === 'bob')?.bankroll).toBe(1);
@@ -583,6 +585,7 @@ describe('per-game room authority', () => {
     const reseated = authority.handle('c', claimSeat('right')).broadcasts[0];
     const aliceBeforeRebet = reseated.players.find((player) => player.profileId === 'alice')!.bankroll;
     expect(reseated.players.find((player) => player.profileId === 'cory')?.bankroll).toBe(1);
+    expect(reseated.beat?.rebetSeatIds).toEqual(['left']);
 
     const aliceRebet = authority.handle('a', { version: 1, type: 'rebet' }).broadcasts[0];
 
