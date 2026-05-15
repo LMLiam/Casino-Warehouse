@@ -93,6 +93,26 @@ proc make_goal_tui_safe {goal} {
   return $safe_goal
 }
 
+proc goal_objective_from_command {goal_command} {
+  if {[string match "/goal *" $goal_command]} {
+    return [string range $goal_command [string length "/goal "] end]
+  }
+
+  return $goal_command
+}
+
+proc normalize_visible_text {text} {
+  regsub -all {\033\[[0-9;?]*[ -/]*[@-~]} $text "" without_ansi
+  regsub -all {[[:space:]]+} $without_ansi { } normalized
+  return [string trim $normalized]
+}
+
+proc goal_confirmation_matches {confirmation expected_objective} {
+  set visible_confirmation [normalize_visible_text $confirmation]
+  set visible_objective [normalize_visible_text $expected_objective]
+  return [expr {[string first $visible_objective $visible_confirmation] >= 0}]
+}
+
 proc send_goal_text {goal delay_ms} {
   foreach character [split $goal ""] {
     send -- $character
@@ -153,20 +173,53 @@ while {1} {
 }
 
 after 200
-send_goal_text [make_goal_tui_safe $goal] $key_delay_ms
+set goal_command [make_goal_tui_safe $goal]
+set expected_objective [goal_objective_from_command $goal_command]
+send_goal_text $goal_command $key_delay_ms
 after 100
 send -- "\r"
 set timeout 10
-expect {
-  -re {Goal active} {
-  }
-  timeout {
-    puts stderr "error: Codex did not confirm that the generated /goal is active."
-    exit 1
-  }
-  eof {
-    puts stderr "error: Codex exited before confirming that the generated /goal is active."
-    exit 1
+set seen_goal_active 0
+set confirmation_tail ""
+while {1} {
+  expect {
+    -re {Goal active[^\r\n]*} {
+      set seen_goal_active 1
+      append confirmation_tail $expect_out(0,string)
+
+      if {[goal_confirmation_matches $confirmation_tail $expected_objective]} {
+        break
+      }
+
+      exp_continue
+    }
+    -re {.+} {
+      if {$seen_goal_active} {
+        append confirmation_tail $expect_out(0,string)
+
+        if {[goal_confirmation_matches $confirmation_tail $expected_objective]} {
+          break
+        }
+      }
+
+      exp_continue
+    }
+    timeout {
+      if {$seen_goal_active} {
+        puts stderr "error: Codex confirmed a /goal but did not expose the complete generated objective. Refusing to continue because the active goal may be truncated."
+      } else {
+        puts stderr "error: Codex did not confirm that the generated /goal is active."
+      }
+      exit 1
+    }
+    eof {
+      if {$seen_goal_active} {
+        puts stderr "error: Codex exited before exposing the complete generated /goal objective."
+      } else {
+        puts stderr "error: Codex exited before confirming that the generated /goal is active."
+      }
+      exit 1
+    }
   }
 }
 after 750
