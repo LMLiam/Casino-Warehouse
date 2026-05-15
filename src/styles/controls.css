@@ -146,7 +146,7 @@ button.wide {
   padding: 10px 12px 12px;
 }
 
-.admin-panel.hud-menu {
+.admin-panel.hud-overflow-section {
   padding: 0;
   border: 0;
   background: transparent;
@@ -159,7 +159,7 @@ button.wide {
   font-weight: 900;
 }
 
-.admin-panel.hud-menu > summary {
+.admin-panel.hud-overflow-section > summary {
   color: #fff5d6;
 }
 

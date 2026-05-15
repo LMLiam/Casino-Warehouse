@@ -62,6 +62,7 @@ test('multiplayer room lobby supports create, join, seat choice, spectate, leave
     await expect(host.locator('.blackjack-table-seat')).toHaveCount(5);
     await expect(host.locator('.blackjack-table-seat')).toContainText(['Alice', 'Bob']);
 
+    await openHudOverflow(players[1]);
     await players[1].locator('#leaveRoomBtn').click();
     await expect(players[1].locator('#roomLobby')).toBeVisible();
     await expect(players[1].locator('#blackjackView')).toBeHidden();
@@ -165,6 +166,7 @@ test('new browsers do not inherit another saved profile session and can switch p
     await expect(bob.locator('#playerStrip')).toContainText('Server Bob');
     await expect(bob.locator('#playerStrip')).not.toContainText('Server Alice');
 
+    await openHudOverflow(bob);
     await bob.getByRole('button', { name: 'Switch Profile' }).click();
     await expect(bob.locator('#setup')).toBeVisible();
     await expect(bob.locator('#casinoShell')).toBeHidden();
@@ -265,7 +267,7 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
       .toBeGreaterThanOrEqual(1);
 
     const animationOrdersBeforePanel = await parsedDataset(page, 'cardAnimationOrders');
-    await page.locator('.admin-panel > summary').click();
+    await openHudSection(page, 'admin');
     await expect.poll(() => parsedDataset(page, 'cardAnimationOrders')).toEqual(animationOrdersBeforePanel);
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -293,6 +295,7 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
       .toBe(true);
     await expect.poll(async () => (await parsedDataset(page, 'sideBetLabels')).some((label) => String(label).includes('Dealer Sevens'))).toBe(true);
 
+    await openHudSection(page, 'admin');
     await page.locator('#layoutOverlayBtn').click();
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible)).toBe('true');
 
@@ -359,7 +362,7 @@ test('Beat the House win popup includes House Advance repayment from authoritati
     await expect
       .poll(async () => flatPopupLines(page))
       .toEqual(expect.arrayContaining(['Main WIN +£25', 'Side bets NONE +£0', 'Gross WIN +£25', 'House Advance payment -£2', 'Net WIN +£23']));
-    await page.locator('.stats-menu > summary').click();
+    await openHudSection(page, 'stats');
     await expect(page.locator('#auditLog')).toContainText('House Advance repayment withheld from beat-the-house net winnings.');
     await expect(page.locator('#auditLog')).toContainText('Withheld £2; owed £98.');
   } finally {
@@ -519,10 +522,27 @@ const waitForRealtime = async (page: Page): Promise<void> => {
   await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 15_000 });
 };
 
+type HudSection = 'admin' | 'room' | 'stats';
+
+const openHudOverflow = async (page: Page): Promise<void> => {
+  const menu = page.locator('#hudOverflowMenu');
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.locator('#hudOverflowButton').click();
+  }
+  await expect(page.locator('#hudOverflowPanel')).toBeVisible();
+};
+
+const openHudSection = async (page: Page, sectionName: HudSection): Promise<void> => {
+  await openHudOverflow(page);
+  const section = page.locator(`[data-hud-section="${sectionName}"]`);
+  if (!(await section.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await section.locator('summary').first().click();
+  }
+  await expect(section).toBeVisible();
+};
+
 const claimRoomSeat = async (page: Page, seatLabel: string): Promise<void> => {
-  await page.locator('#roomMenu').evaluate((element) => {
-    (element as HTMLDetailsElement).open = true;
-  });
+  await openHudSection(page, 'room');
   const seatButton = page.locator('#roomSeats').getByRole('button', { name: `${seatLabel}: open` });
   await expect(seatButton).toBeVisible();
   await seatButton.evaluate((element) => {

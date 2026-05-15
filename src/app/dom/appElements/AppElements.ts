@@ -45,6 +45,7 @@ export interface AppElements {
   readonly blackjackView: HTMLDivElement;
   readonly slotsView: HTMLDivElement;
   readonly gameHud: HTMLDivElement;
+  readonly hudOverflowMenu: HTMLDetailsElement;
   readonly moneyPill: HTMLDivElement;
   readonly actionDock: HTMLDivElement;
   readonly status: HTMLDivElement;

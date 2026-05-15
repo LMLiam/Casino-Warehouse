@@ -35,19 +35,39 @@ test('profile lobby and game tiles render without overflowing key text', async (
   await expect(page.locator('[data-lobby-game^="slots:"]')).toHaveCount(1);
   await expect(page.locator('#gameLobby .fictional-notice')).toContainText('Fictional currency only');
   const primaryHud = page.locator('#gameHud > .hud-button-row').first();
+  await expect(primaryHud.getByRole('button', { name: 'Home' })).toBeVisible();
+  await expect(primaryHud.locator('summary')).toHaveCount(0);
   await expect(primaryHud.locator('summary').filter({ hasText: /^Games$/ })).toHaveCount(0);
   await expect(primaryHud.locator('summary').filter({ hasText: /^Rules$/ })).toHaveCount(0);
   await expect(primaryHud.locator('summary').filter({ hasText: /^Paytable$/ })).toHaveCount(0);
-  await expect(primaryHud.locator('summary').filter({ hasText: /^Info$/ })).toBeVisible();
-  await primaryHud
-    .locator('summary')
-    .filter({ hasText: /^Info$/ })
-    .click();
+  await expect(page.locator('#hudOverflowButton')).toBeVisible();
+  await openHudOverflow(page);
+  const overflowPanel = page.locator('#hudOverflowPanel');
+  await expect(overflowPanel.getByRole('button', { name: 'Switch Profile' })).toBeVisible();
+  await expect(overflowPanel.getByRole('button', { name: 'Exit Room' })).toBeHidden();
+  await expect(overflowPanel.locator('[data-hud-section="info"] > summary')).toBeVisible();
+  await expect(overflowPanel.locator('[data-hud-section="profile"] > summary')).toBeVisible();
+  await expect(overflowPanel.locator('[data-hud-section="stats"] > summary')).toBeVisible();
+  await expect(overflowPanel.locator('[data-hud-section="admin"] > summary')).toBeVisible();
+  await expect(overflowPanel.locator('[data-hud-section="room"]')).toBeHidden();
+  await openHudSection(page, 'info');
   await expect(page.locator('#beatRules')).toContainText('Play up to three hands');
   await expect(page.locator('#beatPaytable')).toContainText('Dealer Sevens');
+  await openHudSection(page, 'profile');
+  await expect(page.locator('#playerStrip')).toContainText('QA Player');
+  await openHudSection(page, 'stats');
+  await expect(page.locator('#profileStats')).toContainText('Wagered');
+  await expect(page.locator('#onTable')).toContainText('£0');
+  await openHudSection(page, 'admin');
+  await expect(page.locator('#authorizeAdminBtn')).toBeVisible();
   await expect(page.locator('#roomMenu')).toBeHidden();
 
   await expectNoHorizontalOverflow(page.locator('.game-shell'));
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#hudOverflowPanel')).toBeHidden();
+  await openHudOverflow(page);
+  await overflowPanel.getByRole('button', { name: 'Switch Profile' }).click();
+  await expect(page.locator('#setup')).toBeVisible();
   expectConsoleClean(page);
 });
 
@@ -153,7 +173,7 @@ test('audio mute and volume controls persist across reloads', async ({ page }) =
 test('admin bankroll adjustments update wallet and audit ledger without corrupting profile storage', async ({ page }) => {
   await createSession(page);
 
-  await page.locator('.admin-panel > summary').click();
+  await openHudSection(page, 'admin');
   await page.locator('#moneyInput').fill('125');
   await page.getByRole('button', { name: 'Add' }).click();
   await expect(page.locator('#bankroll')).toContainText('£1,125');
@@ -177,7 +197,7 @@ test('admin bankroll adjustments update wallet and audit ledger without corrupti
 
 test('House Advance offer, owed balance, and capped-state messaging render in the lobby and wallet', async ({ page }) => {
   await createSession(page);
-  await page.locator('.admin-panel > summary').click();
+  await openHudSection(page, 'admin');
   await page.locator('#moneyInput').fill('1000');
   await page.getByRole('button', { name: 'Subtract' }).click();
 
@@ -189,11 +209,12 @@ test('House Advance offer, owed balance, and capped-state messaging render in th
   await page.getByRole('button', { name: 'Take House Advance' }).click();
   await expect(page.locator('#bankroll')).toContainText('£100');
   await expect(page.locator('#houseAdvancePill')).toContainText('House Advance owed: £100 · 1/3 active');
-  await page.locator('.stats-menu > summary').click();
+  await openHudSection(page, 'stats');
   await expect(page.locator('#profileStats')).toContainText('House Advance owed £100');
   await expect(page.locator('#auditLog')).toContainText('House Advance accepted');
 
   for (let count = 2; count <= 3; count += 1) {
+    await openHudSection(page, 'admin');
     await page.locator('#moneyInput').fill('100');
     await page.getByRole('button', { name: 'Subtract' }).click();
     await expect(page.locator('#bankroll')).toContainText('£0');
@@ -201,6 +222,7 @@ test('House Advance offer, owed balance, and capped-state messaging render in th
     await expect(page.locator('#houseAdvancePill')).toContainText(`House Advance owed: £${count}00 · ${count}/3 active`);
   }
 
+  await openHudSection(page, 'admin');
   await page.locator('#moneyInput').fill('100');
   await page.getByRole('button', { name: 'Subtract' }).click();
   await expect(page.locator('#bankroll')).toContainText('£0');
@@ -258,16 +280,19 @@ test('Beat the House selection opens the multiplayer room lobby before table pla
   await expect(page.locator('#roomMaxPlayersInput')).toHaveAttribute('max', '3');
   await expect(page.locator('#roomMaxPlayersInput')).toHaveValue('3');
   await expect(page.locator('#roomBrowser')).toContainText('Beat the House Main Room');
+  await openHudOverflow(page);
   await expect(page.locator('#roomMenu')).toBeHidden();
+  await expect(page.locator('#leaveRoomBtn')).toBeHidden();
   await expect(page.locator('#tableHost')).toBeHidden();
   await expect(page.locator('#chipRail')).toBeHidden();
   await page.getByRole('button', { name: 'Join Room' }).first().click();
   await expect(page.locator('#tableHost')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Home' })).toBeEnabled();
+  await openHudOverflow(page);
   await expect(page.locator('#roomMenu')).toBeVisible();
+  await expect(page.locator('#leaveRoomBtn')).toBeVisible();
   await expect(page.locator('#chipRail')).toBeHidden();
-  await page.locator('#roomMenu').evaluate((element) => {
-    (element as HTMLDetailsElement).open = true;
-  });
+  await openHudSection(page, 'room');
   await page.locator('#roomSeats').getByRole('button', { name: 'Left: open' }).click();
   await expect(page.locator('#roomSeats')).toContainText('Left: QA Player');
   await expect(page.locator('#chipRail')).toBeVisible();
@@ -378,6 +403,25 @@ const expectNoHorizontalOverflow = async (locator: Locator): Promise<void> => {
   await expect(locator).toBeVisible();
   const overflow = await locator.evaluate((element) => element.scrollWidth - element.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+};
+
+type HudSection = 'admin' | 'info' | 'profile' | 'room' | 'stats';
+
+const openHudOverflow = async (page: Page): Promise<void> => {
+  const menu = page.locator('#hudOverflowMenu');
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.locator('#hudOverflowButton').click();
+  }
+  await expect(page.locator('#hudOverflowPanel')).toBeVisible();
+};
+
+const openHudSection = async (page: Page, sectionName: HudSection): Promise<void> => {
+  await openHudOverflow(page);
+  const section = page.locator(`[data-hud-section="${sectionName}"]`);
+  if (!(await section.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await section.locator('summary').first().click();
+  }
+  await expect(section).toBeVisible();
 };
 
 const setRangeValue = async (locator: Locator, value: string): Promise<void> => {

@@ -56,6 +56,7 @@ export const collectElements = (): AppElements => {
     blackjackView: query('#blackjackView'),
     slotsView: query('#slotsView'),
     gameHud: query('#gameHud'),
+    hudOverflowMenu: query('#hudOverflowMenu'),
     moneyPill: query('#moneyPill'),
     actionDock: query('#actionDock'),
     status: query('#status'),

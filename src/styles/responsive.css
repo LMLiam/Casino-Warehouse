@@ -19,10 +19,17 @@
   }
 
   .hud-button,
-  .hud-menu > summary {
+  .hud-overflow-menu > summary {
     min-width: 62px;
     padding: 0 10px;
     font-size: 12px;
+  }
+
+  .hud-overflow-menu > summary {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 18px;
   }
 
   .game-tabs {

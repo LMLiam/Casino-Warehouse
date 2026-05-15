@@ -13,16 +13,51 @@ export class AppEventBinder {
     this.elements.startSessionButton.addEventListener('click', () => this.callbacks.startSelectedProfiles());
     this.elements.roomRefreshButton.addEventListener('click', () => this.callbacks.refreshMultiplayerRooms());
     this.elements.hostRoomButton.addEventListener('click', () => this.callbacks.hostMultiplayerRoom());
-    this.elements.leaveRoomButton.addEventListener('click', () => this.callbacks.leaveMultiplayerRoom());
-    this.elements.backToLobbyButton.addEventListener('click', () => this.callbacks.backToLobby());
-    this.elements.switchProfileButton.addEventListener('click', () => this.callbacks.switchProfiles());
+    this.elements.leaveRoomButton.addEventListener('click', () => {
+      this.closeHudOverflowMenu();
+      this.callbacks.leaveMultiplayerRoom();
+    });
+    this.elements.backToLobbyButton.addEventListener('click', () => {
+      this.closeHudOverflowMenu();
+      this.callbacks.backToLobby();
+    });
+    this.elements.switchProfileButton.addEventListener('click', () => {
+      this.closeHudOverflowMenu();
+      this.callbacks.switchProfiles();
+    });
     this.elements.houseAdvanceButton.addEventListener('click', () => this.callbacks.acceptHouseAdvance());
     this.elements.sessionLimitInput.addEventListener('change', () => this.callbacks.updateSessionLimit());
+    this.bindHudOverflow();
     this.bindGameTabs();
     this.bindChips();
     this.bindBeatControls();
     this.bindBlackjackControls();
     this.bindSlotsControls();
+  }
+
+  private bindHudOverflow(): void {
+    this.elements.hudOverflowMenu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && this.elements.hudOverflowMenu.open) {
+        event.preventDefault();
+        this.closeHudOverflowMenu(true);
+      }
+    });
+    document.addEventListener('click', (event) => {
+      if (!this.elements.hudOverflowMenu.open) {
+        return;
+      }
+      const target = event.target;
+      if (target instanceof Node && !this.elements.hudOverflowMenu.contains(target)) {
+        this.closeHudOverflowMenu();
+      }
+    });
+  }
+
+  private closeHudOverflowMenu(restoreFocus = false): void {
+    this.elements.hudOverflowMenu.open = false;
+    if (restoreFocus) {
+      this.elements.hudOverflowMenu.querySelector('summary')?.focus();
+    }
   }
 
   private bindGameTabs(): void {
