@@ -11,6 +11,9 @@ import type { SlotSymbol } from './SlotSymbol';
 import type { SlotTheme } from './SlotTheme';
 
 export class SlotsGame {
+  private static readonly bonusTriggerMatchCount = 3;
+  private static readonly wildLineMinimumMatches = 3;
+
   private static readonly slotSymbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
 
   private readonly rng?: Rng;
@@ -90,7 +93,7 @@ export class SlotsGame {
     this.returned = this.lineWin;
 
     const bonusCount = this.reels.filter((symbol) => symbol === this.theme.bonus.triggerSymbol).length;
-    if (bonusCount >= 3) {
+    if (bonusCount >= SlotsGame.bonusTriggerMatchCount) {
       this.phase = 'bonus';
       this.bonusPicksRemaining = this.theme.bonus.picks;
       this.status = `${this.theme.title} bonus unlocked. Pick ${this.theme.bonus.picks} prizes.`;
@@ -181,7 +184,7 @@ export class SlotsGame {
       break;
     }
 
-    if (matches < 3) {
+    if (matches < SlotsGame.wildLineMinimumMatches) {
       return 0;
     }
 

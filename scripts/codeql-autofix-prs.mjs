@@ -10,6 +10,8 @@ export const defaultAutofixOptions = {
   pollSeconds: 10,
 };
 
+const millisecondsPerSecond = 1000;
+
 const severityOrder = new Map([
   ['note', 0],
   ['warning', 1],
@@ -332,7 +334,7 @@ export async function requestAutofix({ alertNumber, client, owner, repo, options
   }
 
   for (let attempt = 0; attempt < normalized.pollAttempts; attempt += 1) {
-    await delayImpl(normalized.pollSeconds * 1000);
+    await delayImpl(normalized.pollSeconds * millisecondsPerSecond);
     const status = await client.request('GET', `/repos/${owner}/${repo}/code-scanning/alerts/${alertNumber}/autofix`);
     if (status.data?.status === 'success') {
       return status.data;

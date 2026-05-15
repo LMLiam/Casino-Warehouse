@@ -9,6 +9,11 @@ import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 
 export class SlotsView {
+  private static readonly spinAnimationMs = 1280;
+  private static readonly reelDelayStepMs = 42;
+  private static readonly reelShineBaseDelayMs = 120;
+  private static readonly reelShineStepDelayMs = 34;
+
   private spinTimer: number | undefined;
 
   public constructor(private readonly elements: AppElements) {}
@@ -20,7 +25,7 @@ export class SlotsView {
     this.elements.slotReels.classList.add('is-spinning');
     this.spinTimer = window.setTimeout(() => {
       this.elements.slotReels.classList.remove('is-spinning');
-    }, 1280);
+    }, SlotsView.spinAnimationMs);
   }
 
   public render(snapshot: SlotSnapshot, activeGame: CasinoGameId, activeRoom?: RoomSnapshot, profileId = ''): void {
@@ -40,8 +45,8 @@ export class SlotsView {
       const symbolAsset = slotSymbolAsset(symbol);
 
       const reelCell = document.createElement('span');
-      reelCell.style.setProperty('--reel-delay', `${index * 42}ms`);
-      reelCell.style.setProperty('--reel-shine-delay', `${120 + index * 34}ms`);
+      reelCell.style.setProperty('--reel-delay', `${index * SlotsView.reelDelayStepMs}ms`);
+      reelCell.style.setProperty('--reel-shine-delay', `${SlotsView.reelShineBaseDelayMs + index * SlotsView.reelShineStepDelayMs}ms`);
       reelCell.setAttribute('aria-label', `Column ${column}, row ${row}: ${label}`);
       reelCell.setAttribute('data-slot-symbol', String(symbol));
       reelCell.setAttribute('data-slot-column', String(column));

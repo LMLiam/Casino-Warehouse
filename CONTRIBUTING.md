@@ -49,6 +49,8 @@ Keep new `src/` modules focused on one module-scope top-level element. Classes, 
 
 `npm run architecture:check` enforces this convention. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
 
+The architecture check also rejects unexplained magic numbers in source, TypeScript tests, and repository tooling scripts. Name game rules, payout multipliers, layout values, protocol bytes, thresholds, and reusable test-helper values in the narrowest owner, or use the documented inline exception marker only when an inline number is intentionally clearer.
+
 ## Local Checks
 
 Configure your editor to respect the repository `.editorconfig` before making changes.

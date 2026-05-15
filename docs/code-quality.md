@@ -37,6 +37,20 @@ The app is organised by domain first. New modules should go into the narrowest f
 - Files over 700 lines must either be split or listed with a documented exception.
 - App modules must live in an approved `src/app/<role>/` folder instead of directly under `src/app/`.
 - Tests must live under `tests/unit/<domain>/` or `tests/e2e/`.
+- No unexplained magic numbers in checked TypeScript, TSX, or repository tooling scripts.
+
+## Magic Numbers
+
+Numeric values that define game rules, payout multipliers, room limits, timing thresholds, layout offsets, binary protocol bytes, schema bounds, or test helper behaviour must be named where they are owned. Prefer domain constants, class-private constants, focused config objects, or test fixture constants near the behaviour they explain.
+
+The architecture checker scans `src/**/*.{ts,tsx}`, `tests/**/*.ts`, and `scripts/**/*.mjs`. Inline numeric literals are allowed only when they are:
+
+- neutral values such as `-1`, `0`, `0.5`, `1`, or `2` used for arithmetic, indexes, or simple binary choices;
+- values in named `const` declarations, readonly/static class properties, enum members, object config properties, type literals, or default parameters;
+- literal test-case data inside `it`/`test`/`describe` callbacks, where the test title and matcher explain the example;
+- an intentional local exception on the same line with `casino-magic-number-allow: <reason>`.
+
+Do not create broad `constants.ts` buckets. Keep constants in the narrowest domain owner, such as game rule modules, renderer config objects, multiplayer protocol helpers, state/schema boundaries, or focused test fixtures.
 
 ## File Responsibility
 

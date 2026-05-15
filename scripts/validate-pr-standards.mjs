@@ -17,6 +17,8 @@ const requiredChecks = [
   'I ran the relevant local checks.',
 ];
 
+const summaryMinLength = 20;
+
 const templatePlaceholders = ['Describe the change and why it is needed.', 'Anything reviewers should know:'];
 
 function escapeRegex(value) {
@@ -66,7 +68,7 @@ function validateBody(body) {
   }
 
   const summary = sections.get('summary');
-  if (!summary || summary.length < 20) {
+  if (!summary || summary.length < summaryMinLength) {
     failures.push('The Summary section must describe the change and why it is needed.');
   }
 

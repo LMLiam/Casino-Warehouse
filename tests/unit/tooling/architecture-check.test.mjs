@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { magicNumberErrors } from '../../../scripts/magic-number-check.mjs';
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
 
@@ -97,5 +98,72 @@ describe('mathRandomErrors', () => {
   it('allows direct Math.random only in visual effect renderers', () => {
     expect(mathRandomErrors('src/ui/renderers/EffectRenderer.ts', 'const offset = Math.random() * 10;')).toEqual([]);
     expect(mathRandomErrors('src/state/profiles/createStateId.ts', 'const id = crypto.randomUUID();')).toEqual([]);
+  });
+});
+
+describe('magicNumberErrors', () => {
+  it('rejects unexplained executable numeric literals in source files', () => {
+    expect(
+      magicNumberErrors(
+        'src/game/example.ts',
+        `
+export function isBust(total: number): boolean {
+  return total > 21;
+}
+`,
+      ),
+    ).toEqual([
+      'src/game/example.ts:3:18 uses unexplained numeric literal 21. Name the value with a domain constant/config/fixture, or add "casino-magic-number-allow: <reason>" for an intentional inline exception.',
+    ]);
+  });
+
+  it('accepts named constants, config values, and documented inline exceptions', () => {
+    expect(
+      magicNumberErrors(
+        'src/game/example.ts',
+        `
+const blackjackTargetTotal = 21;
+const layoutConfig = { tagOffsetY: 14 };
+
+export function isBust(total: number): boolean {
+  return total > blackjackTargetTotal || total > 50; // casino-magic-number-allow: legacy payout table threshold
+}
+`,
+      ),
+    ).toEqual([]);
+  });
+
+  it('covers tests while allowing literal test-case data inside test callbacks', () => {
+    expect(
+      magicNumberErrors(
+        'tests/unit/game/example.test.ts',
+        `
+function helper(value: number): boolean {
+  return value > 99;
+}
+
+it('asserts a domain example', () => {
+  expect(helper(125)).toBe(true);
+});
+`,
+      ),
+    ).toEqual([
+      'tests/unit/game/example.test.ts:3:18 uses unexplained numeric literal 99. Name the value with a domain constant/config/fixture, or add "casino-magic-number-allow: <reason>" for an intentional inline exception.',
+    ]);
+  });
+
+  it('checks repository scripts too', () => {
+    expect(
+      magicNumberErrors(
+        'scripts/example.mjs',
+        `
+export function timeoutMs(seconds) {
+  return seconds * 1000;
+}
+`,
+      ),
+    ).toEqual([
+      'scripts/example.mjs:3:20 uses unexplained numeric literal 1000. Name the value with a domain constant/config/fixture, or add "casino-magic-number-allow: <reason>" for an intentional inline exception.',
+    ]);
   });
 });

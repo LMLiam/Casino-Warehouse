@@ -6,6 +6,22 @@ import { MARKER_RENDERING } from './renderingConstants/MARKER_RENDERING';
 import { TAG_RENDERING } from './renderingConstants/TAG_RENDERING';
 
 export class TagRenderer {
+  private static readonly resultPopupWidth = 260;
+  private static readonly resultPopupBaseHeight = 92;
+  private static readonly resultPopupSideLineHeight = 20;
+  private static readonly resultPopupGlowPadding = 8;
+  private static readonly resultPopupGlowRadius = 22;
+  private static readonly resultPopupBackingRadius = 18;
+  private static readonly jackpotStrokeWidth = 5;
+  private static readonly standardStrokeWidth = 3;
+  private static readonly jackpotHeadingFontSize = 28;
+  private static readonly standardHeadingFontSize = 24;
+  private static readonly headingOffsetY = 26;
+  private static readonly detailFontSize = 15;
+  private static readonly detailOffsetY = 53;
+  private static readonly sideLineFontSize = 13;
+  private static readonly sideLineStartOffsetY = 77;
+
   public constructor(private readonly layer: Container) {}
 
   public drawPayoutTag(text: string, x: number, y: number, state: 'win' | 'push' | 'lose', alpha = 1): void {
@@ -43,38 +59,51 @@ export class TagRenderer {
 
   public drawResultPopup(title: string, subtitle: string, sideLines: readonly string[], x: number, y: number, result: HandResult, jackpot: boolean): void {
     const color = jackpot ? COLORS.jackpot : TagRenderer.resultColor(result);
-    const width = 260;
-    const height = 92 + sideLines.length * 20;
+    const width = TagRenderer.resultPopupWidth;
+    const height = TagRenderer.resultPopupBaseHeight + sideLines.length * TagRenderer.resultPopupSideLineHeight;
     const group = new Container();
     group.position.set(x, y);
 
-    const glow = new Graphics().roundRect(-width / 2 - 8, -height / 2 - 8, width + 16, height + 16, 22).fill({ color, alpha: jackpot ? 0.22 : 0.13 });
+    const glow = new Graphics()
+      .roundRect(
+        -width / 2 - TagRenderer.resultPopupGlowPadding,
+        -height / 2 - TagRenderer.resultPopupGlowPadding,
+        width + TagRenderer.resultPopupGlowPadding * 2,
+        height + TagRenderer.resultPopupGlowPadding * 2,
+        TagRenderer.resultPopupGlowRadius,
+      )
+      .fill({ color, alpha: jackpot ? 0.22 : 0.13 });
     const backing = new Graphics()
-      .roundRect(-width / 2, -height / 2, width, height, 18)
+      .roundRect(-width / 2, -height / 2, width, height, TagRenderer.resultPopupBackingRadius)
       .fill({ color: COLORS.black, alpha: 0.88 })
-      .stroke({ color, width: jackpot ? 5 : 3, alpha: 0.95 });
+      .stroke({ color, width: jackpot ? TagRenderer.jackpotStrokeWidth : TagRenderer.standardStrokeWidth, alpha: 0.95 });
     const heading = new Text({
       text: title,
-      style: new TextStyle({ fill: color, fontFamily: 'Arial', fontSize: jackpot ? 28 : 24, fontWeight: '900' }),
+      style: new TextStyle({
+        fill: color,
+        fontFamily: 'Arial',
+        fontSize: jackpot ? TagRenderer.jackpotHeadingFontSize : TagRenderer.standardHeadingFontSize,
+        fontWeight: '900',
+      }),
     });
     heading.anchor.set(0.5);
-    heading.position.set(0, -height / 2 + 26);
+    heading.position.set(0, -height / 2 + TagRenderer.headingOffsetY);
 
     const detail = new Text({
       text: subtitle,
-      style: new TextStyle({ fill: COLORS.white, fontFamily: 'Arial', fontSize: 15, fontWeight: 'bold' }),
+      style: new TextStyle({ fill: COLORS.white, fontFamily: 'Arial', fontSize: TagRenderer.detailFontSize, fontWeight: 'bold' }),
     });
     detail.anchor.set(0.5);
-    detail.position.set(0, -height / 2 + 53);
+    detail.position.set(0, -height / 2 + TagRenderer.detailOffsetY);
 
     group.addChild(glow, backing, heading, detail);
     sideLines.forEach((line, index) => {
       const label = new Text({
         text: line,
-        style: new TextStyle({ fill: TagRenderer.popupLineColor(line), fontFamily: 'Arial', fontSize: 13, fontWeight: 'bold' }),
+        style: new TextStyle({ fill: TagRenderer.popupLineColor(line), fontFamily: 'Arial', fontSize: TagRenderer.sideLineFontSize, fontWeight: 'bold' }),
       });
       label.anchor.set(0.5);
-      label.position.set(0, -height / 2 + 77 + index * 20);
+      label.position.set(0, -height / 2 + TagRenderer.sideLineStartOffsetY + index * TagRenderer.resultPopupSideLineHeight);
       group.addChild(label);
     });
 

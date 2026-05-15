@@ -20,6 +20,17 @@ import { betTypeLabel } from './betTypeLabel';
 import type { GameOptions } from './GameOptions';
 
 export class BeatTheHouseGame {
+  private static readonly defaultInitialBankroll = 100;
+  private static readonly maxPlayerCards = 4;
+  private static readonly dealerDrawMaxRank = 10;
+  private static readonly maxDealerCards = 4;
+  private static readonly sideBetMultipliers = {
+    aceFlashBoth: 50,
+    aceFlashSingle: 10,
+    dealerBust: 4,
+    matchPush: 9,
+  } as const;
+
   private static readonly sideBetTypes = betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[];
 
   private static readonly handName: Record<HandId, string> = {
@@ -42,7 +53,7 @@ export class BeatTheHouseGame {
   private readonly rng?: Rng;
 
   public constructor(options: GameOptions = {}) {
-    this.bankroll = options.initialBankroll ?? 100;
+    this.bankroll = options.initialBankroll ?? BeatTheHouseGame.defaultInitialBankroll;
     this.rng = options.rng;
     this.deck = options.deck ? [...options.deck] : createDeck(this.rng);
   }
@@ -258,7 +269,7 @@ export class BeatTheHouseGame {
       return this.advanceFromPlayer(events);
     }
 
-    if (cards.length >= 4) {
+    if (cards.length >= BeatTheHouseGame.maxPlayerCards) {
       this.hands[handId] = { ...hand, cards, done: true, finalCard: card };
       events.push({ type: 'hand-completed', handId, message: `${BeatTheHouseGame.handName[handId]} reaches four cards and stands on ${cardLabel(card)}.` });
       return this.advanceFromPlayer(events);
@@ -419,7 +430,11 @@ export class BeatTheHouseGame {
       return this.settle(events);
     }
 
-    while (this.dealer.finalCard && rankValue(this.dealer.finalCard.rank) <= 10 && this.dealer.cards.length < 4) {
+    while (
+      this.dealer.finalCard &&
+      rankValue(this.dealer.finalCard.rank) <= BeatTheHouseGame.dealerDrawMaxRank &&
+      this.dealer.cards.length < BeatTheHouseGame.maxDealerCards
+    ) {
       const card = this.draw();
       const cards = [...this.dealer.cards, card];
       this.dealer = { ...this.dealer, cards, finalCard: card };
@@ -519,14 +534,14 @@ export class BeatTheHouseGame {
       const playerAce = isBlackAce(playerFirst);
       const dealerAce = isBlackAce(dealerFirst);
       if (playerAce && dealerAce) {
-        win('aceFlash', 'Ace Flash', 50);
+        win('aceFlash', 'Ace Flash', BeatTheHouseGame.sideBetMultipliers.aceFlashBoth);
       } else if (playerAce || dealerAce) {
-        win('aceFlash', 'Ace Flash', 10);
+        win('aceFlash', 'Ace Flash', BeatTheHouseGame.sideBetMultipliers.aceFlashSingle);
       }
     }
 
     if (bets.dealerBust > 0 && this.dealer.bust) {
-      win('dealerBust', 'Dealer Bust', 4);
+      win('dealerBust', 'Dealer Bust', BeatTheHouseGame.sideBetMultipliers.dealerBust);
     }
 
     if (
@@ -538,7 +553,7 @@ export class BeatTheHouseGame {
       this.dealer.finalCard &&
       rankValue(hand.finalCard.rank) === rankValue(this.dealer.finalCard.rank)
     ) {
-      win('matchPush', 'Match Push', 9);
+      win('matchPush', 'Match Push', BeatTheHouseGame.sideBetMultipliers.matchPush);
     }
 
     if (bets.dealerSevens > 0) {

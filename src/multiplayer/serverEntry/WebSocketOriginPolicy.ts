@@ -1,6 +1,16 @@
 import type { IncomingMessage } from 'node:http';
 
 export class WebSocketOriginPolicy {
+  private static readonly maxIpv4Octet = 255;
+  private static readonly privateClassAFirstOctet = 10;
+  private static readonly privateClassBFirstOctet = 172;
+  private static readonly privateClassBSecondOctetMin = 16;
+  private static readonly privateClassBSecondOctetMax = 31;
+  private static readonly privateClassCFirstOctet = 192;
+  private static readonly privateClassCSecondOctet = 168;
+  private static readonly linkLocalFirstOctet = 169;
+  private static readonly linkLocalSecondOctet = 254;
+
   public static allows(request: IncomingMessage, publicBaseUrl: string): boolean {
     const origin = this.requestOrigin(request);
     if (!origin) {
@@ -83,12 +93,19 @@ export class WebSocketOriginPolicy {
     }
 
     const octets = ipv4.slice(1).map(Number);
-    if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > WebSocketOriginPolicy.maxIpv4Octet)) {
       return undefined;
     }
 
     const [first, second] = octets;
-    if (first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168) || (first === 169 && second === 254)) {
+    if (
+      first === WebSocketOriginPolicy.privateClassAFirstOctet ||
+      (first === WebSocketOriginPolicy.privateClassBFirstOctet &&
+        second >= WebSocketOriginPolicy.privateClassBSecondOctetMin &&
+        second <= WebSocketOriginPolicy.privateClassBSecondOctetMax) ||
+      (first === WebSocketOriginPolicy.privateClassCFirstOctet && second === WebSocketOriginPolicy.privateClassCSecondOctet) ||
+      (first === WebSocketOriginPolicy.linkLocalFirstOctet && second === WebSocketOriginPolicy.linkLocalSecondOctet)
+    ) {
       return 'private-network';
     }
     return undefined;

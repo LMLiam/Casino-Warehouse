@@ -548,9 +548,12 @@ describe('shared casino bankroll', () => {
 });
 
 function createSeededRng(seed: number): () => number {
+  const lcgMultiplier = 1_664_525;
+  const lcgIncrement = 1_013_904_223;
+  const lcgModulus = 0x1_0000_0000;
   let state = seed >>> 0;
   return () => {
-    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
-    return state / 0x1_0000_0000;
+    state = (Math.imul(state, lcgMultiplier) + lcgIncrement) >>> 0;
+    return state / lcgModulus;
   };
 }

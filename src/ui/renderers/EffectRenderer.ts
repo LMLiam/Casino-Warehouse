@@ -6,6 +6,17 @@ import { COLORS } from './renderingConstants/COLORS';
 import { SIDE_WIN_EFFECT } from './renderingConstants/SIDE_WIN_EFFECT';
 
 export class EffectRenderer {
+  private static readonly sparkleDelayStep = 0.035;
+  private static readonly confettiPieceCount = 80;
+  private static readonly confettiSpawnY = -20;
+  private static readonly confettiSpawnYRange = 180;
+  private static readonly confettiFallPadding = 30;
+  private static readonly confettiDriftCenter = 0.5;
+  private static readonly confettiDriftRange = 220;
+  private static readonly confettiMaxRotation = 8;
+  private static readonly confettiDurationBase = 1.7;
+  private static readonly confettiDurationRange = 0.8;
+
   public constructor(private readonly layer: Container) {}
 
   public drawSideBetWin(x: number, y: number, width: number, height: number, isWagered: boolean): void {
@@ -43,7 +54,7 @@ export class EffectRenderer {
       gsap.fromTo(
         sparkle,
         { alpha: 0.15, scale: 0.4 },
-        { alpha: 1, scale: 1.15, repeat: 3, yoyo: true, duration: 0.34, delay: index * 0.035, ease: 'sine.inOut' },
+        { alpha: 1, scale: 1.15, repeat: 3, yoyo: true, duration: 0.34, delay: index * EffectRenderer.sparkleDelayStep, ease: 'sine.inOut' },
       );
     }
   }
@@ -59,15 +70,15 @@ export class EffectRenderer {
       return;
     }
 
-    for (let index = 0; index < 80; index += 1) {
+    for (let index = 0; index < EffectRenderer.confettiPieceCount; index += 1) {
       const bit = new Graphics().rect(-4, -3, 8, 6).fill({ color: [COLORS.gold, 0xfff5d6, 0xd23b32, 0x2d72ff][index % 4] });
-      bit.position.set(Math.random() * tableSize.width, -20 - Math.random() * 180);
+      bit.position.set(Math.random() * tableSize.width, EffectRenderer.confettiSpawnY - Math.random() * EffectRenderer.confettiSpawnYRange);
       this.layer.addChild(bit);
       gsap.to(bit, {
-        y: tableSize.height + 30,
-        x: bit.x + (Math.random() - 0.5) * 220,
-        rotation: Math.random() * 8,
-        duration: 1.7 + Math.random() * 0.8,
+        y: tableSize.height + EffectRenderer.confettiFallPadding,
+        x: bit.x + (Math.random() - EffectRenderer.confettiDriftCenter) * EffectRenderer.confettiDriftRange,
+        rotation: Math.random() * EffectRenderer.confettiMaxRotation,
+        duration: EffectRenderer.confettiDurationBase + Math.random() * EffectRenderer.confettiDurationRange,
         ease: 'power2.in',
         onComplete: () => bit.destroy(),
       });

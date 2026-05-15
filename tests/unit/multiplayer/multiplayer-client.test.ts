@@ -11,6 +11,7 @@ import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMess
 class FakeWebSocket {
   public static readonly CONNECTING = 0;
   public static readonly OPEN = 1;
+  public static readonly CLOSED = 3;
   public static instances: FakeWebSocket[] = [];
   public static throwOnConstruct = false;
   public readyState = 0;
@@ -33,7 +34,7 @@ class FakeWebSocket {
   }
 
   public close(): void {
-    this.readyState = 3;
+    this.readyState = FakeWebSocket.CLOSED;
     this.emit('close');
   }
 
