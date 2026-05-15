@@ -565,25 +565,30 @@ export class PixiTable {
       0,
       Math.floor(settlementMetadata.find((metadata) => metadata.handId === summary.handId)?.houseAdvanceRepayment ?? 0),
     );
-    const netProfit = summary.profit - houseAdvanceRepayment;
+    const netProfit = summary.profit - houseAdvanceRepayment + dealerThanks;
     return {
       mainLine: `Main ${summary.mainResult.toUpperCase()} ${PixiTable.formatProfit(mainProfit)}`,
       sideLine: `Side bets ${sideStake > 0 ? PixiTable.netLabel(sideProfit, 'EVEN') : 'NONE'} ${PixiTable.formatProfit(sideProfit)}`,
-      detailLines: PixiTable.settlementDetailLines(summary.profit, houseAdvanceRepayment, netProfit, dealerThanks),
+      detailLines: PixiTable.settlementDetailLines(summary.profit, houseAdvanceRepayment, dealerThanks, netProfit),
       result: PixiTable.resultForProfit(netProfit),
     };
   }
 
-  private static settlementDetailLines(profit: number, houseAdvanceRepayment: number, netProfit: number, dealerThanks: number): string[] {
-    const dealerThanksLine = dealerThanks > 0 ? [`Dealer's Thanks +£${dealerThanks}`] : [];
-    return houseAdvanceRepayment > 0
-      ? [
-          `Gross ${PixiTable.netLabel(profit, 'PUSH')} ${PixiTable.formatProfit(profit)}`,
-          `House Advance payment -£${houseAdvanceRepayment}`,
-          `Net ${PixiTable.netLabel(netProfit, 'PUSH')} ${PixiTable.formatProfit(netProfit)}`,
-          ...dealerThanksLine,
-        ]
-      : [`Total ${PixiTable.netLabel(profit, 'PUSH')} ${PixiTable.formatProfit(profit)}`, ...dealerThanksLine];
+  private static settlementDetailLines(profit: number, houseAdvanceRepayment: number, dealerThanks: number, netProfit: number): string[] {
+    if (houseAdvanceRepayment <= 0 && dealerThanks <= 0) {
+      return [`Total ${PixiTable.netLabel(profit, 'PUSH')} ${PixiTable.formatProfit(profit)}`];
+    }
+
+    const openingLabel = houseAdvanceRepayment > 0 ? 'Gross' : 'Gameplay';
+    const adjustmentLines = [
+      ...(houseAdvanceRepayment > 0 ? [`House Advance payment -£${houseAdvanceRepayment}`] : []),
+      ...(dealerThanks > 0 ? [`Dealer's Thanks +£${dealerThanks}`] : []),
+    ];
+    return [
+      `${openingLabel} ${PixiTable.netLabel(profit, 'PUSH')} ${PixiTable.formatProfit(profit)}`,
+      ...adjustmentLines,
+      `Net ${PixiTable.netLabel(netProfit, 'PUSH')} ${PixiTable.formatProfit(netProfit)}`,
+    ];
   }
 
   private static mainProfitForSummary(result: RoundSummary['mainResult'], mainStake: number): number {

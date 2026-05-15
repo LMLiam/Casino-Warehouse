@@ -263,7 +263,7 @@ describe('Beat the House popup and animation behaviour', () => {
     expect(popupText).not.toContain('House Advance payment');
   });
 
-  it('draws dealer tip chips while betting and lists Dealer Thanks separately', () => {
+  it('draws dealer tip chips while betting and includes Dealer Thanks in the net breakdown', () => {
     vi.stubGlobal('window', {
       clearTimeout: vi.fn(),
       matchMedia: vi.fn(() => ({ matches: false })),
@@ -290,10 +290,10 @@ describe('Beat the House popup and animation behaviour', () => {
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
       'Main LOSE -£10',
       'Side bets NONE +£0',
-      ['Total LOSE -£10', "Dealer's Thanks +£10"],
+      ['Gameplay LOSE -£10', "Dealer's Thanks +£10", 'Net PUSH +£0'],
       expect.any(Number),
       expect.any(Number),
-      'lose',
+      'push',
       false,
     );
   });

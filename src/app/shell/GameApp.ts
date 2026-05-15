@@ -2,7 +2,7 @@ import { Container, Texture } from 'pixi.js';
 import { CasinoAudio } from '../../audio/casinoAudio/CasinoAudio';
 import { findGame } from '../../game/catalog/findGame';
 import type { CasinoGameId } from '../../game/ids';
-import type { BetType } from '../../game/types/BetType';
+import type { BeatTheHouseStakeTarget } from '../../game/types/BeatTheHouseStakeTarget';
 import type { HandId } from '../../game/types/HandId';
 import type { ChipValue } from '../../ui/chips/ChipValue';
 import { PixiTable } from '../../ui/PixiTable/PixiTable';
@@ -158,13 +158,13 @@ export class GameApp extends GameAppSession {
     this.table = new PixiTable(
       this.elements.tableHost,
       {
-        onBet: (handId: HandId, betType: BetType | 'dealerTip') => {
+        onBet: (handId: HandId, stakeTarget: BeatTheHouseStakeTarget) => {
           if (this.beatChipSelection.value > 0 && this.currentPlayer) {
             if (!this.beatChipSelection.ensureSelectedAffordable()) {
               return;
             }
             const selectedChip = this.beatChipSelection.value;
-            if (betType !== 'dealerTip' && !this.canWager(selectedChip)) {
+            if (stakeTarget !== 'dealerTip' && !this.canWager(selectedChip)) {
               this.elements.status.textContent = 'Session wager limit reached.';
               return;
             }
@@ -172,12 +172,12 @@ export class GameApp extends GameAppSession {
               return;
             }
             if (this.activeRoomForGame()) {
-              if (betType === 'dealerTip') {
+              if (stakeTarget === 'dealerTip') {
                 this.multiplayer.send({ version: currentProtocolVersion, type: 'place-tip', seatId: handId, amount: selectedChip });
                 this.beatControlsView.markPendingBet('dealerTip');
               } else {
-                this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType, amount: selectedChip });
-                this.beatControlsView.markPendingBet(betType);
+                this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType: stakeTarget, amount: selectedChip });
+                this.beatControlsView.markPendingBet(stakeTarget);
               }
             }
             this.audio.play('chip');
