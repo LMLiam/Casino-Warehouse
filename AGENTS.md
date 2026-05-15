@@ -42,6 +42,7 @@ Primary references:
 - `./start-codex-triage-issue.sh --print 121`: preview the Codex `/goal` for triaging an existing GitHub issue.
 - `./start-codex-docs-audit.sh --print "audit scope"`: preview the Codex `/goal` for auditing documentation drift.
 - `./start-codex-security-pass.sh --print "pull request #123"`: preview the Codex `/goal` for a focused security review.
+- `./start-codex-multiplayer-check.sh --print "pull request #123"`: preview the Codex `/goal` for a multiplayer regression review.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -173,6 +174,12 @@ The documentation audit workflow must compare docs, wiki pages, workflow referen
 When asked for a security pass, threat-model-style review, token or authorization audit, public tunnel audit, dependency security review, workflow security review, or other focused security assessment, use the Casino Warehouse security review skill at `.agents/skills/casino-security-review/SKILL.md`. For interactive launches, use `start-codex-security-pass.sh`.
 
 The security review workflow must inspect the requested target and related tests and controls before recommending changes, distinguish confirmed vulnerabilities from hardening suggestions and residual risks, verify current-info claims for advisories, CVEs, deprecations, versions, or best practices, and must not weaken CodeQL, Dependency Review, action pinning, branch protection, public-tunnel origin protections, admin-token controls, profile-token controls, or server authority.
+
+## Multiplayer Regression Workflow
+
+When asked for a multiplayer regression pass, realtime flow review, public tunnel smoke assessment, room authority review, reconnect/reload check, or focused review of multiplayer behavior, use the Casino Warehouse multiplayer regression skill at `.agents/skills/casino-multiplayer-regression/SKILL.md`. For interactive launches, use `start-codex-multiplayer-check.sh`.
+
+The multiplayer regression workflow must inspect changed files and related protocol schemas, server authority, client realtime URL behavior, persistence boundaries, public tunnel scripts, and relevant tests when applicable. It must map room lifecycle, host/join, seat claim, spectator, reconnect, heartbeat, WebSocket origin, public invite URL, profile ownership, admin permission, room snapshot, settlement, and persistence reconciliation risks to targeted checks, including unit tests and Playwright multiplayer or public tunnel smoke lanes where relevant.
 
 ## Pull Request Checklist
 
