@@ -142,7 +142,6 @@ export abstract class GameAppRendering {
     this.elements.tableHost.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse);
     this.elements.blackjackView.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBlackjack);
     this.elements.slotsView.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isSlots);
-    this.elements.status.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse);
     this.elements.beatControls.classList.toggle('hidden', this.showingGameLobby || showingRoomLobby || !isBeatTheHouse || !canUseGameControls);
     this.elements.blackjackControls.classList.toggle(
       'hidden',

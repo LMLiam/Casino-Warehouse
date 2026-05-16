@@ -5,7 +5,6 @@ export class BeatChipSelection {
   public constructor(
     private readonly chipButtons: readonly HTMLButtonElement[],
     private readonly table: { setSelectedChip(value: number): void },
-    private readonly status: { textContent: string | null },
   ) {}
 
   public get value(): number {
@@ -23,13 +22,11 @@ export class BeatChipSelection {
     const nextChip = Number(button.dataset.chip);
     if (!this.isAffordable(nextChip)) {
       this.clear();
-      this.status.textContent = 'Choose a chip within the current bankroll.';
       return;
     }
     this.selectedChip = nextChip;
     this.chipButtons.forEach((chipButton) => chipButton.classList.toggle('selected', chipButton === button));
     this.table.setSelectedChip(this.selectedChip);
-    this.status.textContent = `Selected £${this.selectedChip}. Click a betting circle on the table.`;
   }
 
   public ensureAmountAffordable(amount: number): boolean {
@@ -37,7 +34,6 @@ export class BeatChipSelection {
       return true;
     }
     this.clear();
-    this.status.textContent = 'Choose a chip within the current bankroll.';
     return false;
   }
 
@@ -46,7 +42,6 @@ export class BeatChipSelection {
       return true;
     }
     this.clear();
-    this.status.textContent = 'Selected chip is no longer within the current bankroll.';
     return false;
   }
 

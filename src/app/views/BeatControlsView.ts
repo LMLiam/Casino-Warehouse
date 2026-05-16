@@ -17,7 +17,6 @@ export class BeatControlsView {
 
   public constructor(
     private readonly elements: {
-      readonly status: { textContent: string | null };
       readonly onTable: { textContent: string | null };
       readonly tableHost: { readonly clientWidth: number; readonly clientHeight: number };
       readonly actionDock: {
@@ -54,7 +53,6 @@ export class BeatControlsView {
 
   public queueStartRound(): void {
     this.pendingStartRound = true;
-    this.elements.status.textContent = 'Confirming main bet before dealing.';
   }
 
   public shouldQueueStartRound(room: RoomSnapshot | undefined): boolean {
@@ -79,7 +77,6 @@ export class BeatControlsView {
     profileId?: string,
     bankroll?: number,
   ): void {
-    this.elements.status.textContent = this.roomReadyStatus(snapshot, activeRoom, profileId) ?? snapshot.status;
     const wageredOnTable = totalOnTable(snapshot);
     const activeHandId = activeRoom ? this.activeHandId(activeRoom, profileId) : undefined;
     this.renderSeatAwareDock(isBeatTheHouse, activeRoom, activeHandId);
@@ -200,28 +197,6 @@ export class BeatControlsView {
     }
     const rebetAmount = snapshot.rebetAmounts[activeHandId];
     return Boolean(activeRoom.beat?.rebetSeatIds.includes(activeHandId)) && rebetAmount > 0 && (bankroll ?? 0) >= rebetAmount;
-  }
-
-  private roomReadyStatus(snapshot: GameSnapshot, activeRoom: RoomSnapshot | undefined, profileId: string | undefined): string | undefined {
-    if (!activeRoom?.beat || activeRoom.gameId !== 'beat-the-house') {
-      return undefined;
-    }
-    const readyCount = activeRoom.beat.readyCount;
-    const playerCount = activeRoom.beat.playerCount;
-    const profileReady = Boolean(profileId && activeRoom.beat.readyProfileIds.includes(profileId));
-    if (snapshot.phase === 'betting' && activeRoom.beat.readyPhase === 'betting') {
-      return profileReady ? `Ready to deal. Waiting for players ${readyCount}/${playerCount}.` : `Waiting for deal readiness ${readyCount}/${playerCount}.`;
-    }
-    if (snapshot.phase !== 'roundOver') {
-      return undefined;
-    }
-    const secondsRemaining = activeRoom.beat.nextRoundDeadlineAt
-      ? Math.max(0, Math.ceil((activeRoom.beat.nextRoundDeadlineAt - Date.now()) / 1000))
-      : undefined;
-    const countdown = secondsRemaining === undefined ? '' : ` Next round starts in ${secondsRemaining}s.`;
-    return profileReady
-      ? `Ready for next round. Waiting for players ${readyCount}/${playerCount}.${countdown}`
-      : `Round settled. Ready for next round ${readyCount}/${playerCount}.${countdown}`;
   }
 
   private setActionButton(button: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> }, visible: boolean): void {
