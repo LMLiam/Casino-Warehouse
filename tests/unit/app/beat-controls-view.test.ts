@@ -169,7 +169,7 @@ describe('BeatControlsView', () => {
     expect(elements.dealButton.disabled).toBe(true);
   });
 
-  it('renders the authoritative next-round countdown', () => {
+  it('keeps multiplayer next-round controls driven by readiness', () => {
     const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
     const snapshot: GameSnapshot = { ...base, phase: 'roundOver' };
     const room = {
