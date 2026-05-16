@@ -30,6 +30,37 @@ describe('BeatSeatStatusView', () => {
     view.render({ ...active, phase: 'roundOver' }, createRoom({ ...active, phase: 'roundOver' }), 'alice');
     expect(statusLayer.innerHTML).not.toContain('dealer-tipped');
   });
+
+  it('uses server Beat readiness instead of local wager state for seat labels', () => {
+    const statusLayer = {
+      innerHTML: '',
+      style: {},
+      querySelectorAll: () => [],
+    };
+    const elements = appElementsTestDouble({
+      tableHost: { clientWidth: 1000, clientHeight: 600 },
+      beatSeatStatus: statusLayer,
+    });
+    const base = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      bets: { ...base.bets, left: { ...base.bets.left, main: 25 } },
+    };
+
+    new BeatSeatStatusView(elements).render(
+      snapshot,
+      { ...createRoom(snapshot), beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 } },
+      'alice',
+    );
+    expect(statusLayer.innerHTML).toContain('Wagered');
+
+    new BeatSeatStatusView(elements).render(
+      snapshot,
+      { ...createRoom(snapshot), beat: { rebetSeatIds: [], readyProfileIds: ['alice'], readyCount: 1, playerCount: 1, readyPhase: 'betting' } },
+      'alice',
+    );
+    expect(statusLayer.innerHTML).toContain('Ready');
+  });
 });
 
 const createRoom = (game: GameSnapshot): RoomSnapshot => ({
@@ -50,7 +81,7 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
   spectators: [],
   seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'centre' }, { seatId: 'right' }],
   game,
-  beat: { rebetSeatIds: [] },
+  beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 },
 });
 
 const appElementsTestDouble = (implementation: object): AppElements => implementation as AppElements;

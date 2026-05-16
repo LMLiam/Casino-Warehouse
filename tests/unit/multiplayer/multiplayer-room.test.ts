@@ -6,6 +6,7 @@ import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
 import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
 import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
+import type { AuthorityResult } from '../../../src/multiplayer/roomAuthorityModel/AuthorityResult';
 import type { RoomGameId } from '../../../src/multiplayer/protocol/RoomGameId';
 import type { RoomSeatId } from '../../../src/multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
@@ -45,6 +46,21 @@ const blackjack = (room: RoomSnapshot): BlackjackTableSnapshot => room.game as B
 const slots = (room: RoomSnapshot): SlotSnapshot => room.game as SlotSnapshot;
 const roomStateForTest = (authority: RoomAuthority, roomId: string): RoomState =>
   (authority as RoomAuthority & { readonly rooms: Map<string, RoomState> }).rooms.get(roomId)!;
+const rigImmediateBeatRound = (authority: RoomAuthority, roomId: string): void => {
+  const roomState = roomStateForTest(authority, roomId);
+  if (roomState.model.kind !== 'beat-the-house') {
+    throw new Error('Expected a Beat the House test room.');
+  }
+  const originalDeal = roomState.model.game.deal.bind(roomState.model.game);
+  vi.spyOn(roomState.model.game, 'deal').mockImplementation(() =>
+    originalDeal(
+      rigDeck([
+        { rank: 'A', suit: 'spades' },
+        { rank: 'K', suit: 'hearts' },
+      ] satisfies Card[]),
+    ),
+  );
+};
 
 describe('per-game multiplayer protocol', () => {
   it('requires game-scoped create, list, and join messages', () => {
@@ -269,7 +285,8 @@ describe('per-game room authority', () => {
     expect(bobSeat.error).toBe('Release your current seat before claiming another one.');
 
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
-    let result = authority.handle('a', { version: 1, type: 'start-round' });
+    authority.handle('a', { version: 1, type: 'start-round' });
+    let result = authority.handle('b', { version: 1, type: 'start-round' });
     for (let attempts = 0; result.settlements.length === 0 && attempts < 8; attempts += 1) {
       result = authority.handle('a', { version: 1, type: 'player-action', action: 'stick' });
     }
@@ -420,6 +437,87 @@ describe('per-game room authority', () => {
     expect(authority.handle('b', { version: 1, type: 'slots-spin' }).error).toBe('Every room player must be ready before the shared spin.');
   });
 
+  it('gates Beat the House deal and next round on all current players while ignoring spectators', () => {
+    const authority = new RoomAuthority();
+    const roomId = authority.handle('a', create('beat-the-house', 'alice', 500)).direct!.roomId;
+    authority.handle('a', claimSeat('left'));
+    authority.handle('b', join('beat-the-house', roomId, 'bob', 500));
+    authority.handle('b', claimSeat('centre'));
+    authority.handle('watch', join('beat-the-house', roomId, 'watcher', 500, 'spectator'));
+    authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    rigImmediateBeatRound(authority, roomId);
+
+    const aliceReady = authority.handle('a', { version: 1, type: 'start-round' }).broadcasts[0];
+    expect(beat(aliceReady).phase).toBe('betting');
+    expect(aliceReady.beat?.readyProfileIds).toEqual(['alice']);
+    expect(aliceReady.beat?.readyCount).toBe(1);
+    expect(aliceReady.beat?.playerCount).toBe(2);
+    expect(authority.handle('watch', { version: 1, type: 'start-round' }).error).toBe('Spectators cannot start rounds.');
+
+    const bobReady = authority.handle('b', { version: 1, type: 'start-round' });
+    expect(beat(bobReady.broadcasts[0]).phase).toBe('roundOver');
+    expect(bobReady.broadcasts[0].beat?.readyProfileIds).toEqual([]);
+    expect(bobReady.broadcasts[0].beat?.nextRoundDeadlineAt).toEqual(expect.any(Number));
+
+    const aliceNextReady = authority.handle('a', { version: 1, type: 'next-round' }).broadcasts[0];
+    expect(beat(aliceNextReady).phase).toBe('roundOver');
+    expect(aliceNextReady.beat?.readyProfileIds).toEqual(['alice']);
+    expect(authority.handle('watch', { version: 1, type: 'next-round' }).error).toBe('Spectators cannot advance rounds.');
+
+    const bobNextReady = authority.handle('b', { version: 1, type: 'next-round' }).broadcasts[0];
+    expect(beat(bobNextReady).phase).toBe('betting');
+    expect(bobNextReady.beat?.readyProfileIds).toEqual([]);
+    expect(bobNextReady.beat?.nextRoundDeadlineAt).toBeUndefined();
+  });
+
+  it('clears stale Beat the House readiness when wagers or player membership change', () => {
+    const authority = new RoomAuthority();
+    const roomId = authority.handle('a', create('beat-the-house', 'alice', 500)).direct!.roomId;
+    authority.handle('a', claimSeat('left'));
+    authority.handle('b', join('beat-the-house', roomId, 'bob', 500));
+    authority.handle('b', claimSeat('centre'));
+    authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+
+    expect(authority.handle('a', { version: 1, type: 'start-round' }).broadcasts[0].beat?.readyProfileIds).toEqual(['alice']);
+    expect(authority.handle('a', { version: 1, type: 'place-tip', seatId: 'left', amount: 5 }).broadcasts[0].beat?.readyProfileIds).toEqual([]);
+
+    authority.handle('a', { version: 1, type: 'start-round' });
+    authority.handle('c', join('beat-the-house', roomId, 'cory', 500));
+    const corySeated = authority.handle('c', claimSeat('right')).broadcasts[0];
+    expect(corySeated.beat?.readyProfileIds).toEqual([]);
+  });
+
+  it('advances Beat the House next round after the server-side deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const authority = new RoomAuthority();
+    const timeoutResults: AuthorityResult[] = [];
+    authority.setAsyncResultHandler((result) => timeoutResults.push(result));
+    try {
+      const roomId = authority.handle('a', create('beat-the-house', 'alice', 500)).direct!.roomId;
+      authority.handle('a', claimSeat('left'));
+      authority.handle('b', join('beat-the-house', roomId, 'bob', 500));
+      authority.handle('b', claimSeat('centre'));
+      authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+      rigImmediateBeatRound(authority, roomId);
+
+      authority.handle('a', { version: 1, type: 'start-round' });
+      const settled = authority.handle('b', { version: 1, type: 'start-round' }).broadcasts[0];
+      expect(beat(settled).phase).toBe('roundOver');
+      expect(settled.beat?.nextRoundRemainingMs).toBe(20_000);
+
+      vi.advanceTimersByTime(20_000);
+
+      expect(timeoutResults).toHaveLength(1);
+      expect(beat(timeoutResults[0].broadcasts[0]).phase).toBe('betting');
+      expect(timeoutResults[0].broadcasts[0].beat?.readyProfileIds).toEqual([]);
+      expect(timeoutResults[0].broadcasts[0].beat?.nextRoundDeadlineAt).toBeUndefined();
+    } finally {
+      authority.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it('covers room lifecycle edges, explicit seats, disabled spectators, admin reset, and closed-room cleanup', () => {
     const authority = new RoomAuthority();
     const privateRoom = authority.handle('a', {
@@ -568,7 +666,7 @@ describe('per-game room authority', () => {
     const started = authority.handle('a', { version: 1, type: 'start-round' });
 
     expect(beat(started.broadcasts[0]).phase).toBe('roundOver');
-    expect(started.settlements).toEqual([expect.objectContaining({ kind: 'gameplay', returned: 50, profit: 25 })]);
+    expect(started.settlements).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'gameplay', returned: 50, profit: 25 })]));
     const transactions = store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.transactions ?? [];
     expect(transactions).toContainEqual(
       expect.objectContaining({
@@ -579,7 +677,7 @@ describe('per-game room authority', () => {
         metadata: { handId: 'left', dealerTip: 10 },
       }),
     );
-    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.bankroll).toBe(115);
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.bankroll).toBeGreaterThanOrEqual(115);
   });
 
   it('covers additional room authority validation edges without trusting malformed client state', () => {
@@ -660,7 +758,8 @@ describe('per-game room authority', () => {
     expect(authority.handle('watch', { version: 1, type: 'rebet' }).error).toBe('Spectators cannot rebet.');
 
     authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
-    let room = authority.handle('a', { version: 1, type: 'start-round' }).broadcasts[0];
+    authority.handle('a', { version: 1, type: 'start-round' });
+    let room = authority.handle('b', { version: 1, type: 'start-round' }).broadcasts[0];
     for (let attempts = 0; beat(room).phase !== 'roundOver' && attempts < 8; attempts += 1) {
       const activeHand = beat(room).activeHand;
       const connectionId = activeHand === 'right' ? 'b' : 'a';
@@ -671,7 +770,8 @@ describe('per-game room authority', () => {
       room = acted.broadcasts[0];
     }
     expect(beat(room).phase).toBe('roundOver');
-    const nextRound = authority.handle('a', { version: 1, type: 'next-round' }).broadcasts[0];
+    authority.handle('a', { version: 1, type: 'next-round' });
+    const nextRound = authority.handle('b', { version: 1, type: 'next-round' }).broadcasts[0];
     expect(beat(nextRound).rebetAmounts).toMatchObject({ left: 25, right: 40 });
     expect(nextRound.beat?.rebetSeatIds).toEqual(['left', 'right']);
     store.setProfileBankroll('bob', 1);

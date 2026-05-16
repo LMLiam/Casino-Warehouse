@@ -28,6 +28,7 @@ const createButton = () => ({
   disabled: false,
   draggable: false,
   dataset: {},
+  textContent: '',
   classList: new FakeClassList(),
 });
 
@@ -84,7 +85,7 @@ const createRoom = (
   spectators: [],
   seats: options.seats ?? [{ seatId: 'left', profileId: 'alice' }, { seatId: 'right', profileId: 'bob' }, { seatId: 'centre' }],
   game,
-  beat: { rebetSeatIds: options.rebetSeatIds ?? ['left'] },
+  beat: { rebetSeatIds: options.rebetSeatIds ?? ['left'], readyProfileIds: [], readyCount: 0, playerCount: options.players?.length ?? 2 },
 });
 
 describe('BeatControlsView', () => {
@@ -131,6 +132,53 @@ describe('BeatControlsView', () => {
     view.render(snapshot, true, () => undefined);
 
     expect(elements.dealButton.disabled).toBe(true);
+    expect(elements.nextButton.disabled).toBe(false);
+  });
+
+  it('renders multiplayer deal readiness and hides repeat ready clicks', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      bets: {
+        ...base.bets,
+        left: { ...base.bets.left, main: 25 },
+      },
+    };
+    const room = {
+      ...createRoom(snapshot),
+      beat: { rebetSeatIds: ['left' as const], readyProfileIds: ['alice'], readyCount: 1, playerCount: 2, readyPhase: 'betting' as const },
+    };
+    const elements = createElements();
+
+    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
+
+    expect(elements.status.textContent).toBe('Ready to deal. Waiting for players 1/2.');
+    expect(elements.dealButton.textContent).toBe('Waiting to Deal');
+    expect(elements.dealButton.disabled).toBe(true);
+  });
+
+  it('renders the authoritative next-round countdown', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = { ...base, phase: 'roundOver' };
+    const room = {
+      ...createRoom(snapshot),
+      phase: 'settled' as const,
+      beat: {
+        rebetSeatIds: ['left' as const],
+        readyProfileIds: ['bob'],
+        readyCount: 1,
+        playerCount: 2,
+        readyPhase: 'roundOver' as const,
+        nextRoundDeadlineAt: Date.now() + 20_000,
+        nextRoundRemainingMs: 20_000,
+      },
+    };
+    const elements = createElements();
+
+    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
+
+    expect(elements.status.textContent).toMatch(/^Round settled\. Ready for next round 1\/2\. Next round starts in /);
+    expect(elements.nextButton.textContent).toBe('Ready for Next');
     expect(elements.nextButton.disabled).toBe(false);
   });
 

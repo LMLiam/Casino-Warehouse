@@ -3,7 +3,14 @@ import { BeatTheHouseGame } from '../../game/engine/BeatTheHouseGame';
 import { SlotsGame } from '../../game/slots/SlotsGame';
 
 export type GameModel =
-  | { readonly kind: 'beat-the-house'; readonly game: BeatTheHouseGame }
+  | {
+      readonly kind: 'beat-the-house';
+      readonly game: BeatTheHouseGame;
+      readyProfileIds: Set<string>;
+      readyPhase?: 'betting' | 'roundOver';
+      nextRoundDeadlineAt?: number;
+      nextRoundTimer?: ReturnType<typeof setTimeout>;
+    }
   | { readonly kind: 'blackjack'; readonly table: BlackjackTable; settledSessionIds: Set<string> }
   | {
       readonly kind: 'slots';

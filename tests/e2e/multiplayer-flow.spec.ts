@@ -223,6 +223,65 @@ test('reloaded Beat the House clients verify the saved room against the server a
   }
 });
 
+test('Beat the House multiplayer waits for player readiness before deal and next round', async ({ browser, baseURL }) => {
+  test.setTimeout(90_000);
+  const { profileAuthByName, wsUrl } = await startRealtimeServer(['Ready Alice', 'Ready Bob']);
+  const aliceContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Ready Alice'));
+  const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Ready Bob'));
+  try {
+    const alice = await newPlayerPage(aliceContext, baseURL, 'Ready Alice');
+    const bob = await newPlayerPage(bobContext, baseURL, 'Ready Bob');
+
+    await alice.locator('[data-lobby-game="beat-the-house"]').click();
+    await alice.locator('#roomNameInput').fill('Ready Flow Room');
+    await alice.getByRole('button', { name: 'Create Room' }).click();
+    await expect(alice.locator('#tableHost')).toBeVisible();
+    await claimRoomSeat(alice, 'Left');
+
+    await bob.locator('[data-lobby-game="beat-the-house"]').click();
+    await bob.getByRole('button', { name: 'Join Room' }).first().click();
+    await expect(bob.locator('#tableHost')).toBeVisible();
+    await claimRoomSeat(bob, 'Centre');
+    await expect(alice.locator('#roomSeats')).toContainText('Centre: Ready Bob', { timeout: 10_000 });
+
+    await alice.getByLabel('£25 chip').click();
+    await dropChipPercent(alice, 19.25, 70.55, 25);
+    await expect.poll(async () => (await parsedDataset(alice, 'activeMainBets')).includes('left')).toBe(true);
+
+    await alice.locator('#dealBtn').click();
+    await expect(alice.locator('#status')).toContainText('Ready to deal. Waiting for players 1/2.');
+    await expect(bob.locator('#status')).toContainText('Waiting for deal readiness 1/2.');
+    await expect(alice.locator('#dealBtn')).toBeHidden();
+    await expect(bob.locator('#dealBtn')).toBeVisible();
+
+    await bob.locator('#dealBtn').click();
+    await expect(alice.locator('#chipRail')).toBeHidden({ timeout: 10_000 });
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      if (await alice.locator('#nextBtn').isVisible()) {
+        break;
+      }
+      if (await alice.locator('#stickBtn').isEnabled()) {
+        await alice.locator('#stickBtn').click();
+      } else {
+        await alice.waitForTimeout(250);
+      }
+    }
+    await expect(alice.locator('#nextBtn')).toBeVisible({ timeout: 10_000 });
+    await expect(alice.locator('#status')).toContainText('Next round starts in');
+
+    await alice.locator('#nextBtn').click();
+    await expect(alice.locator('#status')).toContainText('Ready for next round. Waiting for players 1/2.');
+    await expect(alice.locator('#nextBtn')).toBeHidden();
+    await expect(bob.locator('#nextBtn')).toBeVisible();
+    await bob.locator('#nextBtn').click();
+    await expect(alice.locator('#chipRail')).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => alice.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible)).toBe('false');
+  } finally {
+    await aliceContext.close().catch(() => undefined);
+    await bobContext.close().catch(() => undefined);
+  }
+});
+
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Beat QA']);

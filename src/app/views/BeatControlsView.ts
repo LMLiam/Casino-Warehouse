@@ -21,10 +21,10 @@ export class BeatControlsView {
         readonly dataset: DOMStringMap;
         readonly classList: Pick<DOMTokenList, 'toggle'>;
       }[];
-      readonly dealButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly dealButton: { disabled: boolean; textContent: string | null; classList: Pick<DOMTokenList, 'toggle'> };
       readonly rebetButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
       readonly clearButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
-      readonly nextButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
+      readonly nextButton: { disabled: boolean; textContent: string | null; classList: Pick<DOMTokenList, 'toggle'> };
       readonly hitButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
       readonly stickButton: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> };
     },
@@ -69,11 +69,12 @@ export class BeatControlsView {
     profileId?: string,
     bankroll?: number,
   ): void {
-    this.elements.status.textContent = snapshot.status;
+    this.elements.status.textContent = this.roomReadyStatus(snapshot, activeRoom, profileId) ?? snapshot.status;
     const wageredOnTable = totalOnTable(snapshot);
     const activeHandId = activeRoom ? this.activeHandId(activeRoom, profileId) : undefined;
     const currentProfileWagered = activeRoom ? (activeHandId ? this.totalHandTableCredits(snapshot, activeHandId) : 0) : wageredOnTable;
     const hasMainBet = this.hasMainBet(snapshot);
+    const profileReady = Boolean(profileId && activeRoom?.beat?.readyProfileIds.includes(profileId));
     if (snapshot.phase !== 'betting') {
       this.clearPending();
     }
@@ -88,10 +89,12 @@ export class BeatControlsView {
       }
     }
     this.elements.onTable.textContent = money(wageredOnTable);
-    this.setActionButton(this.elements.dealButton, controlsAvailable && snapshot.phase === 'betting' && (hasMainBet || this.pendingMainBet));
+    this.elements.dealButton.textContent = activeRoom ? (profileReady && snapshot.phase === 'betting' ? 'Waiting to Deal' : 'Ready to Deal') : 'Deal';
+    this.elements.nextButton.textContent = activeRoom ? (profileReady && snapshot.phase === 'roundOver' ? 'Waiting Next' : 'Ready for Next') : 'Next Round';
+    this.setActionButton(this.elements.dealButton, controlsAvailable && snapshot.phase === 'betting' && (hasMainBet || this.pendingMainBet) && !profileReady);
     this.setActionButton(this.elements.rebetButton, controlsAvailable && this.canRebet(snapshot, activeRoom, activeHandId, bankroll) && !this.pendingAnyBet);
     this.setActionButton(this.elements.clearButton, controlsAvailable && snapshot.phase === 'betting' && (currentProfileWagered > 0 || this.pendingMainBet));
-    this.setActionButton(this.elements.nextButton, controlsAvailable && snapshot.phase === 'roundOver');
+    this.setActionButton(this.elements.nextButton, controlsAvailable && snapshot.phase === 'roundOver' && !profileReady);
     this.setActionButton(this.elements.hitButton, controlsAvailable && snapshot.phase === 'playing');
     this.setActionButton(this.elements.stickButton, controlsAvailable && snapshot.phase === 'playing');
     const hasAffordableChip = this.renderAffordableChips(bankroll);
@@ -144,6 +147,28 @@ export class BeatControlsView {
     }
     const rebetAmount = snapshot.rebetAmounts[activeHandId];
     return Boolean(activeRoom.beat?.rebetSeatIds.includes(activeHandId)) && rebetAmount > 0 && (bankroll ?? 0) >= rebetAmount;
+  }
+
+  private roomReadyStatus(snapshot: GameSnapshot, activeRoom: RoomSnapshot | undefined, profileId: string | undefined): string | undefined {
+    if (!activeRoom?.beat || activeRoom.gameId !== 'beat-the-house') {
+      return undefined;
+    }
+    const readyCount = activeRoom.beat.readyCount;
+    const playerCount = activeRoom.beat.playerCount;
+    const profileReady = Boolean(profileId && activeRoom.beat.readyProfileIds.includes(profileId));
+    if (snapshot.phase === 'betting' && activeRoom.beat.readyPhase === 'betting') {
+      return profileReady ? `Ready to deal. Waiting for players ${readyCount}/${playerCount}.` : `Waiting for deal readiness ${readyCount}/${playerCount}.`;
+    }
+    if (snapshot.phase !== 'roundOver') {
+      return undefined;
+    }
+    const secondsRemaining = activeRoom.beat.nextRoundDeadlineAt
+      ? Math.max(0, Math.ceil((activeRoom.beat.nextRoundDeadlineAt - Date.now()) / 1000))
+      : undefined;
+    const countdown = secondsRemaining === undefined ? '' : ` Next round starts in ${secondsRemaining}s.`;
+    return profileReady
+      ? `Ready for next round. Waiting for players ${readyCount}/${playerCount}.${countdown}`
+      : `Round settled. Ready for next round ${readyCount}/${playerCount}.${countdown}`;
   }
 
   private setActionButton(button: { disabled: boolean; classList: Pick<DOMTokenList, 'toggle'> }, visible: boolean): void {
