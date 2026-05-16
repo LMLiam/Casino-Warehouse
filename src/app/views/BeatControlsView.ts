@@ -1,11 +1,16 @@
 import type { BeatTheHouseChipTarget } from '../../game/types/BeatTheHouseChipTarget';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
+import type { HandId } from '../../game/types/HandId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import { handLayouts } from '../../ui/layout/handLayouts';
+import { tableSize } from '../../ui/layout/tableSize';
 import { money } from '../format/appMoney';
 import { isBeatSnapshot } from '../state/appSnapshots/isBeatSnapshot';
 import { totalOnTable } from '../state/appSnapshots/totalOnTable';
 
 export class BeatControlsView {
+  private static readonly sideSeatDockOffsetPercent = 18;
+
   private pendingMainBet = false;
   private pendingAnyBet = false;
   private pendingStartRound = false;
@@ -14,6 +19,11 @@ export class BeatControlsView {
     private readonly elements: {
       readonly status: { textContent: string | null };
       readonly onTable: { textContent: string | null };
+      readonly tableHost: { readonly clientWidth: number; readonly clientHeight: number };
+      readonly actionDock: {
+        readonly dataset: DOMStringMap;
+        readonly style: Pick<CSSStyleDeclaration, 'removeProperty' | 'setProperty'>;
+      };
       readonly chipRail: { classList: Pick<DOMTokenList, 'toggle'> };
       readonly chipButtons: readonly {
         disabled: boolean;
@@ -72,6 +82,7 @@ export class BeatControlsView {
     this.elements.status.textContent = this.roomReadyStatus(snapshot, activeRoom, profileId) ?? snapshot.status;
     const wageredOnTable = totalOnTable(snapshot);
     const activeHandId = activeRoom ? this.activeHandId(activeRoom, profileId) : undefined;
+    this.renderSeatAwareDock(isBeatTheHouse, activeRoom, activeHandId);
     const currentProfileWagered = activeRoom ? (activeHandId ? this.totalHandTableCredits(snapshot, activeHandId) : 0) : wageredOnTable;
     const hasMainBet = this.hasMainBet(snapshot);
     const profileReady = Boolean(profileId && activeRoom?.beat?.readyProfileIds.includes(profileId));
@@ -100,6 +111,48 @@ export class BeatControlsView {
     const hasAffordableChip = this.renderAffordableChips(bankroll);
     this.elements.chipRail.classList.toggle('hidden', !isBeatTheHouse || snapshot.phase !== 'betting' || !controlsAvailable || !hasAffordableChip);
     this.onChipBankrollChange(bankroll, controlsAvailable && snapshot.phase === 'betting');
+  }
+
+  private renderSeatAwareDock(isBeatTheHouse: boolean, activeRoom: RoomSnapshot | undefined, activeHandId: HandId | undefined): void {
+    if (!isBeatTheHouse || !activeRoom || !activeHandId) {
+      this.clearSeatAwareDock();
+      return;
+    }
+
+    const handLayout = handLayouts.find((hand) => hand.id === activeHandId);
+    const { tableHost } = this.elements;
+    if (!handLayout) {
+      this.clearSeatAwareDock();
+      return;
+    }
+
+    const actionLeftPercent = this.actionLeftPercent(activeHandId, handLayout.zones.main.x);
+    this.elements.actionDock.dataset.beatSeat = activeHandId;
+    if (tableHost.clientWidth <= 0 || tableHost.clientHeight <= 0) {
+      this.elements.actionDock.style.setProperty('--beat-action-left', `${actionLeftPercent}%`);
+      return;
+    }
+
+    const scale = Math.min(tableHost.clientWidth / tableSize.width, tableHost.clientHeight / tableSize.height);
+    const width = tableSize.width * scale;
+    const leftOffset = (tableHost.clientWidth - width) / 2;
+    const actionLeft = leftOffset + width * (actionLeftPercent / 100);
+    this.elements.actionDock.style.setProperty('--beat-action-left', `${actionLeft}px`);
+  }
+
+  private actionLeftPercent(activeHandId: HandId, seatPillLeftPercent: number): number {
+    if (activeHandId === 'left') {
+      return seatPillLeftPercent + BeatControlsView.sideSeatDockOffsetPercent;
+    }
+    if (activeHandId === 'right') {
+      return seatPillLeftPercent - BeatControlsView.sideSeatDockOffsetPercent;
+    }
+    return seatPillLeftPercent;
+  }
+
+  private clearSeatAwareDock(): void {
+    delete this.elements.actionDock.dataset.beatSeat;
+    this.elements.actionDock.style.removeProperty('--beat-action-left');
   }
 
   private renderAffordableChips(bankroll: number | undefined): boolean {

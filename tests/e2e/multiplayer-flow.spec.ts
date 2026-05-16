@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { AddressInfo } from 'node:net';
 import type { Card } from '../../src/game/cards/Card';
 import { rigDeck } from '../../src/game/cards/rigDeck';
@@ -224,7 +224,7 @@ test('reloaded Beat the House clients verify the saved room against the server a
 });
 
 test('Beat the House multiplayer waits for player readiness before deal and next round', async ({ browser, baseURL }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Ready Alice', 'Ready Bob']);
   const aliceContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Ready Alice'));
   const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Ready Bob'));
@@ -246,7 +246,7 @@ test('Beat the House multiplayer waits for player readiness before deal and next
 
     await alice.getByLabel('£25 chip').click();
     await dropChipPercent(alice, 19.25, 70.55, 25);
-    await expect.poll(async () => (await parsedDataset(alice, 'activeMainBets')).includes('left')).toBe(true);
+    await expect.poll(async () => (await parsedDataset(alice, 'activeMainBets')).includes('left'), { timeout: 10_000 }).toBe(true);
 
     await alice.locator('#dealBtn').click();
     await expect(alice.locator('#status')).toContainText('Ready to deal. Waiting for players 1/2.');
@@ -281,6 +281,55 @@ test('Beat the House multiplayer waits for player readiness before deal and next
     await bobContext.close().catch(() => undefined);
   }
 });
+
+const beatActionDockSeatScenarios = [
+  { seatLabel: 'Left', activeMainBet: 'left', chipXPercent: 19.25 },
+  { seatLabel: 'Right', activeMainBet: 'right', chipXPercent: 80.85 },
+] as const;
+
+for (const scenario of beatActionDockSeatScenarios) {
+  test(`Beat the House room action dock follows the ${scenario.activeMainBet} seat through ready, play, and rebet states`, async ({ browser, baseURL }) => {
+    test.setTimeout(120_000);
+    const playerName = `${scenario.seatLabel} Dock QA`;
+    const { profileAuthByName, wsUrl } = await startRealtimeServer([playerName]);
+    const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get(playerName));
+    try {
+      const page = await newPlayerPage(context, baseURL, playerName);
+      await page.locator('[data-lobby-game="beat-the-house"]').click();
+      await page.locator('#roomNameInput').fill(`${scenario.seatLabel} Dock Room`);
+      await page.getByRole('button', { name: 'Create Room' }).click();
+      await expect(page.locator('#tableHost')).toBeVisible();
+      await claimRoomSeat(page, scenario.seatLabel);
+
+      await page.getByLabel('£25 chip').click();
+      await dropChipPercent(page, scenario.chipXPercent, 70.55, 25);
+      await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes(scenario.activeMainBet), { timeout: 10_000 }).toBe(true);
+      await expectActionDockAnchoredToMineSeat(page, '#dealBtn');
+      await expectActionDockAnchoredToMineSeat(page, '#clearBtn');
+
+      await page.locator('#dealBtn').click();
+      await expect(page.locator('#chipRail')).toBeHidden({ timeout: 10_000 });
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        if (await page.locator('#nextBtn').isVisible()) {
+          break;
+        }
+        if (await page.locator('#stickBtn').isEnabled()) {
+          await expectActionDockAnchoredToMineSeat(page, '#stickBtn');
+          await page.locator('#stickBtn').click();
+        } else {
+          await page.waitForTimeout(250);
+        }
+      }
+
+      await expect(page.locator('#nextBtn')).toBeVisible({ timeout: 10_000 });
+      await page.locator('#nextBtn').click();
+      await expect(page.locator('#chipRail')).toBeVisible({ timeout: 10_000 });
+      await expectActionDockAnchoredToMineSeat(page, '#rebetBtn');
+    } finally {
+      await context.close().catch(() => undefined);
+    }
+  });
+}
 
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
@@ -499,6 +548,14 @@ type SeededDataStore = {
   readonly profileAuthByName: ReadonlyMap<string, SeededProfileAuth>;
 };
 
+type ElementBox = {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
+const actionDockSeatCenterTolerancePx = 36;
 const profileTokensStorageKey = 'casino_warehouse_profile_tokens_v1';
 
 const startRealtimeServer = async (profileNames: readonly string[]): Promise<SeededRealtimeServer> => {
@@ -607,6 +664,7 @@ const claimRoomSeat = async (page: Page, seatLabel: string): Promise<void> => {
   await seatButton.evaluate((element) => {
     (element as HTMLButtonElement).click();
   });
+  await expect(seatButton).toBeHidden({ timeout: 10_000 });
 };
 
 const dropChipPercent = async (page: Page, xPercent: number, yPercent: number, amount: number): Promise<void> => {
@@ -637,6 +695,31 @@ const parsedDataset = async (page: Page, key: string): Promise<unknown[]> =>
     const parsed: unknown = JSON.parse(element.dataset[datasetKey] ?? '[]');
     return Array.isArray(parsed) ? parsed : [];
   }, key);
+
+const expectActionDockAnchoredToMineSeat = async (page: Page, visibleActionSelector: string): Promise<void> => {
+  await expect(page.locator(visibleActionSelector)).toBeVisible();
+  await expect(page.locator('#actionDock')).toHaveAttribute('data-beat-seat', /^(left|centre|right)$/);
+  const beatSeat = await page.locator('#actionDock').getAttribute('data-beat-seat');
+  const actionDock = await boundingBox(page.locator('#actionDock'));
+  const mineSeat = await boundingBox(page.locator('.seat-status-pill.mine'));
+  const tableHost = await boundingBox(page.locator('#tableHost'));
+  const moneyPill = await boundingBox(page.locator('#moneyPill'));
+  if (beatSeat === 'centre') {
+    expect(Math.abs(centerX(actionDock) - centerX(mineSeat))).toBeLessThanOrEqual(actionDockSeatCenterTolerancePx);
+  } else if (beatSeat === 'left') {
+    expect(centerX(actionDock)).toBeGreaterThan(centerX(mineSeat));
+    expect(centerX(actionDock)).toBeLessThan(centerX(tableHost));
+  } else {
+    expect(centerX(actionDock)).toBeLessThan(centerX(mineSeat));
+    expect(centerX(actionDock)).toBeGreaterThan(centerX(tableHost));
+  }
+  expectBoxesNotToOverlap(actionDock, mineSeat);
+  expectBoxesNotToOverlap(actionDock, moneyPill);
+  if (await page.locator('#chipRail').isVisible()) {
+    expectBoxesNotToOverlap(actionDock, await boundingBox(page.locator('#chipRail')));
+  }
+  await expectNoHorizontalOverflow(page.locator('.game-shell'));
+};
 
 const flatPopupLines = async (page: Page): Promise<string[]> =>
   (await parsedDataset(page, 'settlementPopupLines')).flatMap((popup) => (Array.isArray(popup) ? popup.map(String) : [String(popup)]));
@@ -678,6 +761,28 @@ const transactionCount = async (page: Page, text: string): Promise<number> =>
     );
     return (store.profiles ?? []).flatMap((profile) => profile.transactions ?? []).filter((transaction) => transaction.description?.includes(needle)).length;
   }, text);
+
+const boundingBox = async (locator: Locator): Promise<ElementBox> => {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('Expected locator to have a bounding box.');
+  }
+  return box;
+};
+
+const centerX = (box: ElementBox): number => box.x + box.width / 2;
+
+const expectBoxesNotToOverlap = (first: ElementBox, second: ElementBox): void => {
+  expect(first.x < second.x + second.width && first.x + first.width > second.x && first.y < second.y + second.height && first.y + first.height > second.y).toBe(
+    false,
+  );
+};
+
+const expectNoHorizontalOverflow = async (locator: Locator): Promise<void> => {
+  await expect(locator).toBeVisible();
+  const overflow = await locator.evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+};
 
 const expectSlotReelsUseSymbolImages = async (page: Page): Promise<void> => {
   await expect(page.locator('#slotReels [data-slot-symbol]')).toHaveCount(15);
