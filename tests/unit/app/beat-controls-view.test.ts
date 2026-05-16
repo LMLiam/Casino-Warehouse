@@ -24,6 +24,24 @@ class FakeClassList {
   }
 }
 
+class FakeStyleDeclaration {
+  private readonly properties = new Map<string, string>();
+
+  public setProperty(name: string, value: string): void {
+    this.properties.set(name, value);
+  }
+
+  public removeProperty(name: string): string {
+    const value = this.properties.get(name) ?? '';
+    this.properties.delete(name);
+    return value;
+  }
+
+  public getPropertyValue(name: string): string {
+    return this.properties.get(name) ?? '';
+  }
+}
+
 const createButton = () => ({
   disabled: false,
   draggable: false,
@@ -44,8 +62,15 @@ const createElement = () => ({
   classList: new FakeClassList(),
 });
 
+const createActionDock = () => ({
+  dataset: {} as DOMStringMap,
+  style: new FakeStyleDeclaration(),
+});
+
 const createElements = () => ({
   onTable: createElement(),
+  tableHost: { clientWidth: 1000, clientHeight: 600 },
+  actionDock: createActionDock(),
   chipRail: createElement(),
   chipButtons: chipValues.map((value) => createChipButton(value)),
   dealButton: createButton(),
@@ -216,6 +241,33 @@ describe('BeatControlsView', () => {
     expect(aliceElements.clearButton.classList.contains('hidden')).toBe(true);
     expect(bobElements.rebetButton.disabled).toBe(true);
     expect(bobElements.clearButton.disabled).toBe(false);
+  });
+
+  it('anchors room action controls to the active Beat the House seat', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      bets: {
+        ...base.bets,
+        left: { ...base.bets.left, main: 25 },
+        right: { ...base.bets.right, main: 40 },
+      },
+    };
+    const room = createRoom(snapshot);
+    const aliceElements = createElements();
+    const bobElements = createElements();
+    const localElements = createElements();
+
+    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
+    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, 'bob', 100);
+    new BeatControlsView(localElements).render(snapshot, true, () => undefined, true, undefined, undefined, 100);
+
+    expect(aliceElements.actionDock.dataset.beatSeat).toBe('left');
+    expect(aliceElements.actionDock.style.getPropertyValue('--beat-action-left')).toBe('351.5px');
+    expect(bobElements.actionDock.dataset.beatSeat).toBe('right');
+    expect(bobElements.actionDock.style.getPropertyValue('--beat-action-left')).toBe('607.5px');
+    expect(localElements.actionDock.dataset.beatSeat).toBeUndefined();
+    expect(localElements.actionDock.style.getPropertyValue('--beat-action-left')).toBe('');
   });
 
   it('counts dealer tips as clearable table credits without enabling rebet', () => {

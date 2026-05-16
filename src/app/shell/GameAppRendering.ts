@@ -79,8 +79,12 @@ export abstract class GameAppRendering {
     }
     this.roomSeatsView.render(room, this.currentPlayer?.profileId, (seatId) => this.claimRoomSeat(seatId));
     if (room.gameId === 'beat-the-house' && isBeatSnapshot(room.game)) {
+      const profileId = this.currentPlayer?.profileId;
+      const roomMember =
+        room.players.find((candidate) => candidate.profileId === profileId) ?? room.spectators.find((candidate) => candidate.profileId === profileId);
+      const controlsAvailable = Boolean(profileId && room.seats.some((seat) => seat.profileId === profileId));
       this.table.render(room.game, this.beatSettlementMetadataFor(room, this.currentPlayer?.profileId));
-      this.renderBeatControls(room.game);
+      this.renderBeatControls(room.game, controlsAvailable, room, profileId, roomMember?.bankroll, true);
     }
     this.renderRoomBrowser();
   }
@@ -176,10 +180,17 @@ export abstract class GameAppRendering {
     this.gameLobbyView.render(this.currentProfile(), (gameId) => this.openRoomLobby(gameId));
   }
 
-  protected renderBeatControls(snapshot: GameSnapshot, controlsAvailable = true, activeRoom?: RoomSnapshot, profileId?: string, bankroll?: number): void {
+  protected renderBeatControls(
+    snapshot: GameSnapshot,
+    controlsAvailable = true,
+    activeRoom?: RoomSnapshot,
+    profileId?: string,
+    bankroll?: number,
+    isBeatTheHouse = findGame(this.activeGame).kind === 'beat-the-house',
+  ): void {
     this.beatControlsView.render(
       snapshot,
-      findGame(this.activeGame).kind === 'beat-the-house',
+      isBeatTheHouse,
       () => this.multiplayer.send({ version: currentProtocolVersion, type: 'start-round' }),
       controlsAvailable,
       activeRoom,

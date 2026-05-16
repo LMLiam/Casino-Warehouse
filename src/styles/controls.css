@@ -10,6 +10,11 @@
   transform: translateX(-50%);
 }
 
+.action-dock[data-beat-seat] {
+  left: clamp(124px, var(--beat-action-left, 50%), calc(100% - 124px));
+  width: min(248px, calc(100% - 32px));
+}
+
 .action-dock.hidden {
   display: none !important;
 }

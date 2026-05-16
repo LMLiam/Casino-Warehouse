@@ -309,6 +309,26 @@ test('Beat the House selection opens the multiplayer room lobby before table pla
   expectConsoleClean(page);
 });
 
+test('Beat the House room action dock follows the right seat without layout collisions', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="beat-the-house"]').click();
+  await page.getByRole('button', { name: 'Join Room' }).first().click();
+  await expect(page.locator('#tableHost')).toBeVisible();
+  await openHudSection(page, 'room');
+  const rightSeat = page.locator('#roomSeats').getByRole('button', { name: 'Right: open' });
+  await expect(rightSeat).toBeVisible();
+  await rightSeat.click();
+  await expect(rightSeat).toBeHidden({ timeout: 10_000 });
+  await expect(page.locator('#roomSeats')).toContainText('Right: QA Player');
+
+  await page.getByLabel('£25 chip').click();
+  await dropChipPercent(page, 80.85, 70.55, 25);
+  await expect(page.locator('.seat-status-pill.mine')).toContainText('Wagered', { timeout: 10_000 });
+  await expectBeatActionDockClearOfMineSeat(page, '#dealBtn');
+  await expectBeatActionDockClearOfMineSeat(page, '#clearBtn');
+  expectConsoleClean(page);
+});
+
 test('tablet room lobby opens without moving the active table canvas', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await createSession(page);
@@ -404,6 +424,20 @@ const expectNoHorizontalOverflow = async (locator: Locator): Promise<void> => {
   expect(overflow).toBeLessThanOrEqual(1);
 };
 
+const expectBeatActionDockClearOfMineSeat = async (page: Page, actionSelector: string): Promise<void> => {
+  await expect(page.locator(actionSelector)).toBeVisible();
+  await expect(page.locator('#actionDock')).toHaveAttribute('data-beat-seat', /^(left|centre|right)$/);
+  const actionDock = await boundingBox(page.locator('#actionDock'));
+  const mineSeat = await boundingBox(page.locator('.seat-status-pill.mine'));
+  const moneyPill = await boundingBox(page.locator('#moneyPill'));
+  expect(boxesOverlap(actionDock, mineSeat)).toBe(false);
+  expect(boxesOverlap(actionDock, moneyPill)).toBe(false);
+  if (await page.locator('#chipRail').isVisible()) {
+    expect(boxesOverlap(actionDock, await boundingBox(page.locator('#chipRail')))).toBe(false);
+  }
+  await expectNoHorizontalOverflow(page.locator('.game-shell'));
+};
+
 type HudSection = 'admin' | 'info' | 'profile' | 'room' | 'stats';
 
 const openHudOverflow = async (page: Page): Promise<void> => {
@@ -438,6 +472,11 @@ const boundingBox = async (locator: Locator): Promise<{ readonly x: number; read
   }
   return box;
 };
+
+const boxesOverlap = (
+  first: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+  second: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+): boolean => first.x < second.x + second.width && first.x + first.width > second.x && first.y < second.y + second.height && first.y + first.height > second.y;
 
 const dropChipPercent = async (page: Page, xPercent: number, yPercent: number, amount: number): Promise<void> => {
   await page.locator('#tableHost').evaluate(

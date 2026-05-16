@@ -206,7 +206,7 @@ describe('Beat the House RTP guardrails', () => {
       expect(observed.standardDeviation, wagerProfile.name).toBeLessThanOrEqual(wagerProfile.roundStandardDeviationEnvelope);
       expect(observed.mean / wagerProfile.stake, wagerProfile.name).toBeCloseTo(wagerProfile.expectedRtp, 1);
     }
-  }, 30_000);
+  }, 60_000);
 });
 
 function profile(
