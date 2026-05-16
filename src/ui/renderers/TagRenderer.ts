@@ -139,6 +139,9 @@ export class TagRenderer {
     if (line.includes('WIN')) {
       return COLORS.win;
     }
+    if (line.startsWith("Dealer's Thanks +£")) {
+      return COLORS.win;
+    }
     if (line.includes('PUSH') || line.includes('EVEN') || line.includes('NONE')) {
       return COLORS.push;
     }
