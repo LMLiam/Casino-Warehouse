@@ -165,7 +165,6 @@ export class GameApp extends GameAppSession {
             }
             const selectedChip = this.beatChipSelection.value;
             if (chipTarget !== 'dealerTip' && !this.canWager(selectedChip)) {
-              this.elements.status.textContent = 'Session wager limit reached.';
               return;
             }
             if (!this.canUseServer()) {
@@ -191,7 +190,7 @@ export class GameApp extends GameAppSession {
         createTagRenderer: (layer: Container) => new TagRenderer(layer),
       },
     );
-    this.beatChipSelection = new BeatChipSelection(this.elements.chipButtons, this.table, this.elements.status);
+    this.beatChipSelection = new BeatChipSelection(this.elements.chipButtons, this.table);
   }
 
   public async start(): Promise<void> {
@@ -286,7 +285,6 @@ export class GameApp extends GameAppSession {
     const amount = Math.floor(Number(event.dataTransfer?.getData('text/plain') || 0));
     const target = hitTestBetZone(this.elements.tableHost, event.clientX, event.clientY);
     if (!target || amount <= 0 || !this.currentPlayer) {
-      this.elements.status.textContent = 'Drop a chip on a highlighted betting zone.';
       return;
     }
     if (!this.canUseServer()) {
@@ -297,7 +295,6 @@ export class GameApp extends GameAppSession {
     }
     const activeRoom = this.activeRoomForGame();
     if ('betType' in target && target.betType !== 'main' && activeRoom && isBeatSnapshot(activeRoom.game) && activeRoom.game.bets[target.handId].main <= 0) {
-      this.elements.status.textContent = 'Place a main bet before side bets.';
       return;
     }
     if (activeRoom) {

@@ -84,7 +84,6 @@ export const renderTemplate = (): string => `
         <b id="slotsResult"></b>
         <div id="slotsRoomPlayers" class="slots-room-players hidden"></div>
       </div>
-      <div id="status" class="status"></div>
       <div id="gameHud" class="game-hud" aria-label="Game menus">
         <div class="hud-button-row">
           <button id="backToLobbyBtn" class="hud-button primary" type="button">Home</button>

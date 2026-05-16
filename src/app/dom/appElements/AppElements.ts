@@ -48,7 +48,6 @@ export interface AppElements {
   readonly hudOverflowMenu: HTMLDetailsElement;
   readonly moneyPill: HTMLDivElement;
   readonly actionDock: HTMLDivElement;
-  readonly status: HTMLDivElement;
   readonly bankroll: HTMLElement;
   readonly bankrollDelta: HTMLElement;
   readonly houseAdvancePill: HTMLElement;
