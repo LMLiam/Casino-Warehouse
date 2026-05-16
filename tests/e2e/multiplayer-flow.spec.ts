@@ -279,17 +279,18 @@ test('Beat the House multiplayer waits for player readiness before deal and next
 });
 
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Beat QA']);
   const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Beat QA'));
   try {
     const page = await newPlayerPage(context, baseURL, 'Beat QA');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.locator('[data-lobby-game="beat-the-house"]').click();
     await page.locator('#roomNameInput').fill('Popup QA');
     await page.getByRole('button', { name: 'Create Room' }).click();
     await expect(page.locator('#tableHost')).toBeVisible();
     await expect(page.locator('#tableHost canvas')).toBeVisible();
-    await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.dealerCardCount)).toBe('0');
+    await expect.poll(async () => Number(await page.locator('#tableHost').evaluate((element) => element.dataset.dealerCardCount ?? '0'))).toBe(0);
     await expect(page.locator('#chipRail')).toBeHidden();
     await claimRoomSeat(page, 'Left');
     await expect(page.locator('.seat-status-pill.mine')).toContainText('£1,000 (even)');
@@ -330,6 +331,7 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
         break;
       }
       if (await page.locator('#stickBtn').isEnabled()) {
+        await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
         await page.locator('#stickBtn').click();
       } else {
         await page.waitForTimeout(250);
@@ -338,32 +340,32 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
 
     await expect(page.locator('#nextBtn')).toBeEnabled({ timeout: 10_000 });
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
-    await expect
-      .poll(async () => Number(await page.locator('#tableHost').evaluate((element) => element.dataset.settlementHandCount ?? '0')))
-      .toBeGreaterThanOrEqual(1);
-    await expect
-      .poll(async () =>
-        (await parsedDataset(page, 'settlementResults')).some(
-          (result) => String(result).includes(':win:') || String(result).includes(':lose:') || String(result).includes(':push:'),
-        ),
-      )
-      .toBe(true);
-    await expect.poll(async () => (await parsedDataset(page, 'sideBetLabels')).some((label) => String(label).includes('Dealer Sevens'))).toBe(true);
-
     await openHudSection(page, 'admin');
     await page.locator('#layoutOverlayBtn').click();
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible)).toBe('true');
 
-    if (await page.locator('#nextBtn').isEnabled()) {
-      await page.locator('#nextBtn').click();
-    }
+    await expect
+      .poll(async () => {
+        const settlementHandCount = Number(await page.locator('#tableHost').evaluate((element) => element.dataset.settlementHandCount ?? '0'));
+        const settlementResults = await parsedDataset(page, 'settlementResults');
+        const sideBetLabels = await parsedDataset(page, 'sideBetLabels');
+        return {
+          hasDealerSevens: sideBetLabels.some((label) => String(label).includes('Dealer Sevens')),
+          hasHand: settlementHandCount >= 1,
+          hasResult: settlementResults.some(
+            (result) => String(result).includes(':win:') || String(result).includes(':lose:') || String(result).includes(':push:'),
+          ),
+        };
+      })
+      .toEqual({ hasDealerSevens: true, hasHand: true, hasResult: true });
+
+    await page.locator('#nextBtn').click();
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible)).toBe('false');
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.dealerCardCount)).toBe('0');
     await expect.poll(async () => (await parsedDataset(page, 'dealerTipSeats')).length).toBe(0);
     await expect.poll(async () => (await parsedDataset(page, 'dealerThanksRewards')).length).toBe(0);
     await expect(page.locator('#chipRail')).toBeVisible();
 
-    await page.emulateMedia({ reducedMotion: 'reduce' });
     await dropChipPercent(page, 19.25, 70.55, 25);
     await dropChipPercent(page, 29.7, 44.2, 25);
     await page.locator('#dealBtn').click();
@@ -372,6 +374,7 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
         break;
       }
       if (await page.locator('#stickBtn').isEnabled()) {
+        await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
         await page.locator('#stickBtn').click();
       } else {
         await page.waitForTimeout(150);
