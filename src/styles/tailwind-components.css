@@ -42,7 +42,6 @@ button.primary {
 }
 
 .room-seat,
-.status,
 .blackjack-rail {
   @apply rounded-casino-pill border border-casino-line;
 }

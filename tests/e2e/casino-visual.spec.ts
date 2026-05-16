@@ -332,7 +332,6 @@ test('game lobby no longer exposes local-only table play before joining a room',
 
   await expect(page.locator('#roomLobby')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Deal' })).toBeHidden();
-  await expect(page.locator('#status')).toBeHidden();
   expectConsoleClean(page);
 });
 

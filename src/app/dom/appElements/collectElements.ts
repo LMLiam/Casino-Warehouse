@@ -59,7 +59,6 @@ export const collectElements = (): AppElements => {
     hudOverflowMenu: query('#hudOverflowMenu'),
     moneyPill: query('#moneyPill'),
     actionDock: query('#actionDock'),
-    status: query('#status'),
     bankroll: query('#bankroll'),
     bankrollDelta: query('#bankrollDelta'),
     houseAdvancePill: query('#houseAdvancePill'),

@@ -45,7 +45,6 @@ const createElement = () => ({
 });
 
 const createElements = () => ({
-  status: createElement(),
   onTable: createElement(),
   chipRail: createElement(),
   chipButtons: chipValues.map((value) => createChipButton(value)),
@@ -122,6 +121,20 @@ describe('BeatControlsView', () => {
     expect(elements.dealButton.disabled).toBe(false);
   });
 
+  it('ignores routine Beat the House snapshot status while rendering controls', () => {
+    const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      status: "Round complete. Total +£35. Dealer's Thanks +£2.",
+    };
+    const elements = createElements();
+
+    new BeatControlsView(elements).render(snapshot, true, () => undefined);
+
+    expect(elements.onTable.textContent).toBe('£0');
+    expect(elements.dealButton.disabled).toBe(true);
+  });
+
   it('clears pending controls when the Beat the House snapshot leaves betting', () => {
     const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
     const snapshot: GameSnapshot = { ...base, phase: 'roundOver' };
@@ -152,12 +165,11 @@ describe('BeatControlsView', () => {
 
     new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
 
-    expect(elements.status.textContent).toBe('Ready to deal. Waiting for players 1/2.');
     expect(elements.dealButton.textContent).toBe('Waiting to Deal');
     expect(elements.dealButton.disabled).toBe(true);
   });
 
-  it('renders the authoritative next-round countdown', () => {
+  it('keeps multiplayer next-round controls driven by readiness', () => {
     const base = new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot();
     const snapshot: GameSnapshot = { ...base, phase: 'roundOver' };
     const room = {
@@ -177,7 +189,6 @@ describe('BeatControlsView', () => {
 
     new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
 
-    expect(elements.status.textContent).toMatch(/^Round settled\. Ready for next round 1\/2\. Next round starts in /);
     expect(elements.nextButton.textContent).toBe('Ready for Next');
     expect(elements.nextButton.disabled).toBe(false);
   });
