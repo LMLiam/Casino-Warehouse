@@ -18,6 +18,7 @@ permissions:
 jobs:
   validate:
     name: Validate Pull Request Metadata
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
 
     steps:
