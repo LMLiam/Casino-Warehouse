@@ -29,6 +29,10 @@ function labelNames(pullRequest) {
   return (pullRequest.labels ?? []).map((label) => String(label.name ?? '').toLowerCase());
 }
 
+function isDependabotPullRequest(pullRequest) {
+  return pullRequest.user?.login === 'dependabot[bot]';
+}
+
 function extractSections(body) {
   const sections = new Map();
   const matches = [...body.matchAll(/^##\s+(.+?)\s*$/gim)];
@@ -100,16 +104,20 @@ export function validatePullRequest(pullRequest) {
   const labels = labelNames(pullRequest);
   const body = String(pullRequest.body ?? '').trim();
 
-  if (!titlePattern.test(title)) {
-    failures.push(`PR title must match "type(scope): summary" using one of: ${titleTypes.join(', ')}.`);
-  }
-
   if (!labels.some((label) => label.startsWith('type:'))) {
     failures.push('Add one type label, for example "type:feature" or "type:maintenance".');
   }
 
   if (!labels.some((label) => label.startsWith('area:'))) {
     failures.push('Add one area label, for example "area:ui", "area:gameplay", or "area:tooling".');
+  }
+
+  if (isDependabotPullRequest(pullRequest)) {
+    return failures;
+  }
+
+  if (!titlePattern.test(title)) {
+    failures.push(`PR title must match "type(scope): summary" using one of: ${titleTypes.join(', ')}.`);
   }
 
   failures.push(...validateBody(body));

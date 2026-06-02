@@ -47,6 +47,32 @@ describe('validatePullRequest', () => {
     expect(validatePullRequest(pullRequest())).toEqual([]);
   });
 
+  it('accepts Dependabot pull requests with repository labels without enforcing human template fields', () => {
+    expect(
+      validatePullRequest(
+        pullRequest({
+          title: 'Bump ws from 8.20.1 to 8.21.0',
+          body: 'Bumps ws from 8.20.1 to 8.21.0.',
+          user: { login: 'dependabot[bot]' },
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('still requires repository labels on Dependabot pull requests', () => {
+    expect(
+      validatePullRequest({
+        title: 'Bump ws from 8.20.1 to 8.21.0',
+        labels: [],
+        body: 'Bumps ws from 8.20.1 to 8.21.0.',
+        user: { login: 'dependabot[bot]' },
+      }),
+    ).toEqual([
+      'Add one type label, for example "type:feature" or "type:maintenance".',
+      'Add one area label, for example "area:ui", "area:gameplay", or "area:tooling".',
+    ]);
+  });
+
   it('requires a conventional pull request title', () => {
     const failures = validatePullRequest(pullRequest({ title: 'Add a validator' }));
 
