@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Casino Issue Creation'
-  short_description: 'Research and create Casino Warehouse GitHub issues'
-  default_prompt: 'Use $casino-issue-creation to research and create a GitHub issue for adding a keyboard-accessible table settings panel.'
-
-policy:
-  allow_implicit_invocation: false

@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Casino Architecture Splitter'
-  short_description: 'Plan safe Casino architecture splits'
-  default_prompt: 'Use $casino-architecture-splitter to plan and execute a focused Casino Warehouse architecture cleanup for src/multiplayer/roomAuthority.ts.'
-
-policy:
-  allow_implicit_invocation: true

@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Casino Security Review'
-  short_description: 'Focused Casino Warehouse security reviews'
-  default_prompt: 'Use $casino-security-review to run a focused security pass on pull request #123, including public tunnel, token, server authority, and supply-chain risks.'
-
-policy:
-  allow_implicit_invocation: true

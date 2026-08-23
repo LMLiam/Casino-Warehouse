@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Casino Issue Completion'
-  short_description: 'Evidence-first Casino Warehouse issue completion'
-  default_prompt: 'Use $casino-issue-completion to complete issue #127 in a separate worktree, open or update the pull request, run the review loop, and report readiness evidence.'
-
-policy:
-  allow_implicit_invocation: false

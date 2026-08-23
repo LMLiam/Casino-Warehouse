@@ -37,17 +37,6 @@ Primary references:
 - `npm run dev:localtunnel`: run the provider-specific localtunnel public demo flow.
 - `npm run dev:cloudflare`: run the provider-specific Cloudflare Tunnel quick-tunnel public demo flow.
 - `npm run dev:cloudflared`: alias for `npm run dev:cloudflare`.
-- `./start-codex.sh`: choose a Codex maintainer routine from the central interactive launcher.
-- `./start-codex.sh --print issue 123`: preview the Codex `/goal` for completing an existing issue.
-- `./start-codex.sh --print create-issue "issue topic"`: preview the Codex `/goal` for researching and creating a new GitHub issue.
-- `./start-codex.sh --print ci-failure 123`: preview the Codex `/goal` for diagnosing failing checks on a pull request.
-- `./start-codex.sh --print triage-issue 121`: preview the Codex `/goal` for triaging an existing GitHub issue.
-- `./start-codex.sh --print docs-audit "audit scope"`: preview the Codex `/goal` for auditing documentation drift.
-- `./start-codex.sh --print issue-dependencies`: preview the Codex `/goal` for auditing open issue dependency relationships.
-- `./start-codex.sh --print security-pass "pull request #123"`: preview the Codex `/goal` for a focused security review.
-- `./start-codex.sh --print multiplayer-check "pull request #123"`: preview the Codex `/goal` for a multiplayer regression review.
-- `./start-codex.sh --print architecture-split "src/multiplayer/roomAuthority.ts"`: preview the Codex `/goal` for planning a focused architecture cleanup or file split.
-- Direct routine shims live under `.agents/launchers/start-codex-*.sh` for compatibility without crowding the repository root.
 - `npm run format`: check editorconfig and Prettier formatting.
 - `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
 - `npm run test`: run the Vitest suite.
@@ -125,9 +114,9 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 
 ## Issue Completion Workflow
 
-When asked to complete, finish, fix, review, ready, update, or check an issue or pull request, use the Casino Warehouse issue-completion skill at `.agents/skills/casino-issue-completion/SKILL.md`.
+When asked to complete, finish, fix, review, ready, update, or check an issue or pull request, follow the evidence requirements below.
 
-Do not describe an issue or pull request as complete, ready, ready to merge, done, or finished unless the skill's evidence checklist is satisfied on the current PR head.
+Do not describe an issue or pull request as complete, ready, ready to merge, done, or finished unless the evidence checklist below is satisfied on the current PR head.
 
 A self-review claim is invalid unless it includes evidence. The agent must name:
 
@@ -151,53 +140,35 @@ After any new commit, rebase, merge from the target branch, force-push, PR body 
 
 ## Issue Creation Workflow
 
-When asked to create, open, draft, file, or prepare a new GitHub issue from a user request, use the Casino Warehouse issue-creation skill at `.agents/skills/casino-issue-creation/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the issue creation routine; `.agents/launchers/start-codex-create-issue.sh` remains a compatibility shim, and `.agents/launchers/start-codex-issue.sh` remains for completing an existing issue number.
-
-The issue-creation workflow must inspect relevant repository context, search existing open and closed issues and pull requests for duplicates or related work, choose repository-compliant title/labels/status/milestone, create the issue through GitHub, then verify the created issue number, URL, metadata, and body before reporting success.
+When asked to create, open, draft, file, or prepare a new GitHub issue from a user request: inspect relevant repository context, search existing open and closed issues and pull requests for duplicates or related work, choose repository-compliant title/labels/status/milestone, create the issue through GitHub, then verify the created issue number, URL, metadata, and body before reporting success.
 
 ## Issue Triage Workflow
 
-When asked to triage, groom, clarify, label, milestone, de-duplicate, decline, block, or ready an existing GitHub issue without implementing it, use the Casino Warehouse issue-triage skill at `.agents/skills/casino-issue-triage/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the issue triage routine; `.agents/launchers/start-codex-triage-issue.sh` remains a compatibility shim.
-
-Use issue creation for new issue drafting, issue triage for improving an existing issue into a repo-compliant state, and issue completion for implementation work that opens or updates a pull request.
-
-The issue-triage workflow must inspect the issue, search existing issues and pull requests for duplicates or related work, read relevant repository context, update labels/milestone/body/comments only when evidence supports the change, then verify and report the issue URL, labels/milestone before and after, duplicate-search terms, files inspected, and unresolved questions.
+When asked to triage, groom, clarify, label, milestone, de-duplicate, decline, block, or ready an existing GitHub issue without implementing it: inspect the issue, search existing issues and pull requests for duplicates or related work, read relevant repository context, update labels/milestone/body/comments only when evidence supports the change, then verify and report the issue URL, labels/milestone before and after, duplicate-search terms, files inspected, and unresolved questions.
 
 ## Issue Dependency Audit Workflow
 
-When asked to audit, map, review, clarify, update, or report dependency relationships between existing GitHub issues, use the Casino Warehouse issue dependency audit skill at `.agents/skills/casino-issue-dependency-audit/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the issue dependency audit routine; `.agents/launchers/start-codex-issue-dependencies.sh` remains a compatibility shim.
-
-The issue dependency audit workflow must review every open issue, group the backlog by milestone, label, and status, inspect issue bodies, comments, linked pull requests, and reverse references, distinguish evidence-backed blockers from preferred sequencing, update issue labels or canonical dependency notes only when evidence supports the change, avoid closing or re-scoping issues unless a maintainer explicitly asks, verify any updates, and report blocker relationships in both directions plus maintainer-clarification needs.
+When asked to audit, map, review, clarify, update, or report dependency relationships between existing GitHub issues: review every open issue, group the backlog by milestone, label, and status, inspect issue bodies, comments, linked pull requests, and reverse references, distinguish evidence-backed blockers from preferred sequencing, update issue labels or canonical dependency notes only when evidence supports the change, avoid closing or re-scoping issues unless a maintainer explicitly asks, verify any updates, and report blocker relationships in both directions plus maintainer-clarification needs.
 
 ## CI Failure Review Workflow
 
-When asked to inspect, explain, diagnose, review, retry, or fix failing pull request checks, use the Casino Warehouse CI failure review skill at `.agents/skills/casino-ci-failure-review/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the CI failure review routine; `.agents/launchers/start-codex-ci-failure.sh` remains a compatibility shim.
-
-The CI failure review workflow must fetch current pull request metadata, head SHA, base branch, required check status, workflow runs, failing jobs, and relevant logs before diagnosing a failure. It must distinguish required checks from informational or external checks, map visual/e2e failures to local reproduction commands where applicable, classify the failure cause, and ask before making fixes unless the user's active goal clearly asks to fix CI.
+When asked to inspect, explain, diagnose, review, retry, or fix failing pull request checks: fetch current pull request metadata, head SHA, base branch, required check status, workflow runs, failing jobs, and relevant logs before diagnosing a failure. Distinguish required checks from informational or external checks, map visual/e2e failures to local reproduction commands where applicable, classify the failure cause, and ask before making fixes unless the user's active goal clearly asks to fix CI.
 
 ## Documentation Audit Workflow
 
-When asked to audit, verify, or report documentation drift without immediately implementing fixes, use the Casino Warehouse documentation audit skill at `.agents/skills/casino-docs-audit/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the documentation audit routine; `.agents/launchers/start-codex-docs-audit.sh` remains a compatibility shim.
-
-The documentation audit workflow must compare docs, wiki pages, workflow references, npm scripts, issue and pull request templates, launcher scripts, and local agent skills against source-of-truth files, commands, GitHub metadata, and wiki evidence. It must report findings with location, evidence, severity, suggested remediation, skipped checks, and whether each finding is docs-only drift or implementation work.
+When asked to audit, verify, or report documentation drift without immediately implementing fixes: compare docs, wiki pages, workflow references, npm scripts, issue and pull request templates, launcher scripts, and local agent skills against source-of-truth files, commands, GitHub metadata, and wiki evidence. Report findings with location, evidence, severity, suggested remediation, skipped checks, and whether each finding is docs-only drift or implementation work.
 
 ## Security Review Workflow
 
-When asked for a security pass, threat-model-style review, token or authorization audit, public tunnel audit, dependency security review, workflow security review, or other focused security assessment, use the Casino Warehouse security review skill at `.agents/skills/casino-security-review/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the security review routine; `.agents/launchers/start-codex-security-pass.sh` remains a compatibility shim.
-
-The security review workflow must inspect the requested target and related tests and controls before recommending changes, distinguish confirmed vulnerabilities from hardening suggestions and residual risks, verify current-info claims for advisories, CVEs, deprecations, versions, or best practices, and must not weaken CodeQL, Dependency Review, action pinning, branch protection, public-tunnel origin protections, admin-token controls, profile-token controls, or server authority.
+When asked for a security pass, threat-model-style review, token or authorization audit, public tunnel audit, dependency security review, workflow security review, or other focused security assessment: inspect the requested target and related tests and controls before recommending changes, distinguish confirmed vulnerabilities from hardening suggestions and residual risks, verify current-info claims for advisories, CVEs, deprecations, versions, or best practices, and must not weaken CodeQL, Dependency Review, action pinning, branch protection, public-tunnel origin protections, admin-token controls, profile-token controls, or server authority.
 
 ## Multiplayer Regression Workflow
 
-When asked for a multiplayer regression pass, realtime flow review, public tunnel smoke assessment, room authority review, reconnect/reload check, or focused review of multiplayer behavior, use the Casino Warehouse multiplayer regression skill at `.agents/skills/casino-multiplayer-regression/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the multiplayer regression routine; `.agents/launchers/start-codex-multiplayer-check.sh` remains a compatibility shim.
-
-The multiplayer regression workflow must inspect changed files and related protocol schemas, server authority, client realtime URL behavior, persistence boundaries, public tunnel scripts, and relevant tests when applicable. It must map room lifecycle, host/join, seat claim, spectator, reconnect, heartbeat, WebSocket origin, public invite URL, profile ownership, admin permission, room snapshot, settlement, and persistence reconciliation risks to targeted checks, including unit tests and Playwright multiplayer or public tunnel smoke lanes where relevant.
+When asked for a multiplayer regression pass, realtime flow review, public tunnel smoke assessment, room authority review, reconnect/reload check, or focused review of multiplayer behavior: inspect changed files and related protocol schemas, server authority, client realtime URL behavior, persistence boundaries, public tunnel scripts, and relevant tests when applicable. Map room lifecycle, host/join, seat claim, spectator, reconnect, heartbeat, WebSocket origin, public invite URL, profile ownership, admin permission, room snapshot, settlement, and persistence reconciliation risks to targeted checks, including unit tests and Playwright multiplayer or public tunnel smoke lanes where relevant.
 
 ## Architecture Cleanup Workflow
 
-When asked to split large files, fix source-file shape problems, reduce architecture-check failures, move modules between domain owners, or plan structural cleanup, use the Casino Warehouse architecture splitter skill at `.agents/skills/casino-architecture-splitter/SKILL.md`. For interactive launches, start with `start-codex.sh` and choose the architecture cleanup routine; `.agents/launchers/start-codex-architecture-split.sh` remains a compatibility shim.
-
-The architecture cleanup workflow must inspect `docs/code-quality.md`, target files, imports, dependents, relevant tests, and architecture-check rules before proposing a split. It must preserve behavior, direct imports, one module-scope top-level element per source file, domain ownership, circular-dependency safety, and game/multiplayer/state authority boundaries.
+When asked to split large files, fix source-file shape problems, reduce architecture-check failures, move modules between domain owners, or plan structural cleanup: inspect `docs/code-quality.md`, target files, imports, dependents, relevant tests, and architecture-check rules before proposing a split. Preserve behavior, direct imports, one module-scope top-level element per source file, domain ownership, circular-dependency safety, and game/multiplayer/state authority boundaries.
 
 ## Pull Request Checklist
 
@@ -215,11 +186,9 @@ Before opening or updating a PR:
 - Confirm the issue completion review loop has been run on the current PR head, including after any rebase or follow-up fix.
 - Confirm generated build output is not committed.
 
-## Local Skill Metadata
+## Local Agent Skills
 
-Repo-owned local skills under `.agents/skills/<skill-name>/` must include an `agents/openai.yaml` file with user-facing `interface.display_name`, `interface.short_description`, and `interface.default_prompt` fields. The default prompt should show a realistic invocation for the workflow, including the `$skill-name` reference when the skill is meant to be called directly.
-
-Set `policy.allow_implicit_invocation` intentionally for every local skill. Preserve `false` for workflows that should only run through explicit skill references or AGENTS.md routing instead of generic user wording.
+The repo-owned local skills previously hosted under `.agents/skills/` (and the `start-codex.sh` launcher) have been removed pending a redesign. Do not recreate them or reference them until the replacement setup lands; if older issues, pull requests, or docs point at those paths, treat the references as stale.
 
 ## Documentation Guidance
 

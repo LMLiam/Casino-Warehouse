@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Casino Multiplayer Regression'
-  short_description: 'Review Casino Warehouse multiplayer regressions'
-  default_prompt: 'Use $casino-multiplayer-regression to review pull request #123 for room lifecycle, host/join, reconnect, public tunnel, profile ownership, and settlement regressions.'
-
-policy:
-  allow_implicit_invocation: true
