@@ -74,7 +74,8 @@ jobs:
     needs: e2e-plan
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.e2e-plan.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJson(needs.e2e-plan.outputs.matrix) }}
 
     steps:
       - name: Checkout
