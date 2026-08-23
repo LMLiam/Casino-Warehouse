@@ -101,12 +101,19 @@ PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --pr
 Serial execution is reserved for debugging with `npm run visual:serial`.
 `tests/e2e/multiplayer-flow.spec.ts` opts into Playwright's parallel test mode
 because every scenario owns an ephemeral realtime server and fresh browser
-contexts, but the `Project Checks` workflow runs the multiplayer lane as two
-one-worker shards instead of in-worker parallelism: two-vCPU runners starve
-overlapping browser scenarios, while separate runners keep each scenario in
-idle-like conditions and still halve wall-clock time. Visual lanes stay at
-one worker to keep screenshot timing deterministic. For debugging a flaky
-browser test serially, use:
+contexts. The `Project Checks` e2e matrix is generated from
+`scripts/ci-e2e-matrix.mjs`: each lane lists its project, suite files, and
+shard count, the plan job validates the table (including that every listed
+suite file exists) and expands it into one runner per shard. To change CI
+coverage, edit the lane table there; to reproduce a lane locally, run its
+`playwrightArgs` from the script output:
+
+```bash
+node scripts/ci-e2e-matrix.mjs --report-balance   # shard balance per lane
+npm run visual -- --workers=1 --project=laptop --shard=1/2 tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
+```
+
+For debugging a flaky browser test serially, use:
 
 ```bash
 npm run visual:serial
