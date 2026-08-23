@@ -16,7 +16,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `HOST=${playwrightHost} PORT=${playwrightPort} npm run dev:server`,
+    // Long auto-advance window so slow CI runners never race the Beat the House settlement assertions (#202).
+    command: `HOST=${playwrightHost} PORT=${playwrightPort} CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS=3600000 npm run dev:server`,
     url: playwrightBaseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
