@@ -63,10 +63,14 @@ jobs:
             label: Tablet Visual
             workers: 1
             args: --project=tablet tests/e2e/casino-visual.spec.ts
-          - name: laptop-multiplayer
-            label: Laptop Multiplayer
-            workers: 2
-            args: --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
+          - name: laptop-multiplayer-1
+            label: Laptop Multiplayer 1/2
+            workers: 1
+            args: --project=laptop --shard=1/2 tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
+          - name: laptop-multiplayer-2
+            label: Laptop Multiplayer 2/2
+            workers: 1
+            args: --project=laptop --shard=2/2 tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 
     steps:
       - name: Checkout
