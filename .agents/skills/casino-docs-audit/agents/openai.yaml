@@ -1,7 +1,0 @@
-interface:
-  display_name: 'Casino Docs Audit'
-  short_description: 'Audit Casino Warehouse documentation drift'
-  default_prompt: 'Use $casino-docs-audit to audit Casino Warehouse documentation drift across README, AGENTS.md, contributor docs, workflows, npm scripts, issue and PR templates, local agent skills, launchers, and the GitHub Wiki.'
-
-policy:
-  allow_implicit_invocation: false

@@ -130,18 +130,6 @@ npm run build
 npm run dev:server
 ```
 
-## Maintainer Codex Routines
-
-Maintainers can start repository-specific Codex workflows from one interactive front door:
-
-```bash
-./start-codex.sh
-```
-
-Use `./start-codex.sh --print <routine> [input...]` to preview the generated `/goal` without launching Codex. Direct compatibility shims live under `.agents/launchers/start-codex-*.sh` for maintainers who want a specific routine entrypoint without crowding the repository root.
-
-The launcher colorizes the interactive menu when the terminal supports ANSI colors. Use `--color=always`, `--color=never`, or `--no-color` to override automatic color detection.
-
 ## Troubleshooting
 
 - If the app stays on a reconnecting screen, make sure `npm run dev:server` or `npm run dev:full` is running.
