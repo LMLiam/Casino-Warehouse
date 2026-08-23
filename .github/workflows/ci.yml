@@ -65,7 +65,7 @@ jobs:
             args: --project=tablet tests/e2e/casino-visual.spec.ts
           - name: laptop-multiplayer
             label: Laptop Multiplayer
-            workers: 3
+            workers: 2
             args: --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 
     steps:

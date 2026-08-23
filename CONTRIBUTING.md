@@ -101,9 +101,10 @@ PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --pr
 Serial execution is reserved for debugging with `npm run visual:serial`.
 `tests/e2e/multiplayer-flow.spec.ts` opts into Playwright's parallel test mode
 because every scenario owns an ephemeral realtime server and fresh browser
-contexts, so the CI multiplayer lane runs it with three workers; visual lanes
-stay at one worker to keep screenshot timing deterministic. For debugging a
-flaky browser test serially, use:
+contexts. The CI multiplayer lane runs it with two workers, matching the
+two vCPUs of GitHub-hosted runners; visual lanes stay at one worker to keep
+screenshot timing deterministic. For debugging a flaky browser test serially,
+use:
 
 ```bash
 npm run visual:serial
