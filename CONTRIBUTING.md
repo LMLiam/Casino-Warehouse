@@ -99,14 +99,19 @@ PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --pr
 `NGROK_SMOKE_URL` remains an ngrok-specific alias for existing workflows.
 
 Serial execution is reserved for debugging with `npm run visual:serial`.
-The committed e2e config does not force any spec file into serial mode;
-the multi-context specs in `tests/e2e/multiplayer-flow.spec.ts` and
-`tests/e2e/public-tunnel-smoke.spec.ts` skip tablet project duplication inside the
-test files. For debugging a flaky browser test serially, use:
+`tests/e2e/multiplayer-flow.spec.ts` opts into Playwright's parallel test mode
+because every scenario owns an ephemeral realtime server and fresh browser
+contexts, so the CI multiplayer lane runs it with three workers; visual lanes
+stay at one worker to keep screenshot timing deterministic. For debugging a
+flaky browser test serially, use:
 
 ```bash
 npm run visual:serial
 ```
+
+The `Project Checks` workflow cancels superseded runs for the same pull request
+through a concurrency group, and caches Playwright browsers keyed on
+`package-lock.json` so dependency changes re-download them automatically.
 
 ## Reporting Issues
 

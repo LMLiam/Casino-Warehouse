@@ -12,6 +12,10 @@ import type { ServerDataStore } from '../../src/state/serverDataStore/ServerData
 import { createSessionState } from '../../src/state/session/createSessionState';
 import { profileTokenAuth } from '../../src/state/serverDataStore/profileTokenAuth';
 
+// Every test owns a realtime server on an ephemeral port plus fresh browser contexts,
+// so tests are isolation-safe across parallel workers (#88).
+test.describe.configure({ mode: 'parallel' });
+
 let realtimeServer: CasinoServer | undefined;
 
 test.beforeEach(({ context: _context }, testInfo) => {

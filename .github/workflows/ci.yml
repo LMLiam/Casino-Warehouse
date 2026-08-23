@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Quality, Coverage, and Server Build
@@ -53,13 +57,16 @@ jobs:
         include:
           - name: laptop-visual
             label: Laptop Visual
+            workers: 1
             args: --project=laptop tests/e2e/casino-visual.spec.ts
           - name: tablet-visual
             label: Tablet Visual
+            workers: 1
             args: --project=tablet tests/e2e/casino-visual.spec.ts
           - name: laptop-multiplayer
             label: Laptop Multiplayer
-            args: --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/ngrok-smoke.spec.ts
+            workers: 3
+            args: --project=laptop tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 
     steps:
       - name: Checkout
@@ -74,11 +81,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright e2e and visual tests
-        run: npm run visual -- ${{ matrix.args }}
+        run: npm run visual -- --workers=${{ matrix.workers }} ${{ matrix.args }}
 
       - name: Upload Playwright artifacts
         if: failure()
