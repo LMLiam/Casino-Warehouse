@@ -25,12 +25,11 @@ import { mainBeatRoomId } from './roomAuthorityModel/mainBeatRoomId';
 import { roomPhase } from './roomAuthorityModel/roomPhase';
 import type { RoomState } from './roomAuthorityModel/RoomState';
 import { roomStatus } from './roomAuthorityModel/roomStatus';
+import { beatNextRoundTimeoutMs } from './roomLimits/beatNextRoundTimeoutMs';
 import { safeBankroll } from './roomAuthorityModel/safeBankroll';
 import { totalBeatStake } from './roomAuthorityModel/totalBeatStake';
 
 export abstract class RoomAuthorityBase {
-  private static readonly beatNextRoundTimeoutMs = 20_000;
-
   protected readonly rooms = new Map<string, RoomState>();
   private asyncResultHandler: ((result: AuthorityResult) => void) | undefined;
 
@@ -532,7 +531,8 @@ export abstract class RoomAuthorityBase {
     if (room.model.kind !== 'beat-the-house' || room.model.nextRoundDeadlineAt) {
       return;
     }
-    const deadlineAt = Date.now() + RoomAuthorityBase.beatNextRoundTimeoutMs;
+    const timeoutMs = beatNextRoundTimeoutMs();
+    const deadlineAt = Date.now() + timeoutMs;
     room.model.nextRoundDeadlineAt = deadlineAt;
     const timer = setTimeout(() => {
       const currentRoom = this.rooms.get(room.roomId);
@@ -548,7 +548,7 @@ export abstract class RoomAuthorityBase {
       if (result.broadcasts.length > 0 || result.settlements.length > 0) {
         this.asyncResultHandler?.(result);
       }
-    }, RoomAuthorityBase.beatNextRoundTimeoutMs);
+    }, timeoutMs);
     if (typeof timer === 'object' && 'unref' in timer && typeof timer.unref === 'function') {
       timer.unref();
     }

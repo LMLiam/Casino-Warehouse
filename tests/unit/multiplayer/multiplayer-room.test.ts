@@ -518,6 +518,38 @@ describe('per-game room authority', () => {
     }
   });
 
+  it('honors a configured Beat the House auto-advance window override', () => {
+    vi.stubEnv('CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS', '4000');
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const authority = new RoomAuthority();
+    const timeoutResults: AuthorityResult[] = [];
+    authority.setAsyncResultHandler((result) => timeoutResults.push(result));
+    try {
+      const roomId = authority.handle('a', create('beat-the-house', 'alice', 500)).direct!.roomId;
+      authority.handle('a', claimSeat('left'));
+      authority.handle('b', join('beat-the-house', roomId, 'bob', 500));
+      authority.handle('b', claimSeat('centre'));
+      authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+      rigImmediateBeatRound(authority, roomId);
+
+      authority.handle('a', { version: 1, type: 'start-round' });
+      const settled = authority.handle('b', { version: 1, type: 'start-round' }).broadcasts[0];
+      expect(beat(settled).phase).toBe('roundOver');
+      expect(settled.beat?.nextRoundRemainingMs).toBe(4_000);
+
+      vi.advanceTimersByTime(4_000);
+
+      expect(timeoutResults).toHaveLength(1);
+      expect(beat(timeoutResults[0].broadcasts[0]).phase).toBe('betting');
+      expect(timeoutResults[0].broadcasts[0].beat?.nextRoundDeadlineAt).toBeUndefined();
+    } finally {
+      authority.dispose();
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('covers room lifecycle edges, explicit seats, disabled spectators, admin reset, and closed-room cleanup', () => {
     const authority = new RoomAuthority();
     const privateRoom = authority.handle('a', {
