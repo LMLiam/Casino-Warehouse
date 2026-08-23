@@ -12,6 +12,10 @@ import type { ServerDataStore } from '../../src/state/serverDataStore/ServerData
 import { createSessionState } from '../../src/state/session/createSessionState';
 import { profileTokenAuth } from '../../src/state/serverDataStore/profileTokenAuth';
 
+// Every test owns a realtime server on an ephemeral port plus fresh browser contexts,
+// so tests are isolation-safe across parallel workers (#88).
+test.describe.configure({ mode: 'parallel' });
+
 let realtimeServer: CasinoServer | undefined;
 
 test.beforeEach(({ context: _context }, testInfo) => {
@@ -23,7 +27,7 @@ test.afterEach(async () => {
 });
 
 test('multiplayer room lobby supports create, join, seat choice, spectate, leave, reconnect, and Blackjack table play', async ({ browser, baseURL }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Alice', 'Bob', 'Sue']);
   const contexts: BrowserContext[] = [];
   const openPlayer = async (name: string): Promise<Page> => {
@@ -98,7 +102,7 @@ test('multiplayer room lobby supports create, join, seat choice, spectate, leave
 });
 
 test('reconnected Beat the House clients return home when a restarted server has no active room', async ({ browser, baseURL }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   const { dataStore, profileAuthByName } = seedDataStore(['Restart Alice', 'Restart Bob']);
   const wsUrl = await startRealtimeServerWithStore(dataStore);
   const restartPort = Number(new URL(wsUrl).port);
@@ -182,7 +186,7 @@ test('new browsers do not inherit another saved profile session and can switch p
 });
 
 test('reloaded Beat the House clients verify the saved room against the server and restore active state', async ({ browser, baseURL }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Restore Alice', 'Restore Bob']);
   const aliceContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Restore Alice'));
   const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Restore Bob'));
@@ -224,7 +228,7 @@ test('reloaded Beat the House clients verify the saved room against the server a
 });
 
 test('Beat the House multiplayer waits for player readiness before deal and next round', async ({ browser, baseURL }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Ready Alice', 'Ready Bob']);
   const aliceContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Ready Alice'));
   const bobContext = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Ready Bob'));
@@ -285,7 +289,7 @@ const beatActionDockSeatScenarios = [
 
 for (const scenario of beatActionDockSeatScenarios) {
   test(`Beat the House room action dock follows the ${scenario.activeMainBet} seat through ready, play, and rebet states`, async ({ browser, baseURL }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(150_000);
     const playerName = `${scenario.seatLabel} Dock QA`;
     const { profileAuthByName, wsUrl } = await startRealtimeServer([playerName]);
     const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get(playerName));
@@ -328,7 +332,7 @@ for (const scenario of beatActionDockSeatScenarios) {
 }
 
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Beat QA']);
   const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Beat QA'));
   try {
