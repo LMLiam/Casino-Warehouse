@@ -10,6 +10,11 @@ export default defineConfig({
   timeout: 30_000,
   workers: Number.isFinite(playwrightWorkers) && playwrightWorkers > 0 ? Math.floor(playwrightWorkers) : 2,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]] : 'list',
+  expect: {
+    // Parallel workers on two-vCPU runners stall the main thread well past the
+    // 5s default; polls and auto-waits get 10s before failing (#88).
+    timeout: 10_000,
+  },
   use: {
     baseURL: playwrightBaseURL,
     screenshot: 'only-on-failure',
