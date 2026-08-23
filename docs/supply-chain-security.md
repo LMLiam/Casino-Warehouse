@@ -64,6 +64,14 @@ Maintainers triage Scorecard findings as security-health signals, not automatic 
 - Prefer small, scoped follow-up issues over broad "raise the score" work.
 - Do not weaken existing CodeQL, Dependency Review, branch protection, or action-pinning controls to improve a Scorecard score.
 
+### Accepted risk: single-owner branch protection posture
+
+OpenSSF Scorecard's `BranchProtection` check reports a less-than-maximal score because `main` requires one approving review and because the ruleset does not apply identically to administrators. This is an intentional, documented policy decision (#63), reviewed by the maintainer in August 2026:
+
+- The repository has a single maintainer. Raising the required approval count above one would require a second reviewer that the project cannot currently provide, blocking all merges without adding real review diversity.
+- The owner bypass on the `main protection with owner bypass` ruleset is deliberate: it lets the maintainer merge routine, green dependency and tooling pull requests without self-approving. Every other protection rule still applies to bypass merges — squash-only merges, required status checks (`Required Quality Gate`, CodeQL analysis, metadata validation, dependency review), stale-review dismissal, review-thread resolution, and non-fast-forward/deletion blocks.
+- Revisit this decision if additional maintainers with merge rights join the project; at that point the bypass should be removed and the approval requirement re-evaluated.
+
 ## SBOM Export
 
 GitHub can [export the repository dependency graph as an SPDX SBOM](https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/exporting-a-software-bill-of-materials-for-your-repository) from the Dependency graph UI or through the SBOM REST API. That is enough for the current demo project because there is no packaged release artifact. Add an SBOM-producing workflow only when the project starts publishing downloadable releases or needs repeatable release-time provenance artifacts.
