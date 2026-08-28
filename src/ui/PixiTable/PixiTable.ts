@@ -17,6 +17,7 @@ import { handLayouts } from '../layout/handLayouts';
 import { rectToPixels } from '../layout/rectToPixels';
 import { tableSize } from '../layout/tableSize';
 import { toPixels } from '../layout/toPixels';
+import { shouldShowWagerIndicators } from './shouldShowWagerIndicators';
 import { CardRenderer } from '../renderers/CardRenderer';
 import { ChipRenderer } from '../renderers/ChipRenderer';
 import { EffectRenderer } from '../renderers/EffectRenderer';
@@ -189,6 +190,7 @@ export class PixiTable {
   }
 
   private drawBettingZones(snapshot: GameSnapshot): void {
+    const wagerAmounts: string[] = [];
     for (const hand of handLayouts) {
       for (const [betType, zone] of Object.entries(hand.zones) as [BetType, (typeof hand.zones)[BetType]][]) {
         const px = rectToPixels(zone);
@@ -234,6 +236,11 @@ export class PixiTable {
         if (amount > 0 && this.shouldShowLiveBet(snapshot, hand.id, betType)) {
           this.chipRenderer?.drawStack(amount, centerX, centerY, PixiTable.liveBetChipRadius, `bet-${hand.id}-${betType}-${amount}`);
         }
+
+        if (amount > 0 && shouldShowWagerIndicators(snapshot) && this.shouldShowLiveBet(snapshot, hand.id, betType)) {
+          this.tagRenderer.drawMarker(`£${amount}`, centerX, centerY + BET_RENDERING.wagerAmountOffsetY);
+          wagerAmounts.push(`${hand.id}:${betType}:${amount}`);
+        }
       }
       const tipPx = rectToPixels(hand.tipZone);
       const tipX = tipPx.x + tipPx.width / 2;
@@ -241,6 +248,7 @@ export class PixiTable {
       this.drawDealerTipZone(snapshot, hand.id, tipX, tipY, tipPx.width, tipPx.height);
       this.drawDealerThanksPayout(snapshot, hand.id, tipX, tipY);
     }
+    this.host.dataset.wagerAmounts = JSON.stringify(wagerAmounts);
   }
 
   private drawBettingZone(snapshot: GameSnapshot, handId: HandId, betType: BetType, x: number, y: number, width: number, height: number): void {
