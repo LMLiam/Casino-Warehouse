@@ -57,14 +57,6 @@ export default [
         { selector: 'TSUnknownKeyword', message: 'Do not use the unknown type. Use a named domain type.' },
         { selector: 'TSObjectKeyword', message: 'Do not use the object type. Use a named domain type.' },
         { selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='unknown']", message: 'Do not use unknown-valued schemas.' },
-      ],
-    },
-  },
-  {
-    files: ['src/**/*.{ts,tsx}'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
         { selector: 'TSNonNullExpression', message: 'Do not use non-null assertion (!). Use a guard or fallback.' },
       ],
     },
