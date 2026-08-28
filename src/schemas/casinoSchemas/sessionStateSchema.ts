@@ -3,6 +3,7 @@ import { creditSchema } from './creditSchema';
 import { currentSessionStateVersionSchema } from './currentSessionStateVersionSchema';
 import { profileIdSchema } from './profileIdSchema';
 import { roomGameIdSchema } from './roomGameIdSchema';
+import { sessionGameSnapshotSchema } from './sessionGameSnapshotSchema';
 
 export const sessionStateSchema = z.object({
   version: currentSessionStateVersionSchema,
@@ -11,6 +12,6 @@ export const sessionStateSchema = z.object({
   showingGameLobby: z.coerce.boolean().default(true),
   wagerLimit: creditSchema.default(0),
   wagered: creditSchema.default(0),
-  gameSnapshot: z.record(z.string(), z.unknown()).optional(),
+  gameSnapshot: sessionGameSnapshotSchema.optional(),
   updatedAt: z.string().default(() => new Date().toISOString()),
 });

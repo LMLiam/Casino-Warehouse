@@ -6,18 +6,20 @@ import type { SlotSnapshot } from '../../game/slots/SlotSnapshot';
 import type { CasinoSessionRoomState } from './CasinoSessionRoomState';
 import type { PlayerGameSnapshots } from './PlayerGameSnapshots';
 import type { SessionRoomSeatId } from './SessionRoomSeatId';
+import type { SessionStateInput } from './SessionStateInput';
 
 export class SessionStateParser {
-  public static isGameId(value: unknown): value is CasinoGameId {
+  public static isGameId(value: string | undefined): value is CasinoGameId {
     return typeof value === 'string' && gameCatalog.some((game) => game.id === value);
   }
 
-  public static safeMoney(value: unknown): number {
-    return Number.isFinite(value) ? Math.max(0, Math.floor(Number(value))) : 0;
+  public static safeMoney(value: number | string | null | undefined): number {
+    const numericValue = typeof value === 'number' || typeof value === 'string' ? Number(value) : Number.NaN;
+    return Number.isFinite(numericValue) ? Math.max(0, Math.floor(numericValue)) : 0;
   }
 
-  public static parseRoomState(value: unknown): CasinoSessionRoomState | undefined {
-    if (!SessionStateParser.isRecord(value)) {
+  public static parseRoomState(value: SessionStateInput['room']): CasinoSessionRoomState | undefined {
+    if (!value) {
       return undefined;
     }
     const roomId = typeof value.roomId === 'string' ? value.roomId.trim().toUpperCase() : '';
@@ -27,13 +29,13 @@ export class SessionStateParser {
     return roomId && gameId && role ? { roomId, gameId, role, seatId } : undefined;
   }
 
-  public static parseUpdatedAt(value: unknown): Date {
+  public static parseUpdatedAt(value: string | null | undefined): Date {
     const date = typeof value === 'string' ? new Date(value) : new Date();
     return Number.isNaN(date.getTime()) ? new Date() : date;
   }
 
-  public static parseGameSnapshot(value: unknown): PlayerGameSnapshots | undefined {
-    if (!SessionStateParser.isRecord(value)) {
+  public static parseGameSnapshot(value: SessionStateInput['gameSnapshot']): PlayerGameSnapshots | undefined {
+    if (!value) {
       return undefined;
     }
 
@@ -44,11 +46,7 @@ export class SessionStateParser {
     };
   }
 
-  private static isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
-  }
-
-  private static parseRoomSeatId(value: unknown): SessionRoomSeatId | undefined {
+  private static parseRoomSeatId(value: string | null | undefined): SessionRoomSeatId | undefined {
     if (typeof value !== 'string') {
       return undefined;
     }
@@ -56,14 +54,14 @@ export class SessionStateParser {
     return seatId === 'left' || seatId === 'centre' || seatId === 'right' || /^seat-\d+$/.test(seatId) ? (seatId as SessionRoomSeatId) : undefined;
   }
 
-  private static parseSnapshotRecord<Snapshot>(value: unknown): Snapshot | undefined {
-    return SessionStateParser.isRecord(value) ? (value as Snapshot) : undefined;
+  private static parseSnapshotRecord<Snapshot>(value: Partial<Snapshot> | null | undefined): Snapshot | undefined {
+    return value ? (value as Snapshot) : undefined;
   }
 
-  private static parseSlotSnapshots(value: unknown): Readonly<Record<string, SlotSnapshot>> | undefined {
-    if (!SessionStateParser.isRecord(value)) {
+  private static parseSlotSnapshots(value: NonNullable<SessionStateInput['gameSnapshot']>['slots']): Readonly<Record<string, SlotSnapshot>> | undefined {
+    if (!value) {
       return undefined;
     }
-    return Object.fromEntries(Object.entries(value).filter(([, snapshot]) => SessionStateParser.isRecord(snapshot))) as Readonly<Record<string, SlotSnapshot>>;
+    return Object.fromEntries(Object.entries(value).filter(([, snapshot]) => snapshot)) as Readonly<Record<string, SlotSnapshot>>;
   }
 }

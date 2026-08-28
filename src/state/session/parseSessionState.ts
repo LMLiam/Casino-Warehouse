@@ -2,11 +2,15 @@ import { z } from 'zod';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSessionState } from './CasinoSessionState';
 import { parseSessionStateV2 } from './parseSessionStateV2';
+import type { SessionStateInput } from './SessionStateInput';
 
-export const parseSessionState = (value: unknown): CasinoSessionState => {
+export const parseSessionState = (value: SessionStateInput | null): CasinoSessionState => {
   const parsed = z.object({ version: z.number().int() }).safeParse(value);
   if (!parsed.success) {
     throw new Error(`Session data is not valid. ${zodErrorSummary(parsed.error)}`);
+  }
+  if (value === null) {
+    throw new Error('Session data is not valid.');
   }
 
   switch (parsed.data.version) {

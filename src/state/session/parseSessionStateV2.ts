@@ -3,13 +3,14 @@ import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSessionState } from './CasinoSessionState';
 import { createSessionState } from './createSessionState';
 import { SessionStateParser } from './SessionStateParser';
+import type { SessionStateInput } from './SessionStateInput';
 
-export const parseSessionStateV2 = (value: unknown): CasinoSessionState => {
+export const parseSessionStateV2 = (value: SessionStateInput): CasinoSessionState => {
   const parsed = sessionStateV2Schema.safeParse(value);
   if (!parsed.success) {
     throw new Error(`Session v2 data is not valid. ${zodErrorSummary(parsed.error)}`);
   }
-  const session = parsed.data;
+  const session = { ...value, profileId: parsed.data.profileId };
 
   return createSessionState(
     session.profileId,
