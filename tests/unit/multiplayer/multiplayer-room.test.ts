@@ -259,6 +259,7 @@ describe('per-game room authority', () => {
 
     expect(room.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(467);
     expect(beat(room).bankroll).toBe(467);
+    expect(Object.keys(beat(room))).not.toContain('deck');
 
     const wagered = authority.handle('a', { version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 }).broadcasts[0];
     expect(wagered.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(442);
