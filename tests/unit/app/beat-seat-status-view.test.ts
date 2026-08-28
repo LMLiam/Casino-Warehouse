@@ -7,15 +7,15 @@ import type { BeatSeatStatusViewElements } from '../../../src/app/views/BeatSeat
 
 describe('BeatSeatStatusView', () => {
   it('marks tipped seats only while the round is active', () => {
-    const statusLayer: BeatSeatStatusViewElements['beatSeatStatus'] = {
+    const statusLayer = {
       innerHTML: '',
       style: { width: '', height: '', left: '', top: '' },
       querySelectorAll: () => [],
     };
-    const elements: BeatSeatStatusViewElements = {
+    const elements = appElementsTestDouble({
       tableHost: { clientWidth: 1000, clientHeight: 600 },
       beatSeatStatus: statusLayer,
-    };
+    });
     const base = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
     const active: GameSnapshot = {
       ...base,
@@ -32,15 +32,15 @@ describe('BeatSeatStatusView', () => {
   });
 
   it('uses server Beat readiness instead of local wager state for seat labels', () => {
-    const statusLayer: BeatSeatStatusViewElements['beatSeatStatus'] = {
+    const statusLayer = {
       innerHTML: '',
       style: { width: '', height: '', left: '', top: '' },
       querySelectorAll: () => [],
     };
-    const elements: BeatSeatStatusViewElements = {
+    const elements = appElementsTestDouble({
       tableHost: { clientWidth: 1000, clientHeight: 600 },
       beatSeatStatus: statusLayer,
-    };
+    });
     const base = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
     const snapshot: GameSnapshot = {
       ...base,
@@ -83,3 +83,5 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
   game,
   beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 },
 });
+
+const appElementsTestDouble = (implementation: BeatSeatStatusViewElements): BeatSeatStatusViewElements => implementation;

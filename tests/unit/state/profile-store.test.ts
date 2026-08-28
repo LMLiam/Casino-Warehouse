@@ -4,7 +4,6 @@ import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
 import { houseAdvanceRepaymentForProfit } from '../../../src/state/profiles/houseAdvanceRepaymentForProfit';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
 import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
-import { parseCasinoProfile } from '../../../src/state/profiles/parseCasinoProfile';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import { recordTransaction } from '../../../src/state/profiles/recordTransaction';
 import { renameProfile } from '../../../src/state/profiles/renameProfile';
@@ -29,7 +28,7 @@ describe('profile store', () => {
   it('creates, saves, and reloads persistent profiles', () => {
     const storage = new MemoryStorage();
     expect(loadProfileStore(storage)).toMatchObject({ recovered: false, state: { profiles: [] } });
-    const state = createProfile({ version: 1, profiles: [] }, 'Liam', 1500, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Liam', 1500, new Date('2026-05-04T12:00:00Z'));
 
     saveProfileStore(storage, state);
     const loaded = loadProfileStore(storage);
@@ -42,7 +41,7 @@ describe('profile store', () => {
   });
 
   it('renames and deletes profiles without touching other records', () => {
-    let state = createProfile({ version: 1, profiles: [] }, 'One', 100, new Date('2026-05-04T12:00:00Z'));
+    let state = createProfile({ profiles: [] }, 'One', 100, new Date('2026-05-04T12:00:00Z'));
     state = createProfile(state, 'Two', 200, new Date('2026-05-04T12:01:00Z'));
     const secondId = state.profiles[1].id;
 
@@ -55,7 +54,7 @@ describe('profile store', () => {
   });
 
   it('records bankroll transaction history and stats', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Stats', 1000, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Stats', 1000, new Date('2026-05-04T12:00:00Z'));
     let profile = state.profiles[0];
 
     profile = recordTransaction(
@@ -82,7 +81,7 @@ describe('profile store', () => {
   });
 
   it('keeps House Advance credits and repayments out of gameplay stats', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Advance Stats', 0, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Advance Stats', 0, new Date('2026-05-04T12:00:00Z'));
     let profile = state.profiles[0];
 
     profile = recordTransaction(
@@ -116,7 +115,7 @@ describe('profile store', () => {
   });
 
   it('keeps dealer tips and Dealer Thanks rewards out of wager and winnings stats', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Tip Stats', 100, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Tip Stats', 100, new Date('2026-05-04T12:00:00Z'));
     let profile = state.profiles[0];
 
     profile = recordTransaction(
@@ -168,7 +167,7 @@ describe('profile store', () => {
 
     try {
       const now = new Date('2026-05-04T12:00:00Z');
-      const state = createProfile(createProfile({ version: 1, profiles: [] }, 'One', 100, now), 'Two', 200, now);
+      const state = createProfile(createProfile({ profiles: [] }, 'One', 100, now), 'Two', 200, now);
       const firstProfile = state.profiles[0];
       const secondProfile = state.profiles[1];
       const updated = recordTransaction(
@@ -198,7 +197,7 @@ describe('profile store', () => {
     const profileNow = new Date('2026-05-04T12:00:00Z');
     const transactionNow = new Date('2026-05-04T12:01:00Z');
     const idGenerator = vi.fn((prefix: string, now: Date) => `${prefix}-${now.toISOString()}`);
-    const state = createProfile({ version: 1, profiles: [] }, 'Deterministic', 1000, profileNow, idGenerator);
+    const state = createProfile({ profiles: [] }, 'Deterministic', 1000, profileNow, idGenerator);
     const profile = recordTransaction(
       state.profiles[0],
       { gameId: 'blackjack', type: 'wager', amount: -25, description: 'Wager', metadata: {} },
@@ -244,7 +243,7 @@ describe('profile store', () => {
   });
 
   it('does not count pushes or admin adjustments as gambling wins', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Clean stats', 100, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Clean stats', 100, new Date('2026-05-04T12:00:00Z'));
     let profile = state.profiles[0];
 
     profile = recordTransaction(
@@ -264,130 +263,21 @@ describe('profile store', () => {
   });
 
   it('parses a validated save file', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Stored', 777, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Stored', 777, new Date('2026-05-04T12:00:00Z'));
 
     const imported = parseProfileStoreJson(JSON.stringify(state));
 
     expect(imported).toEqual(state);
   });
 
-  it('migrates profile-store v1 legacy transactions and missing optional profile fields', () => {
-    const imported = parseCasinoSaveState({
-      version: 1,
-      profiles: [
-        {
-          id: 'legacy',
-          name: 'Legacy',
-          bankroll: 50,
-          stats: { totalWagered: 10, totalWon: 20, biggestWin: 20, gamesPlayed: 1 },
-          transactions: [
-            { id: 'tx1', gameId: 'blackjack', type: 'push', amount: 10, balanceAfter: 50, note: 'Old push' },
-            { id: 'tx2', gameId: 'admin', type: 'admin', amount: 5, balanceAfter: 40, note: 'Old admin' },
-          ],
-        },
-      ],
-    });
-
-    expect(imported.version).toBe(1);
-    expect(imported.profiles[0].color).toMatch(/^#/);
-    expect(imported.profiles[0].houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
-    expect(imported.profiles[0].stats.netProfit).toBe(10);
-    expect(imported.profiles[0].transactions.map((transaction) => transaction.type)).toEqual(['push_refund', 'admin_adjustment']);
-    expect(imported.profiles[0].transactions[0].description).toBe('Old push');
-  });
-
-  it('rejects malformed and unsupported profile-store migration inputs clearly', () => {
-    expect(() => parseCasinoSaveState({ version: 1 })).toThrow('Profile store v1 data is not valid');
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
-  });
-
-  it('normalizes partial profile records that bypass save-state schema defaults', () => {
-    const empty = parseCasinoProfile({ id: 'empty', name: '   ', stats: null });
-    const rich = parseCasinoProfile({
-      id: 'rich',
-      name: '  Rich  ',
-      bankroll: Number.NaN,
-      houseAdvance: {
-        outstandingBalance: 425,
-        activeCount: 99,
-      },
-      stats: {
-        perGame: {
-          ignored: null,
-          slots: { gamesPlayed: 2, wagered: Number.NaN, won: 25, netProfit: 7 },
-        },
-      },
-      transactions: [
-        {
-          id: 'reset',
-          gameId: 'admin',
-          roomId: 'room-1',
-          sessionId: 'session-1',
-          type: 'reset',
-          amount: Number.NaN,
-          balanceBefore: Number.NaN,
-          balanceAfter: Number.NaN,
-          metadata: { keep: 'yes', count: 2, flag: false, drop: {} },
-        },
-        { id: 'import', gameId: 'admin', type: 'import', amount: 5, balanceBefore: 0, balanceAfter: 5 },
-        { id: 'correction', gameId: 'admin', type: 'correction', amount: -5, balanceBefore: 5, balanceAfter: 0 },
-      ],
-    });
-
-    expect(empty).toMatchObject({ name: 'Player', bankroll: 0, transactions: [] });
-    expect(rich).toMatchObject({
-      name: 'Rich',
-      bankroll: 0,
-      transactions: [
-        expect.objectContaining({
-          roomId: 'room-1',
-          sessionId: 'session-1',
-          type: 'reset',
-          amount: 0,
-          description: 'Imported legacy transaction.',
-          metadata: { keep: 'yes', count: 2, flag: false },
-        }),
-        expect.objectContaining({ type: 'import' }),
-        expect.objectContaining({ type: 'correction' }),
-      ],
-    });
-    expect(rich.stats.perGame.slots).toMatchObject({ gamesPlayed: 2, wagered: 0, won: 25, netProfit: 7 });
-    expect(rich.houseAdvance).toEqual({ outstandingBalance: 300, activeCount: 3 });
-  });
-
-  it('normalizes invalid House Advance imports without rejecting profiles', () => {
-    expect(parseCasinoProfile({ id: 'missing', name: 'Missing' }).houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
-    expect(parseCasinoProfile({ id: 'negative', name: 'Negative', houseAdvance: { outstandingBalance: -100, activeCount: 2 } }).houseAdvance).toEqual({
-      outstandingBalance: 0,
-      activeCount: 0,
-    });
-    expect(
-      parseCasinoProfile({ id: 'active-missing', name: 'Active Missing', houseAdvance: { outstandingBalance: 100, activeCount: -5 } }).houseAdvance,
-    ).toEqual({
-      outstandingBalance: 100,
-      activeCount: 1,
-    });
-    expect(parseCasinoProfile({ id: 'too-high', name: 'Too High', houseAdvance: { outstandingBalance: 999, activeCount: 8 } }).houseAdvance).toEqual({
-      outstandingBalance: 300,
-      activeCount: 3,
-    });
-  });
-
-  it('rejects invalid imported profiles and transactions', () => {
-    expect(() => parseProfileStoreJson(JSON.stringify({ version: 1, profiles: [{ id: 1 }] }))).toThrow('Profile record is invalid.');
-    expect(() =>
-      parseProfileStoreJson(
-        JSON.stringify({
-          version: 1,
-          profiles: [{ id: 'bad', name: 'Bad', transactions: [{ id: 1 }] }],
-        }),
-      ),
-    ).toThrow('Transaction record is invalid.');
+  it('rejects obsolete and malformed profile stores instead of migrating them', () => {
+    expect(() => parseCasinoSaveState({ version: 1, profiles: [] })).toThrow('Unrecognized key: "version"');
+    expect(() => parseProfileStoreJson('{"profiles":[{"id":1}]}')).toThrow('Save data is not a casino profile store');
   });
 
   it('recovers gracefully from corrupted storage data', () => {
     const storage = new MemoryStorage();
-    storage.setItem('casino_warehouse_profiles_v1', '{ broken');
+    storage.setItem('casino_warehouse_profiles', '{ broken');
 
     const loaded = loadProfileStore(storage);
 
@@ -404,11 +294,11 @@ describe('profile store', () => {
       }),
     };
 
-    expect(() => saveProfileStore(storage, { version: 1, profiles: [] })).toThrow('quota exceeded');
+    expect(() => saveProfileStore(storage, { profiles: [] })).toThrow('quota exceeded');
   });
 
   it('replaces one profile in a save state', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'A', 100, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'A', 100, new Date('2026-05-04T12:00:00Z'));
     const updated = recordTransaction(
       state.profiles[0],
       { gameId: 'slots', type: 'bonus', amount: 500, description: 'Bonus win', metadata: { slotTheme: 'thai-princess' } },

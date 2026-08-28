@@ -1,14 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-type TestContainer = {
-  readonly children: readonly TestContainer[];
-};
-
-type TestText = TestContainer & {
-  readonly style: { readonly fill?: number };
-  readonly text: string;
-};
-
 vi.mock('pixi.js', () => {
   class Point {
     public x = 0;
@@ -21,10 +12,10 @@ vi.mock('pixi.js', () => {
   }
 
   class Container {
-    public readonly children: TestContainer[] = [];
+    public readonly children: Container[] = [];
     public readonly position = new Point();
 
-    public addChild(...children: TestContainer[]): void {
+    public addChild(...children: Container[]): void {
       this.children.push(...children);
     }
   }
@@ -68,7 +59,7 @@ vi.mock('pixi.js', () => {
 
 describe('TagRenderer', () => {
   it("colors Dealer's Thanks settlement detail lines as rewards while keeping repayments red", async () => {
-    const { Container } = await import('pixi.js');
+    const { Container, Text } = await import('pixi.js');
     const { COLORS } = await import('../../../src/ui/renderers/renderingConstants/COLORS');
     const { TagRenderer } = await import('../../../src/ui/renderers/TagRenderer');
     const layer = new Container();
@@ -84,8 +75,8 @@ describe('TagRenderer', () => {
       false,
     );
 
-    const group = layer.children[0] as TestContainer;
-    const labels = group.children.filter((child): child is TestText => 'text' in child);
+    const group = layer.children[0] as { readonly children: readonly InstanceType<typeof Container>[] };
+    const labels = group.children.filter((child) => child instanceof Text);
 
     expect(labels.find((label) => label.text === "Dealer's Thanks +£2")?.style.fill).toBe(COLORS.win);
     expect(labels.find((label) => label.text === 'House Advance payment -£2')?.style.fill).toBe(COLORS.lose);

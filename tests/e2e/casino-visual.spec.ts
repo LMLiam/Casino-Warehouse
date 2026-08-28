@@ -1,4 +1,12 @@
 import { e2eAdminToken, expect, test, resetBrowserStorage, type Locator, type Page } from './fixtures';
+import type { JsonValue } from '../../src/schemas/casinoSchemas/JsonValue';
+
+type ClearServerDataMessage = {
+  readonly type?: string;
+  readonly authorized?: boolean;
+  readonly profileState?: { readonly profiles?: readonly JsonValue[] };
+  readonly session?: JsonValue;
+};
 
 const consoleFailures = new WeakMap<Page, string[]>();
 
@@ -137,7 +145,7 @@ test('profile setup starts one selected local profile', async ({ page }) => {
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const raw = localStorage.getItem('casino_warehouse_session_v2');
+        const raw = localStorage.getItem('casino_warehouse_session');
         return raw ? JSON.parse(raw).profileId : '';
       }),
     )
@@ -155,7 +163,7 @@ test('audio mute and volume controls persist across reloads', async ({ page }) =
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const raw = localStorage.getItem('casino_audio_settings_v1');
+        const raw = localStorage.getItem('casino_audio_settings');
         return raw ? JSON.parse(raw) : undefined;
       }),
     )
@@ -529,13 +537,6 @@ type E2EServerData = {
   };
 };
 
-type E2EDataStateMessage = {
-  readonly type?: string;
-  readonly authorized?: boolean;
-  readonly profileState?: { readonly profiles?: readonly E2EServerProfile[] };
-  readonly session?: { readonly version?: number };
-};
-
 const waitForRealtime = async (page: Page): Promise<void> => {
   await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
 };
@@ -551,13 +552,13 @@ const clearServerData = async (page: Page): Promise<void> => {
         reject(new Error('Timed out clearing server data.'));
       }, 5_000);
       socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ version: 1, type: 'authorize-admin', adminToken }));
+        socket.send(JSON.stringify({ type: 'authorize-admin', adminToken }));
       });
       socket.addEventListener('message', (event) => {
-        const message = JSON.parse(String(event.data)) as E2EDataStateMessage;
+        const message = JSON.parse(String(event.data)) as ClearServerDataMessage;
         if (message.type === 'admin-access' && message.authorized && !authorized) {
           authorized = true;
-          socket.send(JSON.stringify({ version: 1, type: 'clear-server-data' }));
+          socket.send(JSON.stringify({ type: 'clear-server-data' }));
         }
         if (message.type === 'data-state' && message.profileState?.profiles?.length === 0 && message.session === undefined) {
           window.clearTimeout(timer);
@@ -583,7 +584,7 @@ const requestServerData = async (page: Page): Promise<E2EServerData> =>
         reject(new Error('Timed out reading server data.'));
       }, 5_000);
       socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({ version: 1, type: 'request-data' }));
+        socket.send(JSON.stringify({ type: 'request-data' }));
       });
       socket.addEventListener('message', (event) => {
         const message = JSON.parse(String(event.data)) as { type?: string; profileState?: E2EServerData['profileState'] };

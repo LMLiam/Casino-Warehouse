@@ -43,34 +43,16 @@ describe('schema contract fixtures', () => {
     }
   });
 
-  it('documents profile-store v1 persistence contracts and migration failures', () => {
-    expect(parseProfileStoreJson(JSON.stringify(profileStoreContractFixtures.currentV1))).toEqual(profileStoreContractFixtures.currentV1);
-
-    const legacy = parseCasinoSaveState(profileStoreContractFixtures.legacyV1);
-    expect(legacy.profiles[0]).toMatchObject({
-      id: 'legacy-profile',
-      name: 'Legacy Player',
-      bankroll: 75,
-      houseAdvance: {
-        outstandingBalance: 100,
-        activeCount: 1,
-      },
-      stats: {
-        netProfit: 10,
-      },
-    });
-    expect(legacy.profiles[0].color).toMatch(/^#/);
-    expect(legacy.profiles[0].transactions.map((transaction) => transaction.type)).toEqual(['push_refund', 'admin_adjustment']);
-    expect(legacy.profiles[0].transactions[0].description).toBe('Legacy push refund.');
-
-    expect(() => parseCasinoSaveState(profileStoreContractFixtures.malformedV1)).toThrow('Profile record is invalid.');
-    expect(() => parseCasinoSaveState(profileStoreContractFixtures.unsupportedVersion)).toThrow('Profile store data version 2 is not supported.');
+  it('accepts only the current unversioned profile-store contract', () => {
+    expect(parseProfileStoreJson(JSON.stringify(profileStoreContractFixtures.current))).toEqual(profileStoreContractFixtures.current);
+    expect(() => parseCasinoSaveState(profileStoreContractFixtures.malformed)).toThrow('Save data is not a casino profile store');
+    expect(() => parseCasinoSaveState(profileStoreContractFixtures.obsoleteVersion)).toThrow('Unrecognized key: "version"');
   });
 
-  it('documents session-state v2 persistence contracts and restore failures', () => {
-    expect(parseSessionState(sessionStateContractFixtures.currentV2)).toEqual(sessionStateContractFixtures.currentV2);
+  it('accepts only the current unversioned session-state contract', () => {
+    expect(parseSessionState(sessionStateContractFixtures.current)).toEqual(sessionStateContractFixtures.current);
 
-    const restoredRoom = parseSessionState(sessionStateContractFixtures.roomRestoreV2);
+    const restoredRoom = parseSessionState(sessionStateContractFixtures.roomRestore);
     expect(restoredRoom).toMatchObject({
       activeGame: 'blackjack',
       room: {
@@ -86,8 +68,8 @@ describe('schema contract fixtures', () => {
       status: 'Representative restored Blackjack snapshot.',
     });
 
-    expect(() => parseSessionState(sessionStateContractFixtures.malformedV2)).toThrow('Session v2 data is not valid.');
-    expect(() => parseSessionState(sessionStateContractFixtures.unsupportedVersion)).toThrow('Session data version 1 is not supported.');
+    expect(() => parseSessionState(sessionStateContractFixtures.malformed)).toThrow('Session data is not valid');
+    expect(() => parseSessionState(sessionStateContractFixtures.obsoleteVersion)).toThrow('Unrecognized key: "version"');
   });
 });
 

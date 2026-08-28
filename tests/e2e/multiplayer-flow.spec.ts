@@ -2,6 +2,7 @@ import { expect, test, type Browser, type BrowserContext, type Locator, type Pag
 import type { AddressInfo } from 'node:net';
 import type { Card } from '../../src/game/cards/Card';
 import { rigDeck } from '../../src/game/cards/rigDeck';
+import type { JsonValue } from '../../src/schemas/casinoSchemas/JsonValue';
 import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer } from '../../src/multiplayer/serverEntry';
 import { RoomAuthority } from '../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../src/multiplayer/protocol/ClientMessage';
@@ -561,7 +562,7 @@ type ElementBox = {
 };
 
 const actionDockSeatCenterTolerancePx = 36;
-const profileTokensStorageKey = 'casino_warehouse_profile_tokens_v1';
+const profileTokensStorageKey = 'casino_warehouse_profile_tokens';
 
 const startRealtimeServer = async (profileNames: readonly string[]): Promise<SeededRealtimeServer> => {
   const { dataStore, profileAuthByName } = seedDataStore(profileNames);
@@ -695,11 +696,9 @@ const dropChipPercent = async (page: Page, xPercent: number, yPercent: number, a
   );
 };
 
-type TableDatasetEntry = string | number | readonly (string | number)[];
-
-const parsedDataset = async (page: Page, key: string): Promise<TableDatasetEntry[]> =>
-  page.locator('#tableHost').evaluate((element, datasetKey): TableDatasetEntry[] => {
-    const parsed = JSON.parse(element.dataset[datasetKey] ?? '[]');
+const parsedDataset = async (page: Page, key: string): Promise<readonly JsonValue[]> =>
+  page.locator('#tableHost').evaluate((element, datasetKey): readonly JsonValue[] => {
+    const parsed = JSON.parse(element.dataset[datasetKey] ?? '[]') as JsonValue;
     return Array.isArray(parsed) ? parsed : [];
   }, key);
 
@@ -747,7 +746,7 @@ const transactionCount = async (page: Page, text: string): Promise<number> =>
           reject(new Error('Timed out reading server data.'));
         }, 5_000);
         socket.addEventListener('open', () => {
-          socket.send(JSON.stringify({ version: 1, type: 'request-data' }));
+          socket.send(JSON.stringify({ type: 'request-data' }));
         });
         socket.addEventListener('message', (event) => {
           const message = JSON.parse(String(event.data)) as {

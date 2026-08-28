@@ -89,7 +89,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
     const firstSocket = FakeWebSocket.instances[0];
     expect(firstSocket.url).toBe('ws://casino.test/ws');
     firstSocket.open();
-    firstSocket.serverMessage({ version: 1, type: 'server-hello', serverInstanceId: 'server-before-restart' });
+    firstSocket.serverMessage({ type: 'server-hello', serverInstanceId: 'server-before-restart' });
 
     firstSocket.close();
     vi.advanceTimersByTime(1_000);
@@ -98,7 +98,6 @@ describe('multiplayer realtime client reconnect reloads', () => {
 
     reconnectSocket.open();
     reconnectSocket.serverMessage({
-      version: 1,
       type: 'reload-required',
       reason: 'server-restarted',
       message: 'The game server restarted. Reload the app to use the latest client.',
@@ -121,7 +120,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
 
     const events = createEvents();
     const client = new MultiplayerClient(events);
-    expect(client.send({ version: 1, type: 'request-data' })).toBe(false);
+    expect(client.send({ type: 'request-data' })).toBe(false);
     expect(events.onError).toHaveBeenCalledWith('Connect to the game server first.');
 
     client.connect('ws://casino.test/ws');
@@ -130,29 +129,28 @@ describe('multiplayer realtime client reconnect reloads', () => {
     expect(events.onConnectionState).toHaveBeenCalledWith('connected');
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'request-data' });
 
-    const profileState = { version: 1 as const, profiles: [] };
-    socket.serverMessage({ version: 1, type: 'data-state', database: 'memory', profileState });
+    const profileState = { profiles: [] };
+    socket.serverMessage({ type: 'data-state', database: 'memory', profileState });
     expect(events.onDataState).toHaveBeenCalledWith({ database: 'memory', profileState, session: undefined });
 
-    socket.serverMessage({ version: 1, type: 'heartbeat', sentAt: 123 });
-    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({ version: 1, type: 'heartbeat-ack', sentAt: 123 });
+    socket.serverMessage({ type: 'heartbeat', sentAt: 123 });
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({ type: 'heartbeat-ack', sentAt: 123 });
 
     const room = createRoomSnapshot();
-    socket.serverMessage({ version: 1, type: 'room-created', room, invitePath: '/?game=beat-the-house&room=ROOM42' });
+    socket.serverMessage({ type: 'room-created', room, invitePath: '/?game=beat-the-house&room=ROOM42' });
     expect(client.room).toMatchObject({ roomId: room.roomId, revision: room.revision });
     expect(events.onRoom).toHaveBeenCalledWith(expect.objectContaining({ roomId: room.roomId, revision: room.revision }));
     expect(events.onStatus).toHaveBeenCalledWith('Beat the House room ROOM42 ready. Invite path: /?game=beat-the-house&room=ROOM42');
 
-    socket.serverMessage({ version: 1, type: 'room-list', gameId: 'beat-the-house', rooms: [] });
+    socket.serverMessage({ type: 'room-list', gameId: 'beat-the-house', rooms: [] });
     expect(events.onRoomList).toHaveBeenCalledWith('beat-the-house', []);
 
     const revisedRoom = { ...room, revision: 2 };
-    socket.serverMessage({ version: 1, type: 'room-state', room: revisedRoom });
+    socket.serverMessage({ type: 'room-state', room: revisedRoom });
     expect(client.room).toMatchObject({ roomId: room.roomId, revision: 2 });
     expect(events.onRoom).toHaveBeenCalledWith(expect.objectContaining({ roomId: room.roomId, revision: 2 }));
 
     socket.serverMessage({
-      version: 1,
       type: 'settlement',
       roomId: room.roomId,
       sessionId: room.sessionId,
@@ -163,7 +161,6 @@ describe('multiplayer realtime client reconnect reloads', () => {
       sessionId: room.sessionId,
       settlements: [{ id: 's1', profileId: 'alice', seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
       type: 'settlement',
-      version: 1,
     });
 
     client.clearRoomState();
@@ -196,14 +193,14 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.connect('ws://casino.test/ws');
     const socket = FakeWebSocket.instances[0];
     socket.open();
-    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
-    socket.serverMessage({ version: 1, type: 'admin-access', authorized: true });
+    socket.serverMessage({ type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    socket.serverMessage({ type: 'admin-access', authorized: true });
     socket.rawMessage('{broken');
     expect(events.onError).toHaveBeenCalledWith('Received an invalid server message.');
 
-    socket.serverMessage({ version: 1, type: 'error', code: 'connected', message: 'Connected.' });
+    socket.serverMessage({ type: 'error', code: 'connected', message: 'Connected.' });
     expect(events.onStatus).toHaveBeenCalledWith('Connected.');
-    socket.serverMessage({ version: 1, type: 'error', code: 'rejected', message: 'Room was not found.' });
+    socket.serverMessage({ type: 'error', code: 'rejected', message: 'Room was not found.' });
     expect(events.onError).toHaveBeenCalledWith('Room was not found.');
     socket.fail();
     expect(events.onError).toHaveBeenCalledWith('Game server connection failed.');
@@ -222,7 +219,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.resetAllBankrolls();
     client.clearServerData();
     client.listRooms('blackjack');
-    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    socket.serverMessage({ type: 'profile-access', ownedProfileIds: ['profile-a'] });
     client.acceptHouseAdvance('profile-a');
     client.createRoom('beat-the-house', 'QA Room', 3, 'profile-a', 'Alice', 1000);
     client.joinRoom('beat-the-house', 'ROOM42', 'player', 'profile-a', 'Alice', 1000);
@@ -372,9 +369,9 @@ describe('multiplayer realtime client reconnect reloads', () => {
     const socket = FakeWebSocket.instances[0];
     socket.open();
     const room = createRoomSnapshot();
-    socket.serverMessage({ version: 1, type: 'room-created', room, invitePath: '/?game=beat-the-house&room=ROOM42' });
+    socket.serverMessage({ type: 'room-created', room, invitePath: '/?game=beat-the-house&room=ROOM42' });
 
-    socket.serverMessage({ version: 1, type: 'room-closed', roomId: room.roomId, gameId: room.gameId, reason: 'profile-deleted' });
+    socket.serverMessage({ type: 'room-closed', roomId: room.roomId, gameId: room.gameId, reason: 'profile-deleted' });
 
     expect(client.room).toBeUndefined();
     expect(events.onRoomCleared).toHaveBeenCalledOnce();
@@ -408,10 +405,10 @@ describe('multiplayer realtime client reconnect reloads', () => {
     expect(events.onError).toHaveBeenCalledWith('This browser does not own that server profile.');
     expect(events.onError).toHaveBeenCalledWith('Admin controls are locked for this browser.');
 
-    socket.serverMessage({ version: 1, type: 'profile-credentials', profileId: 'profile-a', profileToken: 'profile-token' });
+    socket.serverMessage({ type: 'profile-credentials', profileId: 'profile-a', profileToken: 'profile-token' });
     expect(JSON.parse(localStorage.getItem(profileTokensStorageKey) ?? '[]')).toEqual([{ profileId: 'profile-a', profileToken: 'profile-token' }]);
 
-    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    socket.serverMessage({ type: 'profile-access', ownedProfileIds: ['profile-a'] });
     expect(client.ownsProfile('profile-a')).toBe(true);
     expect(events.onProfileAccess).toHaveBeenCalledWith(['profile-a']);
     client.createRoom('beat-the-house', 'Allowed Room', 3, 'profile-a', 'Alice', 1000);
@@ -421,13 +418,13 @@ describe('multiplayer realtime client reconnect reloads', () => {
 
     client.authorizeAdmin(' admin-secret ');
     expect(localStorage.getItem(adminTokenStorageKey)).toBe('admin-secret');
-    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({ version: 1, type: 'authorize-admin', adminToken: 'admin-secret' });
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({ type: 'authorize-admin', adminToken: 'admin-secret' });
 
-    socket.serverMessage({ version: 1, type: 'admin-access', authorized: false });
+    socket.serverMessage({ type: 'admin-access', authorized: false });
     expect(localStorage.getItem(adminTokenStorageKey)).toBeNull();
     expect(client.hasAdminAccess).toBe(false);
 
-    socket.serverMessage({ version: 1, type: 'admin-access', authorized: true });
+    socket.serverMessage({ type: 'admin-access', authorized: true });
     client.adjustBankroll('profile-a', 'add', 100);
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'admin-bankroll', profileId: 'profile-a' });
   });
@@ -435,7 +432,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
   it('covers client-side ownership, admin token, stale socket, and heartbeat edge cases', () => {
     vi.useFakeTimers();
     const localStorage = createMemoryStorage();
-    localStorage.setItem(profileTokensStorageKey, JSON.stringify({ 'profile-a': 'token-a' }));
+    localStorage.setItem(profileTokensStorageKey, JSON.stringify([{ profileId: 'profile-a', profileToken: 'token-a' }]));
     localStorage.setItem(adminTokenStorageKey, 'stored-admin-token');
     vi.stubGlobal('localStorage', localStorage);
     vi.stubGlobal('WebSocket', FakeWebSocket);
@@ -471,12 +468,12 @@ describe('multiplayer realtime client reconnect reloads', () => {
     const socket = FakeWebSocket.instances[1];
     socket.open();
     expect(socket.sent.map((payload) => JSON.parse(payload))).toEqual([
-      { version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: 'profile-a', profileToken: 'token-a' }] },
-      { version: 1, type: 'authorize-admin', adminToken: 'stored-admin-token' },
-      { version: 1, type: 'request-data' },
+      { type: 'authorize-profiles', profileTokens: [{ profileId: 'profile-a', profileToken: 'token-a' }] },
+      { type: 'authorize-admin', adminToken: 'stored-admin-token' },
+      { type: 'request-data' },
     ]);
 
-    socket.serverMessage({ version: 1, type: 'profile-access', ownedProfileIds: ['profile-a'] });
+    socket.serverMessage({ type: 'profile-access', ownedProfileIds: ['profile-a'] });
     const snapshot = new BeatTheHouseGame({ initialBankroll: 1000 }).saveState();
     client.saveSession({
       profileId: 'profile-a',
@@ -515,7 +512,7 @@ describe('multiplayer realtime client reconnect reloads', () => {
     const malformedClient = new MultiplayerClient(malformedEvents);
     malformedClient.connect('wss://casino.test/ws');
     FakeWebSocket.instances[0].open();
-    expect(JSON.parse(FakeWebSocket.instances[0].sent[0])).toEqual({ version: 1, type: 'authorize-profiles', profileTokens: [] });
+    expect(JSON.parse(FakeWebSocket.instances[0].sent[0])).toEqual({ type: 'authorize-profiles', profileTokens: [] });
 
     vi.unstubAllGlobals();
     FakeWebSocket.instances = [];
@@ -546,9 +543,9 @@ describe('multiplayer realtime client reconnect reloads', () => {
     const socket = FakeWebSocket.instances[0];
     socket.open();
 
-    socket.serverMessage({ version: 1, type: 'profile-credentials', profileId: 'profile-a', profileToken: 'token-a' });
-    socket.serverMessage({ version: 1, type: 'admin-access', authorized: false });
-    socket.serverMessage({ version: 1, type: 'room-closed', roomId: 'OTHER', gameId: 'beat-the-house', reason: 'profile-deleted' });
+    socket.serverMessage({ type: 'profile-credentials', profileId: 'profile-a', profileToken: 'token-a' });
+    socket.serverMessage({ type: 'admin-access', authorized: false });
+    socket.serverMessage({ type: 'room-closed', roomId: 'OTHER', gameId: 'beat-the-house', reason: 'profile-deleted' });
 
     expect(throwingStorage.getItem).toHaveBeenCalled();
     expect(throwingStorage.setItem).toHaveBeenCalled();
