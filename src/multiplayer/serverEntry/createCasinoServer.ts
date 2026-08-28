@@ -5,13 +5,13 @@ import { extname, join, normalize } from 'node:path';
 import type { Duplex } from 'node:stream';
 import helmet, { type HelmetOptions } from 'helmet';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
+import type { JsonValue } from '../../schemas/casinoSchemas/JsonValue';
+import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
 import { RoomAuthority } from '../roomAuthority';
 import type { ClientMessage } from '../protocol/ClientMessage';
 import { parseClientMessage } from '../protocol/parseClientMessage';
-import { currentProtocolVersion } from '../protocol/currentProtocolVersion';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { ServerMessage } from '../protocol/ServerMessage';
-import type { ClientMessageCandidate } from '../protocol/ClientMessageCandidate';
 import { createSessionState } from '../../state/session/createSessionState';
 import { createDefaultServerDataStore } from '../../state/serverDataStore/createDefaultServerDataStore';
 import { profileTokenAuth } from '../../state/serverDataStore/profileTokenAuth';
@@ -125,7 +125,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     for (const gameId of uniqueGameIds) {
       const recipients = [...peers.values()].filter((candidate) => candidate.browsingGameId === gameId).map((candidate) => candidate.id);
       if (recipients.length > 0) {
-        broadcast({ version: currentProtocolVersion, type: 'room-list', gameId, rooms: authority.listRoomSummaries(gameId) }, recipients);
+        broadcast({ type: 'room-list', gameId, rooms: authority.listRoomSummaries(gameId) }, recipients);
       }
     }
   };
@@ -133,7 +133,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const sendDataState = (peer: Peer): void => {
     const snapshot = dataStore.snapshot();
     send(peer, {
-      version: currentProtocolVersion,
       type: 'data-state',
       database: snapshot.database,
       profileState: snapshot.profileState,
@@ -142,11 +141,11 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   };
 
   const sendProfileAccess = (peer: Peer): void => {
-    send(peer, { version: currentProtocolVersion, type: 'profile-access', ownedProfileIds: [...peer.ownedProfileIds] });
+    send(peer, { type: 'profile-access', ownedProfileIds: [...peer.ownedProfileIds] });
   };
 
   const sendAdminAccess = (peer: Peer): void => {
-    send(peer, { version: currentProtocolVersion, type: 'admin-access', authorized: peer.isAdmin });
+    send(peer, { type: 'admin-access', authorized: peer.isAdmin });
   };
 
   const broadcastDataState = (): void => {
@@ -157,37 +156,30 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
 
   const emitAuthorityResult = (peer: Peer, result: ReturnType<CasinoRoomAuthority['handle']>, options: { readonly forceDataState?: boolean } = {}): void => {
     if (result.error) {
-      send(peer, { version: currentProtocolVersion, type: 'error', code: 'rejected', message: result.error });
+      send(peer, { type: 'error', code: 'rejected', message: result.error });
     }
     if (result.roomList) {
-      send(peer, { version: currentProtocolVersion, type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
+      send(peer, { type: 'room-list', gameId: result.roomList.gameId, rooms: result.roomList.rooms });
     }
     if (result.direct) {
       send(peer, {
-        version: currentProtocolVersion,
         type: 'room-created',
         room: result.direct,
         invitePath: createInvitePath(result.direct.gameId, result.direct.roomId),
       });
     }
     for (const closure of result.roomClosures ?? []) {
-      broadcast(
-        { version: currentProtocolVersion, type: 'room-closed', roomId: closure.roomId, gameId: closure.gameId, reason: closure.reason },
-        closure.connectionIds,
-      );
+      broadcast({ type: 'room-closed', roomId: closure.roomId, gameId: closure.gameId, reason: closure.reason }, closure.connectionIds);
     }
     const broadcastRecipients = new Map((result.broadcastRecipients ?? []).map((entry) => [entry.roomId, entry.connectionIds]));
     for (const snapshot of result.broadcasts) {
-      broadcast({ version: currentProtocolVersion, type: 'room-state', room: snapshot }, broadcastRecipients.get(snapshot.roomId) ?? connectionIds(snapshot));
+      broadcast({ type: 'room-state', room: snapshot }, broadcastRecipients.get(snapshot.roomId) ?? connectionIds(snapshot));
     }
     broadcastRoomLists(roomListGameIds(result));
     if (result.settlements.length > 0) {
       const room = result.broadcasts.at(-1);
       if (room) {
-        broadcast(
-          { version: currentProtocolVersion, type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements },
-          connectionIds(room),
-        );
+        broadcast({ type: 'settlement', roomId: room.roomId, sessionId: room.sessionId, settlements: result.settlements }, connectionIds(room));
       }
     }
     if (options.forceDataState || result.broadcasts.length > 0 || result.settlements.length > 0 || (result.roomClosures?.length ?? 0) > 0) {
@@ -271,7 +263,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       }
     } catch (error) {
       send(peer, {
-        version: currentProtocolVersion,
         type: 'error',
         code: 'rejected',
         message: error instanceof Error ? error.message : 'Server data action failed.',
@@ -289,7 +280,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     const profileToken = profileTokenAuth.createToken();
     dataStore.setProfileTokenHash(profile.id, profileTokenAuth.hash(profile.id, profileToken));
     peer.ownedProfileIds.add(profile.id);
-    send(peer, { version: currentProtocolVersion, type: 'profile-credentials', profileId: profile.id, profileToken });
+    send(peer, { type: 'profile-credentials', profileId: profile.id, profileToken });
     sendProfileAccess(peer);
   };
 
@@ -387,17 +378,17 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   };
 
   const handlePayload = (peer: Peer, payload: string): void => {
-    let parsedJson: ClientMessageCandidate | null;
+    let parsedJson: JsonValue;
     try {
-      parsedJson = JSON.parse(payload);
+      parsedJson = parseJsonText(payload);
     } catch {
-      send(peer, { version: currentProtocolVersion, type: 'error', code: 'bad-json', message: 'Message was not valid JSON.' });
+      send(peer, { type: 'error', code: 'bad-json', message: 'Message was not valid JSON.' });
       return;
     }
 
     const parsed = parseClientMessage(parsedJson);
     if (!parsed.ok || !parsed.message) {
-      send(peer, { version: currentProtocolVersion, type: 'error', code: 'bad-message', message: parsed.error ?? 'Message was invalid.' });
+      send(peer, { type: 'error', code: 'bad-message', message: parsed.error ?? 'Message was invalid.' });
       return;
     }
     if (handleDataMessage(peer, parsed.message)) {
@@ -409,7 +400,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       serverOwnedMessage = useServerProfile(peer, parsed.message);
     } catch (error) {
       send(peer, {
-        version: currentProtocolVersion,
         type: 'error',
         code: 'rejected',
         message: error instanceof Error ? error.message : 'Server rejected the player action.',
@@ -432,14 +422,11 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         peers.delete(peer.id);
         const result = authority.disconnect(peer.id);
         const snapshot = result.broadcasts.at(-1);
-        broadcast(
-          snapshot ? { version: currentProtocolVersion, type: 'room-state', room: snapshot } : undefined,
-          snapshot ? connectionIds(snapshot) : undefined,
-        );
+        broadcast(snapshot ? { type: 'room-state', room: snapshot } : undefined, snapshot ? connectionIds(snapshot) : undefined);
         broadcastRoomLists(roomListGameIds(result));
         continue;
       }
-      send(peer, { version: currentProtocolVersion, type: 'heartbeat', sentAt: now });
+      send(peer, { type: 'heartbeat', sentAt: now });
     }
   }, heartbeatIntervalMs);
   server.on('close', () => {
@@ -469,7 +456,6 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
       if (clientServerInstanceId && clientServerInstanceId !== serverInstanceId) {
         send(peer, {
-          version: currentProtocolVersion,
           type: 'reload-required',
           reason: 'server-restarted',
           message: 'The game server restarted. Reload the app to use the latest client.',
@@ -479,8 +465,8 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
       }
 
       peers.set(peer.id, peer);
-      send(peer, { version: currentProtocolVersion, type: 'server-hello', serverInstanceId });
-      send(peer, { version: currentProtocolVersion, type: 'error', code: 'connected', message: 'Connected to Casino Warehouse game server.' });
+      send(peer, { type: 'server-hello', serverInstanceId });
+      send(peer, { type: 'error', code: 'connected', message: 'Connected to Casino Warehouse game server.' });
       sendDataState(peer);
 
       websocket.on('message', (data, isBinary) => {
@@ -497,10 +483,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
         peers.delete(peer.id);
         const result = authority.disconnect(peer.id);
         const snapshot = result.broadcasts.at(-1);
-        broadcast(
-          snapshot ? { version: currentProtocolVersion, type: 'room-state', room: snapshot } : undefined,
-          snapshot ? connectionIds(snapshot) : undefined,
-        );
+        broadcast(snapshot ? { type: 'room-state', room: snapshot } : undefined, snapshot ? connectionIds(snapshot) : undefined);
         broadcastRoomLists(roomListGameIds(result));
       });
       websocket.on('error', () => {

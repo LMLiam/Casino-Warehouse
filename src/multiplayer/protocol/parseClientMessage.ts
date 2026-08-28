@@ -1,17 +1,9 @@
+import type { JsonValue } from '../../schemas/casinoSchemas/JsonValue';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import { clientMessageSchema } from '../../schemas/protocol/clientMessageSchema';
-import type { ClientMessageCandidate } from './ClientMessageCandidate';
-import { currentProtocolVersion } from './currentProtocolVersion';
 import type { ParsedMessage } from './ParsedMessage';
 
-export const parseClientMessage = (value: ClientMessageCandidate | null | undefined): ParsedMessage => {
-  if (!value || value.version !== currentProtocolVersion || typeof value.type !== 'string') {
-    return { ok: false, error: 'Message version or type is invalid.' };
-  }
-  if (value.type === 'join-room' && typeof value.roomId !== 'string') {
-    return { ok: false, error: 'Room id is required.' };
-  }
-
+export const parseClientMessage = (value: JsonValue): ParsedMessage => {
   const parsed = clientMessageSchema.safeParse(value);
   if (!parsed.success) {
     return { ok: false, error: zodErrorSummary(parsed.error) };

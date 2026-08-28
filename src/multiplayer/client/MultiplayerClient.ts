@@ -1,13 +1,14 @@
 import type { ClientMessage } from '../protocol/ClientMessage';
+import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
+import { playerGameSnapshotsSchema } from '../../schemas/casinoSchemas/playerGameSnapshotsSchema';
+import { profileTokenStorageSchema } from '../../schemas/casinoSchemas/profileTokenStorageSchema';
 import { decodeServerMessage } from '../protocol/decodeServerMessage';
 import { encodeMessage } from '../protocol/encodeMessage';
-import { currentProtocolVersion } from '../protocol/currentProtocolVersion';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { RoomRole } from '../protocol/RoomRole';
 import type { RoomSeatId } from '../protocol/RoomSeatId';
 import type { RoomSnapshot } from '../protocol/RoomSnapshot';
 import type { CasinoSessionState } from '../../state/session/CasinoSessionState';
-import { profileTokenStorageSchema } from '../../schemas/casinoSchemas/profileTokenStorageSchema';
 import { adminTokenStorageKey } from './adminTokenStorageKey';
 import { defaultRealtimeUrl } from './defaultRealtimeUrl';
 import type { MultiplayerClientEvents } from './MultiplayerClientEvents';
@@ -66,52 +67,51 @@ export class MultiplayerClient {
   }
 
   public requestData(): void {
-    this.send({ version: currentProtocolVersion, type: 'request-data' });
+    this.send({ type: 'request-data' });
   }
 
   public createProfile(profileName: string): void {
-    this.send({ version: currentProtocolVersion, type: 'create-profile', profileName });
+    this.send({ type: 'create-profile', profileName });
   }
 
   public renameProfile(profileId: string, profileName: string): void {
-    this.sendOwnedProfileMessage(profileId, { version: currentProtocolVersion, type: 'rename-profile', profileId, profileName });
+    this.sendOwnedProfileMessage(profileId, { type: 'rename-profile', profileId, profileName });
   }
 
   public deleteProfile(profileId: string): void {
-    if (this.sendOwnedProfileMessage(profileId, { version: currentProtocolVersion, type: 'delete-profile', profileId })) {
+    if (this.sendOwnedProfileMessage(profileId, { type: 'delete-profile', profileId })) {
       this.forgetProfileToken(profileId);
     }
   }
 
   public acceptHouseAdvance(profileId: string): void {
-    this.sendOwnedProfileMessage(profileId, { version: currentProtocolVersion, type: 'house-advance', profileId });
+    this.sendOwnedProfileMessage(profileId, { type: 'house-advance', profileId });
   }
 
-  public saveSession(session: Omit<CasinoSessionState, 'version' | 'updatedAt'>): void {
+  public saveSession(session: Omit<CasinoSessionState, 'updatedAt'>): void {
     if (!this.ownsProfile(session.profileId)) {
       this.events.onError('This browser does not own this session profile.');
       return;
     }
     this.send({
-      version: currentProtocolVersion,
       type: 'save-session',
       session: {
         ...session,
-        gameSnapshot: session.gameSnapshot ? { ...session.gameSnapshot } : undefined,
+        gameSnapshot: session.gameSnapshot ? playerGameSnapshotsSchema.parse(session.gameSnapshot) : undefined,
       },
     });
   }
 
   public adjustBankroll(profileId: string, action: 'add' | 'subtract' | 'reset', amount?: number): void {
-    this.sendAdminMessage({ version: currentProtocolVersion, type: 'admin-bankroll', profileId, action, amount });
+    this.sendAdminMessage({ type: 'admin-bankroll', profileId, action, amount });
   }
 
   public resetAllBankrolls(): void {
-    this.sendAdminMessage({ version: currentProtocolVersion, type: 'admin-reset-all' });
+    this.sendAdminMessage({ type: 'admin-reset-all' });
   }
 
   public clearServerData(): void {
-    if (this.sendAdminMessage({ version: currentProtocolVersion, type: 'clear-server-data' })) {
+    if (this.sendAdminMessage({ type: 'clear-server-data' })) {
       this.clearProfileTokens();
     }
   }
@@ -123,7 +123,7 @@ export class MultiplayerClient {
       return;
     }
     MultiplayerClient.writeStorageValue(adminTokenStorageKey, token);
-    this.send({ version: currentProtocolVersion, type: 'authorize-admin', adminToken: token });
+    this.send({ type: 'authorize-admin', adminToken: token });
   }
 
   private openSocket(url: string, state: RealtimeConnectionState): void {
@@ -175,12 +175,11 @@ export class MultiplayerClient {
   }
 
   public listRooms(gameId: RoomGameId): void {
-    this.send({ version: currentProtocolVersion, type: 'list-rooms', gameId });
+    this.send({ type: 'list-rooms', gameId });
   }
 
   public createRoom(gameId: RoomGameId, roomName: string, maxPlayers: number, profileId: string, profileName: string, bankroll: number): void {
     this.sendOwnedProfileMessage(profileId, {
-      version: currentProtocolVersion,
       type: 'create-room',
       gameId,
       roomName,
@@ -194,7 +193,6 @@ export class MultiplayerClient {
 
   public joinRoom(gameId: RoomGameId, roomId: string, role: RoomRole, profileId: string, profileName: string, bankroll: number, seatId?: RoomSeatId): void {
     this.sendOwnedProfileMessage(profileId, {
-      version: currentProtocolVersion,
       type: 'join-room',
       gameId,
       roomId,
@@ -207,7 +205,7 @@ export class MultiplayerClient {
   }
 
   public leaveRoom(): void {
-    this.send({ version: currentProtocolVersion, type: 'leave-room' });
+    this.send({ type: 'leave-room' });
     this.lastRoom = undefined;
   }
 
@@ -289,7 +287,7 @@ export class MultiplayerClient {
     }
     if (message.type === 'heartbeat') {
       this.lastHeartbeatAt = Date.now();
-      this.send({ version: currentProtocolVersion, type: 'heartbeat-ack', sentAt: message.sentAt });
+      this.send({ type: 'heartbeat-ack', sentAt: message.sentAt });
       return;
     }
     if (message.type === 'server-hello') {
@@ -366,7 +364,6 @@ export class MultiplayerClient {
 
   private authorizeStoredProfiles(): void {
     this.send({
-      version: currentProtocolVersion,
       type: 'authorize-profiles',
       profileTokens: MultiplayerClient.profileTokenEntries(MultiplayerClient.readProfileTokens()),
     });
@@ -375,7 +372,7 @@ export class MultiplayerClient {
   private authorizeStoredAdminToken(): void {
     const adminToken = MultiplayerClient.readStorageValue(adminTokenStorageKey);
     if (adminToken) {
-      this.send({ version: currentProtocolVersion, type: 'authorize-admin', adminToken });
+      this.send({ type: 'authorize-admin', adminToken });
     }
   }
 
@@ -415,11 +412,8 @@ export class MultiplayerClient {
       return new Map();
     }
     try {
-      const parsed = profileTokenStorageSchema.safeParse(JSON.parse(value));
-      if (!parsed.success) {
-        return new Map();
-      }
-      return Array.isArray(parsed.data) ? new Map(parsed.data.map((entry) => [entry.profileId, entry.profileToken])) : new Map(Object.entries(parsed.data));
+      const parsed = profileTokenStorageSchema.parse(parseJsonText(value));
+      return new Map(parsed.map((entry) => [entry.profileId, entry.profileToken]));
     } catch {
       return new Map();
     }

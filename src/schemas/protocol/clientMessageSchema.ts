@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { betTypeSchema } from '../casinoSchemas/betTypeSchema';
-import { currentProtocolVersionSchema } from '../casinoSchemas/currentProtocolVersionSchema';
 import { handIdSchema } from '../casinoSchemas/handIdSchema';
 import { networkCreditSchema } from '../casinoSchemas/networkCreditSchema';
+import { playerGameSnapshotsSchema } from '../casinoSchemas/playerGameSnapshotsSchema';
 import { positiveNetworkCreditSchema } from '../casinoSchemas/positiveNetworkCreditSchema';
 import { profileIdSchema } from '../casinoSchemas/profileIdSchema';
 import { profileNameSchema } from '../casinoSchemas/profileNameSchema';
@@ -10,13 +10,13 @@ import { roomGameIdSchema } from '../casinoSchemas/roomGameIdSchema';
 import { roomNameSchema } from '../casinoSchemas/roomNameSchema';
 import { roomRoleSchema } from '../casinoSchemas/roomRoleSchema';
 import { roomSeatIdSchema } from '../casinoSchemas/roomSeatIdSchema';
-import { sessionGameSnapshotSchema } from '../casinoSchemas/sessionGameSnapshotSchema';
 
 export const clientMessageSchema = (() => {
-  const baseClientMessageSchema = z.object({
-    version: currentProtocolVersionSchema,
-    type: z.string(),
-  });
+  const baseClientMessageSchema = z
+    .object({
+      type: z.string(),
+    })
+    .strict();
 
   const identitySchema = z.object({
     profileId: profileIdSchema,
@@ -31,26 +31,28 @@ export const clientMessageSchema = (() => {
     profileToken: profileTokenSchema,
   });
 
-  const clientSessionStateSchema = z.object({
-    profileId: profileIdSchema,
-    activeGame: roomGameIdSchema,
-    showingGameLobby: z.boolean(),
-    wagerLimit: networkCreditSchema,
-    wagered: networkCreditSchema,
-    gameSnapshot: sessionGameSnapshotSchema.optional(),
-    room: z
-      .object({
-        roomId: z
-          .string()
-          .trim()
-          .min(1)
-          .transform((value) => value.toUpperCase()),
-        gameId: roomGameIdSchema,
-        role: roomRoleSchema,
-        seatId: roomSeatIdSchema.optional(),
-      })
-      .optional(),
-  });
+  const clientSessionStateSchema = z
+    .object({
+      profileId: profileIdSchema,
+      activeGame: roomGameIdSchema,
+      showingGameLobby: z.boolean(),
+      wagerLimit: networkCreditSchema,
+      wagered: networkCreditSchema,
+      gameSnapshot: playerGameSnapshotsSchema.optional(),
+      room: z
+        .object({
+          roomId: z
+            .string()
+            .trim()
+            .min(1)
+            .transform((value) => value.toUpperCase()),
+          gameId: roomGameIdSchema,
+          role: roomRoleSchema,
+          seatId: roomSeatIdSchema.optional(),
+        })
+        .optional(),
+    })
+    .strict();
 
   return z.discriminatedUnion('type', [
     baseClientMessageSchema.extend({ type: z.literal('request-data') }),
