@@ -80,7 +80,9 @@ export class BeatTheHouseGame {
         ...this.dealer,
         cards: [...this.dealer.cards],
       },
-      sideStates: Object.fromEntries(handIds.map((handId) => [handId, { ...this.sideStates[handId] }])) as SideStates,
+      sideStates: Object.fromEntries(
+        handIds.map((handId) => [handId, { ...(this.sideStates[handId] ?? BeatTheHouseGame.emptySideState()) }]),
+      ) as SideStates,
       summaries: [...this.summaries],
       lastEvents,
       status: this.status,
@@ -94,7 +96,7 @@ export class BeatTheHouseGame {
     return {
       ...snapshot,
       deck: [...this.deck],
-      lastBets: this.lastBets ? BeatTheHouseGame.cloneBets(this.lastBets) : undefined,
+      ...(this.lastBets ? { lastBets: BeatTheHouseGame.cloneBets(this.lastBets) } : {}),
     };
   }
 
@@ -109,7 +111,9 @@ export class BeatTheHouseGame {
     this.hands = BeatTheHouseGame.cloneHands(state.hands);
     this.dealer = { ...state.dealer, cards: [...state.dealer.cards] };
     this.activeHand = state.activeHand;
-    this.sideStates = Object.fromEntries(handIds.map((handId) => [handId, { ...state.sideStates[handId] }])) as SideStates;
+    this.sideStates = Object.fromEntries(
+        handIds.map((handId) => [handId, { ...(state.sideStates[handId] ?? BeatTheHouseGame.emptySideState()) }]),
+      ) as SideStates;
     this.summaries = [...state.summaries];
     this.status = state.status;
     return this.snapshot();

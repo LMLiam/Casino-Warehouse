@@ -31,7 +31,14 @@ export class BeatSeatStatusView {
         const seat = room.seats.find((candidate) => candidate.seatId === hand.id);
         const owner = seat?.profileId ? room.players.find((candidate) => candidate.profileId === seat.profileId) : undefined;
         const handSnapshot = snapshot.hands[hand.id];
-        const mainBet = snapshot.bets[hand.id].main;
+        if (!handSnapshot) {
+          return '';
+        }
+        const betsForHand = snapshot.bets[hand.id];
+        if (!betsForHand) {
+          return '';
+        }
+        const mainBet = betsForHand.main;
         const ownerReady = Boolean(owner && room.beat?.readyProfileIds.includes(owner.profileId));
         const status = owner
           ? snapshot.activeHand === hand.id
@@ -50,7 +57,8 @@ export class BeatSeatStatusView {
           : 'Open';
         const mine = owner?.profileId === profileId ? ' mine' : '';
         const occupied = owner ? ' occupied' : '';
-        const tipped = snapshot.phase !== 'betting' && snapshot.phase !== 'roundOver' && snapshot.dealerTips[hand.id] > 0 ? ' dealer-tipped' : '';
+        const tipped =
+          snapshot.phase !== 'betting' && snapshot.phase !== 'roundOver' && (snapshot.dealerTips[hand.id] ?? 0) > 0 ? ' dealer-tipped' : '';
         const sessionDelta = owner ? owner.bankroll - owner.sessionStartBankroll : 0;
         const deltaClass = sessionDelta > 0 ? ' gain' : sessionDelta < 0 ? ' loss' : '';
         const deltaText = sessionDelta === 0 ? 'even' : `${sessionDelta > 0 ? '+' : '-'}${money(Math.abs(sessionDelta))}`;
