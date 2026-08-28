@@ -2,12 +2,22 @@ import { defaultHouseAdvanceState } from './defaultHouseAdvanceState';
 import { houseAdvanceConfig } from './houseAdvanceConfig';
 import type { HouseAdvanceState } from './HouseAdvanceState';
 
-export const normalizeHouseAdvanceState = (value: unknown): HouseAdvanceState => {
-  const safeMoney = (candidate: unknown): number => (Number.isFinite(candidate) ? Math.max(0, Math.floor(Number(candidate))) : 0);
-  const safeCount = (candidate: unknown): number =>
-    Number.isFinite(candidate) ? Math.min(houseAdvanceConfig.maxActiveCount, Math.max(0, Math.floor(Number(candidate)))) : 0;
-  const isRecord = (candidate: unknown): candidate is Record<string, unknown> => typeof candidate === 'object' && candidate !== null;
-  if (!isRecord(value)) {
+export const normalizeHouseAdvanceState = (
+  value:
+    | {
+        readonly outstandingBalance?: number | string | null;
+        readonly activeCount?: number | string | null;
+      }
+    | null
+    | undefined,
+): HouseAdvanceState => {
+  const safeMoney = (candidate: number | string | null | undefined): number => {
+    const numericValue = typeof candidate === 'number' || typeof candidate === 'string' ? Number(candidate) : Number.NaN;
+    return Number.isFinite(numericValue) ? Math.max(0, Math.floor(numericValue)) : 0;
+  };
+  const safeCount = (candidate: number | string | null | undefined): number =>
+    Math.min(houseAdvanceConfig.maxActiveCount, Math.max(0, Math.floor(safeMoney(candidate))));
+  if (!value) {
     return defaultHouseAdvanceState;
   }
 

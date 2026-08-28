@@ -1,12 +1,16 @@
 import { z } from 'zod';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSaveState } from './CasinoSaveState';
+import type { LegacyProfileStoreInput } from './LegacyProfileStoreInput';
 import { parseProfileStoreV1 } from './parseProfileStoreV1';
 
-export const parseCasinoSaveState = (value: unknown): CasinoSaveState => {
+export const parseCasinoSaveState = (value: LegacyProfileStoreInput | null): CasinoSaveState => {
   const parsed = z.object({ version: z.number().int() }).safeParse(value);
   if (!parsed.success) {
     throw new Error(`Save data is not a casino profile store: ${zodErrorSummary(parsed.error)}`);
+  }
+  if (value === null) {
+    throw new Error('Save data is not a casino profile store.');
   }
 
   switch (parsed.data.version) {

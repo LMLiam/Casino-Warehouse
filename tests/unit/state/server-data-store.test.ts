@@ -112,6 +112,22 @@ describe('server data store', () => {
     expect(cleared).toMatchObject({ houseAdvanceRepayment: 295, profile: { bankroll: 785, houseAdvance: { outstandingBalance: 0, activeCount: 0 } } });
   });
 
+  it('floors decimal values in generic gameplay settlements', () => {
+    const store = createMemoryServerDataStore();
+    const profile = store.createProfile('Decimal QA', 0).profileState.profiles[0];
+    store.acceptHouseAdvance(profile.id);
+
+    const result = store.applyGameplaySettlement(profile.id, 12.9, 19.9, { gameId: 'blackjack' });
+
+    expect(result).toMatchObject({
+      houseAdvanceRepayment: 1,
+      profile: { bankroll: 111, houseAdvance: { outstandingBalance: 99 } },
+    });
+    expect(result?.profile.transactions[0]).toMatchObject({
+      metadata: { grossReturned: 12, netWinnings: 19 },
+    });
+  });
+
   it('persists profile, ledger, and session data in SQLite', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
     tempDirs.push(dir);

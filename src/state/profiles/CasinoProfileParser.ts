@@ -9,10 +9,11 @@ import type { PerGameStats } from './PerGameStats';
 import { profileColorFromName } from './profileColorFromName';
 import type { ProfileStats } from './ProfileStats';
 import type { TransactionType } from './TransactionType';
+import type { LegacyCasinoProfile } from './LegacyCasinoProfile';
 
 export class CasinoProfileParser {
-  public static parse(value: unknown): CasinoProfile {
-    if (!CasinoProfileParser.isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
+  public static parse(value: LegacyCasinoProfile | null): CasinoProfile {
+    if (value === null || typeof value.id !== 'string' || typeof value.name !== 'string') {
       throw new Error('Profile record is invalid.');
     }
 
@@ -29,16 +30,13 @@ export class CasinoProfileParser {
     };
   }
 
-  private static safeMoney(value: unknown): number {
-    return Number.isFinite(value) ? Math.max(0, Math.floor(Number(value))) : 0;
+  private static safeMoney(value: number | string | null | undefined): number {
+    const numericValue = typeof value === 'number' || typeof value === 'string' ? Number(value) : Number.NaN;
+    return Number.isFinite(numericValue) ? Math.max(0, Math.floor(numericValue)) : 0;
   }
 
-  private static isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
-  }
-
-  private static parseStats(value: unknown): ProfileStats {
-    if (!CasinoProfileParser.isRecord(value)) {
+  private static parseStats(value: LegacyCasinoProfile['stats']): ProfileStats {
+    if (!value) {
       return emptyStats();
     }
 
@@ -56,8 +54,8 @@ export class CasinoProfileParser {
     };
   }
 
-  private static parseTransaction(value: unknown): BankrollTransaction {
-    if (!CasinoProfileParser.isRecord(value) || typeof value.id !== 'string' || typeof value.gameId !== 'string') {
+  private static parseTransaction(value: NonNullable<LegacyCasinoProfile['transactions']>[number]): BankrollTransaction {
+    if (typeof value.id !== 'string' || typeof value.gameId !== 'string') {
       throw new Error('Transaction record is invalid.');
     }
 
@@ -77,7 +75,7 @@ export class CasinoProfileParser {
     };
   }
 
-  private static parseTransactionType(value: unknown): TransactionType {
+  private static parseTransactionType(value: string | null | undefined): TransactionType {
     if (value === 'push') {
       return 'push_refund';
     }
@@ -87,7 +85,7 @@ export class CasinoProfileParser {
     return CasinoProfileParser.isTransactionType(value) ? value : 'correction';
   }
 
-  private static isTransactionType(value: unknown): value is TransactionType {
+  private static isTransactionType(value: string | null | undefined): value is TransactionType {
     return (
       value === 'wager' ||
       value === 'payout' ||
@@ -104,14 +102,14 @@ export class CasinoProfileParser {
     );
   }
 
-  private static parsePerGameStats(value: unknown): Readonly<Record<string, PerGameStats>> {
-    if (!CasinoProfileParser.isRecord(value)) {
+  private static parsePerGameStats(value: NonNullable<LegacyCasinoProfile['stats']>['perGame']): Readonly<Record<string, PerGameStats>> {
+    if (!value) {
       return {};
     }
 
     return Object.fromEntries(
       Object.entries(value).flatMap(([gameId, stats]) => {
-        if (!CasinoProfileParser.isRecord(stats)) {
+        if (!stats) {
           return [];
         }
         return [
@@ -131,8 +129,8 @@ export class CasinoProfileParser {
     );
   }
 
-  private static parseMetadata(value: unknown): BankrollTransactionMetadata {
-    if (!CasinoProfileParser.isRecord(value)) {
+  private static parseMetadata(value: NonNullable<LegacyCasinoProfile['transactions']>[number]['metadata']): BankrollTransactionMetadata {
+    if (!value) {
       return {};
     }
 

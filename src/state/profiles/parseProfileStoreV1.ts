@@ -2,9 +2,10 @@ import { profileStoreV1Schema } from '../../schemas/casinoSchemas/profileStoreV1
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSaveState } from './CasinoSaveState';
 import { currentProfileStoreVersion } from './currentProfileStoreVersion';
+import type { LegacyProfileStoreInput } from './LegacyProfileStoreInput';
 import { parseCasinoProfile } from './parseCasinoProfile';
 
-export const parseProfileStoreV1 = (value: unknown): CasinoSaveState => {
+export const parseProfileStoreV1 = (value: LegacyProfileStoreInput): CasinoSaveState => {
   const parsed = profileStoreV1Schema.safeParse(value);
   if (!parsed.success) {
     throw new Error(`Profile store v1 data is not valid: ${zodErrorSummary(parsed.error)}`);

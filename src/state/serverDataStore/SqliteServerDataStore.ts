@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { z } from 'zod';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
@@ -11,6 +12,7 @@ import { MemoryServerDataStore } from './MemoryServerDataStore';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
 import { defaultSqlitePath } from './defaultSqlitePath';
+import { parseProfileStoreJson } from '../profiles/parseProfileStoreJson';
 
 export class SqliteServerDataStore extends MemoryServerDataStore {
   public override readonly database: ServerDatabaseChoice = 'sqlite';
@@ -129,7 +131,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     const stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] } = {};
     for (const row of rows) {
       try {
-        this.assignStoredStateValue(stored, row.key, JSON.parse(row.value));
+        this.assignStoredStateValue(stored, row.key, row.value);
       } catch (error) {
         this.db.prepare('DELETE FROM server_state WHERE key = ?').run(row.key);
         console.warn(`SQLite server_state row "${row.key}" could not be parsed and was deleted.`, error);
@@ -141,23 +143,26 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   private assignStoredStateValue(
     stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] },
     key: string,
-    value: unknown,
+    value: string,
   ): void {
     const storedKey = SqliteServerDataStore.storedStateKey(key);
     if (storedKey === 'profileState') {
-      stored.profileState = value as ServerDataSnapshot['profileState'];
+      stored.profileState = parseProfileStoreJson(value);
       return;
     }
     if (storedKey === 'profileAuth') {
-      stored.profileAuth = value as Record<string, string>;
+      const profileAuth = z.record(z.string(), z.string()).safeParse(JSON.parse(value));
+      if (profileAuth.success) {
+        stored.profileAuth = profileAuth.data;
+      }
       return;
     }
     if (storedKey === 'session') {
-      stored.session = parseSessionState(value);
+      stored.session = parseSessionState(JSON.parse(value));
     }
   }
 
-  private writeValue(key: string, value: unknown): void {
+  private writeValue<Value>(key: string, value: Value): void {
     this.db
       .prepare('INSERT INTO server_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run(key, JSON.stringify(value));

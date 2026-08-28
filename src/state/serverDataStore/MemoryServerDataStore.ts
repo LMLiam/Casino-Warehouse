@@ -1,4 +1,5 @@
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
+import { z } from 'zod';
 import { acceptHouseAdvance } from '../profiles/acceptHouseAdvance';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSaveState } from '../profiles/CasinoSaveState';
@@ -106,12 +107,12 @@ export class MemoryServerDataStore implements ServerDataStore {
   }
 
   protected loadProfileTokenHashesFromJson(profileAuthJson: string): void {
-    const parsed: unknown = JSON.parse(profileAuthJson);
-    if (!MemoryServerDataStore.isProfileTokenHashRecord(parsed)) {
+    const parsed = z.record(z.string(), z.string()).safeParse(JSON.parse(profileAuthJson));
+    if (!parsed.success) {
       this.profileTokenHashes.clear();
       return;
     }
-    this.profileTokenHashes = new Map(Object.entries(parsed));
+    this.profileTokenHashes = new Map(Object.entries(parsed.data));
   }
 
   protected profileTokenHashEntries(): readonly (readonly [string, string])[] {
@@ -206,9 +207,5 @@ export class MemoryServerDataStore implements ServerDataStore {
 
   private static safeMoney(value: number): number {
     return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-  }
-
-  private static isProfileTokenHashRecord(value: unknown): value is Record<string, string> {
-    return typeof value === 'object' && value !== null && Object.values(value).every((tokenHash) => typeof tokenHash === 'string');
   }
 }
