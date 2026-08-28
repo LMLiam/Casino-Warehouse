@@ -1,1 +1,1 @@
-export const sessionStorageKey = 'casino_warehouse_session_v2';
+export const sessionStorageKey = 'casino_warehouse_session';

@@ -1,19 +1,22 @@
 import { z } from 'zod';
+import type { BankrollTransaction } from '../../state/profiles/BankrollTransaction';
 import { creditSchema } from './creditSchema';
 import { metadataSchema } from './metadataSchema';
 import { transactionTypeSchema } from './transactionTypeSchema';
 
-export const bankrollTransactionSchema = z.object({
-  id: z.string().min(1),
-  profileId: z.string().default(''),
-  at: z.string().default(() => new Date().toISOString()),
-  gameId: z.string().min(1),
-  roomId: z.string().optional(),
-  sessionId: z.string().optional(),
-  type: transactionTypeSchema.catch('correction'),
-  amount: z.coerce.number().finite().transform(Math.floor),
-  balanceBefore: creditSchema.default(0),
-  balanceAfter: creditSchema.default(0),
-  description: z.string().default('Imported legacy transaction.'),
-  metadata: metadataSchema.default({}),
-});
+export const bankrollTransactionSchema = z
+  .object({
+    id: z.string().min(1),
+    profileId: z.string(),
+    at: z.string(),
+    gameId: z.string().min(1),
+    roomId: z.string().optional(),
+    sessionId: z.string().optional(),
+    type: transactionTypeSchema,
+    amount: z.number().finite().int(),
+    balanceBefore: creditSchema,
+    balanceAfter: creditSchema,
+    description: z.string(),
+    metadata: metadataSchema,
+  })
+  .strict() satisfies z.ZodType<BankrollTransaction>;

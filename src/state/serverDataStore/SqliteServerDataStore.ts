@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
+import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
@@ -151,14 +152,14 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
       return;
     }
     if (storedKey === 'profileAuth') {
-      const profileAuth = z.record(z.string(), z.string()).safeParse(JSON.parse(value));
+      const profileAuth = z.record(z.string(), z.string()).safeParse(parseJsonText(value));
       if (profileAuth.success) {
         stored.profileAuth = profileAuth.data;
       }
       return;
     }
     if (storedKey === 'session') {
-      stored.session = parseSessionState(JSON.parse(value));
+      stored.session = parseSessionState(parseJsonText(value));
     }
   }
 

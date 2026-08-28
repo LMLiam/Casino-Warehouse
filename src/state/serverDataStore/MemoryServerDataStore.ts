@@ -1,5 +1,6 @@
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import { z } from 'zod';
+import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
 import { acceptHouseAdvance } from '../profiles/acceptHouseAdvance';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSaveState } from '../profiles/CasinoSaveState';
@@ -107,7 +108,7 @@ export class MemoryServerDataStore implements ServerDataStore {
   }
 
   protected loadProfileTokenHashesFromJson(profileAuthJson: string): void {
-    const parsed = z.record(z.string(), z.string()).safeParse(JSON.parse(profileAuthJson));
+    const parsed = z.record(z.string(), z.string()).safeParse(parseJsonText(profileAuthJson));
     if (!parsed.success) {
       this.profileTokenHashes.clear();
       return;

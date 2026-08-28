@@ -1,5 +1,5 @@
 import { emptySaveState } from './emptySaveState';
-import { parseCasinoSaveState } from './parseCasinoSaveState';
+import { parseProfileStoreJson } from './parseProfileStoreJson';
 import { profileStorageKey } from './profileStorageKey';
 import type { ProfileStoreResult } from './ProfileStoreResult';
 import type { StorageLike } from './StorageLike';
@@ -11,7 +11,7 @@ export const loadProfileStore = (storage: StorageLike, key = profileStorageKey):
   }
 
   try {
-    return { state: parseCasinoSaveState(JSON.parse(raw)), recovered: false };
+    return { state: parseProfileStoreJson(raw), recovered: false };
   } catch (error) {
     return {
       state: emptySaveState(),

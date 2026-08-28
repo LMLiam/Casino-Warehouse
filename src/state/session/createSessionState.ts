@@ -1,20 +1,17 @@
 import { gameCatalog } from '../../game/catalog/gameCatalog';
 import type { CasinoSessionState } from './CasinoSessionState';
-import { currentSessionStateVersion } from './currentSessionStateVersion';
-import { SessionStateParser } from './SessionStateParser';
 
 export const createSessionState = (
   profileId: string,
-  options: Partial<Omit<CasinoSessionState, 'version' | 'profileId' | 'updatedAt'>> = {},
+  options: Partial<Omit<CasinoSessionState, 'profileId' | 'updatedAt'>> = {},
   now = new Date(),
 ): CasinoSessionState => ({
-  version: currentSessionStateVersion,
   profileId,
-  activeGame: SessionStateParser.isGameId(options.activeGame) ? options.activeGame : gameCatalog[0].id,
+  activeGame: options.activeGame ?? gameCatalog[0].id,
   showingGameLobby: options.showingGameLobby ?? true,
-  wagerLimit: SessionStateParser.safeMoney(options.wagerLimit),
-  wagered: SessionStateParser.safeMoney(options.wagered),
-  gameSnapshot: SessionStateParser.parseGameSnapshot(options.gameSnapshot),
-  room: SessionStateParser.parseRoomState(options.room),
+  wagerLimit: Number.isFinite(options.wagerLimit) ? Math.max(0, Math.floor(options.wagerLimit ?? 0)) : 0,
+  wagered: Number.isFinite(options.wagered) ? Math.max(0, Math.floor(options.wagered ?? 0)) : 0,
+  gameSnapshot: options.gameSnapshot,
+  room: options.room,
   updatedAt: now.toISOString(),
 });
