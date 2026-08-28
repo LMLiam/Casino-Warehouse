@@ -98,6 +98,9 @@ export class WebSocketOriginPolicy {
     }
 
     const [first, second] = octets;
+    if (first === undefined || second === undefined) {
+      return undefined;
+    }
     if (
       first === WebSocketOriginPolicy.privateClassAFirstOctet ||
       (first === WebSocketOriginPolicy.privateClassBFirstOctet &&

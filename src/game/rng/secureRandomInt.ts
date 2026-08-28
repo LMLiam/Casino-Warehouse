@@ -13,7 +13,13 @@ export const secureRandomInt = (maxExclusive: number): number => {
 
   do {
     cryptoApi.getRandomValues(buffer);
-  } while (buffer[0] >= limit);
-
-  return buffer[0] % maxExclusive;
+    const value = buffer[0];
+    if (value === undefined) {
+      throw new Error('Cryptographically secure random values are unavailable in this runtime.');
+    }
+    if (value < limit) {
+      return value % maxExclusive;
+    }
+    // eslint-disable-next-line no-constant-condition -- retry until value is below limit
+  } while (true);
 };

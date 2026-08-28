@@ -6,8 +6,8 @@ export interface BankrollTransaction {
   readonly profileId: string;
   readonly at: string;
   readonly gameId: string;
-  readonly roomId?: string;
-  readonly sessionId?: string;
+  readonly roomId?: string | undefined;
+  readonly sessionId?: string | undefined;
   readonly type: TransactionType;
   readonly amount: number;
   readonly balanceBefore: number;

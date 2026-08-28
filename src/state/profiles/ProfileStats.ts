@@ -8,5 +8,5 @@ export interface ProfileStats {
   readonly biggestWager: number;
   readonly gamesPlayed: number;
   readonly perGame: Readonly<Record<string, PerGameStats>>;
-  readonly favouriteGame?: string;
+  readonly favouriteGame?: string | undefined;
 }

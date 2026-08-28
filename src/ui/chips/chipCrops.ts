@@ -7,10 +7,16 @@ export const chipCrops: readonly ChipCrop[] = (() => {
   const chipLeftInset = 0;
   const chipRowY = [86, 520] as const;
 
-  return chipValues.map((value, index) => ({
-    value,
-    x: (index % 4) * chipColumnWidth + chipLeftInset,
-    y: chipRowY[Math.floor(index / 4)],
-    size: chipCropSize,
-  }));
+  return chipValues.map((value, index) => {
+    const y = chipRowY[Math.floor(index / 4)];
+    if (y === undefined) {
+      throw new Error('Chip crop row is invalid.');
+    }
+    return {
+      value,
+      x: (index % 4) * chipColumnWidth + chipLeftInset,
+      y,
+      size: chipCropSize,
+    };
+  });
 })();

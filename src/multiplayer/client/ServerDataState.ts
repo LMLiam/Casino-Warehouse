@@ -5,5 +5,5 @@ import type { ServerDatabaseChoice } from '../../state/serverDataStore/ServerDat
 export interface ServerDataState {
   readonly database: ServerDatabaseChoice;
   readonly profileState: CasinoSaveState;
-  readonly session?: CasinoSessionState;
+  readonly session?: CasinoSessionState | undefined;
 }

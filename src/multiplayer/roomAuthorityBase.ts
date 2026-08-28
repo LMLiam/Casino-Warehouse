@@ -270,7 +270,11 @@ export abstract class RoomAuthorityBase {
       if (removedConnectionIds.length > 0) {
         roomClosures.push({ roomId: room.roomId, gameId: room.gameId, connectionIds: RoomAuthorityBase.unique(removedConnectionIds), reason });
       }
-      broadcasts.push(this.broadcast(room).broadcasts[0]);
+      const broadcastSnapshot = this.broadcast(room).broadcasts[0];
+      if (!broadcastSnapshot) {
+        throw new Error('Broadcast produced no snapshot.');
+      }
+      broadcasts.push(broadcastSnapshot);
     }
 
     return { broadcasts, settlements: [], roomClosures };
@@ -294,6 +298,9 @@ export abstract class RoomAuthorityBase {
       room.connectionToMember.clear();
       this.resetServerManagedRoom(room);
       const snapshot = this.broadcast(room).broadcasts[0];
+      if (!snapshot) {
+        throw new Error('Broadcast produced no snapshot.');
+      }
       broadcasts.push(snapshot);
       if (connectionIds.length > 0) {
         broadcastRecipients.push({ roomId: snapshot.roomId, connectionIds });

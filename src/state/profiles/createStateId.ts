@@ -10,8 +10,13 @@ export const createStateId = (prefix: string, now = new Date()): string => {
 
     const bytes = new Uint8Array(16);
     cryptoApi.getRandomValues(bytes);
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const byte6 = bytes[6];
+    const byte8 = bytes[8];
+    if (byte6 === undefined || byte8 === undefined) {
+      throw new Error('Cryptographically secure state IDs are unavailable in this runtime.');
+    }
+    bytes[6] = (byte6 & 0x0f) | 0x40;
+    bytes[8] = (byte8 & 0x3f) | 0x80;
     return uuidFromBytes(bytes);
   };
 

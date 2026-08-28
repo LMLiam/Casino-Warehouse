@@ -8,7 +8,7 @@ export interface BlackjackSeatState {
   playerCards: Card[];
   insuranceWager: number;
   splitHands: Card[][];
-  result?: BlackjackResult;
+  result?: BlackjackResult | undefined;
   returned: number;
   status: string;
   settled: boolean;

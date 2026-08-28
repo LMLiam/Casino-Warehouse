@@ -23,12 +23,12 @@ export class BlackjackTable {
   private deck: Card[] = [];
   private dealerCards: Card[] = [];
   private dealerHoleHidden = false;
-  private activeSeatId?: string;
+  private activeSeatId?: string | undefined;
   private phase: BlackjackTablePhase = 'betting';
   private readonly seats = new Map<string, BlackjackSeatState>();
 
-  private readonly rng?: Rng;
-  private readonly deckOverride?: readonly Card[];
+  private readonly rng?: Rng | undefined;
+  private readonly deckOverride?: readonly Card[] | undefined;
 
   public constructor(options: BlackjackTableOptions = {}) {
     this.rng = options.rng;
@@ -167,6 +167,9 @@ export class BlackjackTable {
       }
       debit = seat.wager;
       const [first, second] = seat.playerCards;
+      if (first === undefined || second === undefined) {
+        return { snapshot: this.snapshot(occupants), debit: 0, settlements: [], error: 'Split requires a matching two-card hand.' };
+      }
       seat.wager *= 2;
       seat.splitHands = [
         [first, this.draw()],

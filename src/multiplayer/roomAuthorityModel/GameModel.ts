@@ -7,9 +7,9 @@ export type GameModel =
       readonly kind: 'beat-the-house';
       readonly game: BeatTheHouseGame;
       readyProfileIds: Set<string>;
-      readyPhase?: 'betting' | 'roundOver';
-      nextRoundDeadlineAt?: number;
-      nextRoundTimer?: ReturnType<typeof setTimeout>;
+      readyPhase?: 'betting' | 'roundOver' | undefined;
+      nextRoundDeadlineAt?: number | undefined;
+      nextRoundTimer?: ReturnType<typeof setTimeout> | undefined;
     }
   | { readonly kind: 'blackjack'; readonly table: BlackjackTable; settledSessionIds: Set<string> }
   | {
@@ -17,7 +17,7 @@ export type GameModel =
       readonly game: SlotsGame;
       wagersByProfileId: Map<string, number>;
       readyProfileIds: Set<string>;
-      lastSpinByProfileId?: string;
+      lastSpinByProfileId?: string | undefined;
       returnedByProfileId: Map<string, number>;
       settledSpinKeys: Set<string>;
     };

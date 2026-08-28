@@ -11,7 +11,7 @@ export interface SlotSnapshot {
   readonly rows: number;
   readonly reels: readonly SlotSymbol[];
   readonly lineWin: number;
-  readonly jackpotWin?: JackpotWin;
+  readonly jackpotWin?: JackpotWin | undefined;
   readonly bonusPicksRemaining: number;
   readonly freeSpinsRemaining: number;
   readonly bonusBank: number;

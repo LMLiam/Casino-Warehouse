@@ -22,8 +22,8 @@ export class MultiplayerClient {
   private static readonly heartbeatTimeoutMs = 60_000;
   private static readonly heartbeatIntervalMs = 1_000;
 
-  private socket?: WebSocket;
-  private lastRoom?: RoomSnapshot;
+  private socket?: WebSocket | undefined;
+  private lastRoom?: RoomSnapshot | undefined;
   private readonly ownedProfileIds = new Set<string>();
   private reconnectUrl = '';
   private reconnectTimer: number | undefined;

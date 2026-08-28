@@ -1,6 +1,6 @@
 export interface BlackjackTableOccupant {
   readonly seatId: string;
-  readonly profileId?: string;
-  readonly profileName?: string;
-  readonly bankroll?: number;
+  readonly profileId?: string | undefined;
+  readonly profileName?: string | undefined;
+  readonly bankroll?: number | undefined;
 }

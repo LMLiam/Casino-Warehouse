@@ -7,7 +7,7 @@ export interface SlotTheme {
   readonly accent: string;
   readonly columns: number;
   readonly rows: number;
-  readonly wildSymbol?: SlotSymbol;
+  readonly wildSymbol?: SlotSymbol | undefined;
   readonly reelStrip: readonly SlotSymbol[];
   readonly payouts: Readonly<Partial<Record<SlotSymbol, number>>>;
   readonly jackpots: Readonly<Partial<Record<JackpotTier, { readonly symbol: SlotSymbol; readonly multiplier: number; readonly label: string }>>>;

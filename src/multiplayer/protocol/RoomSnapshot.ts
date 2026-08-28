@@ -28,15 +28,15 @@ export interface RoomSnapshot {
     readonly readyProfileIds: readonly string[];
     readonly readyCount: number;
     readonly playerCount: number;
-    readonly readyPhase?: 'betting' | 'roundOver';
-    readonly nextRoundDeadlineAt?: number;
-    readonly nextRoundRemainingMs?: number;
-  };
+    readonly readyPhase?: 'betting' | 'roundOver' | undefined;
+    readonly nextRoundDeadlineAt?: number | undefined;
+    readonly nextRoundRemainingMs?: number | undefined;
+  } | undefined;
   readonly slots?: {
     readonly wager: number;
     readonly wagersByProfileId: Readonly<Record<string, number>>;
     readonly readyProfileIds: readonly string[];
-    readonly lastSpinByProfileId?: string;
-    readonly returnedByProfileId?: Readonly<Record<string, number>>;
-  };
+    readonly lastSpinByProfileId?: string | undefined;
+    readonly returnedByProfileId?: Readonly<Record<string, number>> | undefined;
+  } | undefined;
 }

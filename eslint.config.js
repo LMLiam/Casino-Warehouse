@@ -60,4 +60,13 @@ export default [
       ],
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'TSNonNullExpression', message: 'Do not use non-null assertion (!). Use a guard or fallback.' },
+      ],
+    },
+  },
 ];

@@ -9,7 +9,13 @@ export const createDeck = (rng?: Rng): Card[] => {
 
   for (let index = deck.length - 1; index > 0; index -= 1) {
     const swapIndex = rng ? Math.floor(rng() * (index + 1)) : secureRandomInt(index + 1);
-    [deck[index], deck[swapIndex]] = [deck[swapIndex], deck[index]];
+    const currentCard = deck[index];
+    const swapCard = deck[swapIndex];
+    if (!currentCard || !swapCard) {
+      throw new Error('Deck shuffle index is invalid.');
+    }
+    deck[index] = swapCard;
+    deck[swapIndex] = currentCard;
   }
 
   return deck;

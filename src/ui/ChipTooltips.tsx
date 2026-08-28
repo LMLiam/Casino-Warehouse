@@ -5,8 +5,12 @@ import { chipCrops } from './chips/chipCrops';
 import { chipSheetSize } from './chips/chipSheetSize';
 
 export const ChipTooltips = (): ReactElement => {
+  const firstCrop = chipCrops[0];
+  if (!firstCrop) {
+    throw new Error('Chip crops are empty.');
+  }
   const chipFaceSize = 72;
-  const chipScale = chipFaceSize / chipCrops[0].size;
+  const chipScale = chipFaceSize / firstCrop.size;
   const chipBackgroundSize = `${chipSheetSize.width * chipScale}px ${chipSheetSize.height * chipScale}px`;
 
   return (

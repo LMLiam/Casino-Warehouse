@@ -6,7 +6,7 @@ export interface PlayerHand {
   readonly id: HandId;
   readonly cards: Card[];
   readonly done: boolean;
-  readonly result?: HandResult;
+  readonly result?: HandResult | undefined;
   readonly automaticWin: boolean;
-  readonly finalCard?: Card;
+  readonly finalCard?: Card | undefined;
 }

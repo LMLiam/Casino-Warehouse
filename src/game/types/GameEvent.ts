@@ -17,14 +17,14 @@ export interface GameEvent {
     | 'hand-completed'
     | 'round-settled'
     | 'message';
-  readonly message?: string;
-  readonly handId?: HandId;
-  readonly betType?: BetType;
-  readonly amount?: number;
-  readonly card?: Card;
-  readonly cardIndex?: number;
-  readonly result?: HandResult;
-  readonly summaries?: RoundSummary[];
-  readonly totalProfit?: number;
-  readonly dealerThanksTotal?: number;
+  readonly message?: string | undefined;
+  readonly handId?: HandId | undefined;
+  readonly betType?: BetType | undefined;
+  readonly amount?: number | undefined;
+  readonly card?: Card | undefined;
+  readonly cardIndex?: number | undefined;
+  readonly result?: HandResult | undefined;
+  readonly summaries?: RoundSummary[] | undefined;
+  readonly totalProfit?: number | undefined;
+  readonly dealerThanksTotal?: number | undefined;
 }

@@ -7,7 +7,7 @@ export interface BlackjackTableSnapshot {
   readonly phase: BlackjackTablePhase;
   readonly dealerCards: readonly Card[];
   readonly dealerHoleHidden: boolean;
-  readonly activeSeatId?: string;
+  readonly activeSeatId?: string | undefined;
   readonly seats: readonly BlackjackTableSeatSnapshot[];
   readonly status: string;
 }

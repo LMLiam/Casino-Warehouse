@@ -8,7 +8,7 @@ export interface CasinoSessionState {
   readonly showingGameLobby: boolean;
   readonly wagerLimit: number;
   readonly wagered: number;
-  readonly gameSnapshot?: PlayerGameSnapshots;
-  readonly room?: CasinoSessionRoomState;
+  readonly gameSnapshot?: PlayerGameSnapshots | undefined;
+  readonly room?: CasinoSessionRoomState | undefined;
   readonly updatedAt: string;
 }

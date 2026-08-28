@@ -16,7 +16,7 @@ export type ServerMessage =
       readonly type: 'data-state';
       readonly database: ServerDatabaseChoice;
       readonly profileState: CasinoSaveState;
-      readonly session?: CasinoSessionState;
+      readonly session?: CasinoSessionState | undefined;
     }
   | { readonly type: 'heartbeat'; readonly sentAt: number }
   | { readonly type: 'room-created'; readonly room: RoomSnapshot; readonly invitePath: string }

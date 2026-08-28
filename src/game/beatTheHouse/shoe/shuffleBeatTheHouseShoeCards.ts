@@ -9,7 +9,13 @@ export const shuffleBeatTheHouseShoeCards = (cards: readonly Card[], rng?: Rng):
     if (!Number.isInteger(swapIndex) || swapIndex < 0 || swapIndex > index) {
       throw new Error('Beat the House shoe RNG returned an invalid shuffle value.');
     }
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    const currentCard = shuffled[index];
+    const swapCard = shuffled[swapIndex];
+    if (!currentCard || !swapCard) {
+      throw new Error('Beat the House shoe shuffle index is invalid.');
+    }
+    shuffled[index] = swapCard;
+    shuffled[swapIndex] = currentCard;
   }
   return shuffled;
 };

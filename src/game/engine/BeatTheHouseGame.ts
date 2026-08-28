@@ -49,15 +49,15 @@ export class BeatTheHouseGame {
   private bets = BeatTheHouseGame.emptyBets();
   private dealerTips = BeatTheHouseGame.emptyDealerTips();
   private dealerTipRewards = BeatTheHouseGame.emptyDealerTips();
-  private lastBets?: Bets;
+  private lastBets?: Bets | undefined;
   private deck: Card[];
   private hands = BeatTheHouseGame.emptyHands();
   private dealer: GameSnapshot['dealer'] = { cards: [], holeRevealed: false, bust: false, blackAce: false };
-  private activeHand?: HandId;
+  private activeHand?: HandId | undefined;
   private sideStates = BeatTheHouseGame.emptySideStates();
   private summaries: RoundSummary[] = [];
   private status = 'Place chips on any hand, then deal.';
-  private readonly rng?: Rng;
+  private readonly rng?: Rng | undefined;
   private readonly randomInt: (maxExclusive: number) => number;
 
   public constructor(options: GameOptions = {}) {
@@ -289,8 +289,14 @@ export class BeatTheHouseGame {
     this.activeHand = BeatTheHouseGame.nextPlayableHand(this.bets, this.hands);
 
     if (this.activeHand) {
+      const activeHandId = this.activeHand;
+      const activeHandSnapshot = this.hands[activeHandId];
+      const lastCard = activeHandSnapshot?.cards.at(-1);
+      if (!lastCard) {
+        throw new Error('Active hand has no cards.');
+      }
       this.phase = 'playing';
-      this.status = `${BeatTheHouseGame.handName[this.activeHand]} hand: ${cardLabel(this.hands[this.activeHand].cards.at(-1)!)}. Hit or stick.`;
+      this.status = `${BeatTheHouseGame.handName[activeHandId]} hand: ${cardLabel(lastCard)}. Hit or stick.`;
     } else {
       return this.playDealer(events);
     }
@@ -331,11 +337,18 @@ export class BeatTheHouseGame {
     }
 
     const handId = this.activeHand;
-    const hand = this.hands[handId];
+    const handSnapshot = this.hands[handId];
+    if (!handSnapshot) {
+      return this.snapshot();
+    }
+    const hand = handSnapshot;
     const finalCard = hand.cards.at(-1);
+    if (!finalCard) {
+      return this.snapshot();
+    }
     this.hands[handId] = { ...hand, done: true, finalCard };
 
-    return this.advanceFromPlayer([{ type: 'hand-completed', handId, message: `${BeatTheHouseGame.handName[handId]} sticks on ${cardLabel(finalCard!)}.` }]);
+    return this.advanceFromPlayer([{ type: 'hand-completed', handId, message: `${BeatTheHouseGame.handName[handId]} sticks on ${cardLabel(finalCard)}.` }]);
   }
 
   public nextRound(): GameSnapshot {
@@ -471,7 +484,12 @@ export class BeatTheHouseGame {
       return this.playDealer(events);
     }
 
-    return this.emit(events, `${BeatTheHouseGame.handName[next]} hand: ${cardLabel(this.hands[next].cards.at(-1)!)}. Hit or stick.`);
+    const nextHand = this.hands[next];
+    const nextCard = nextHand?.cards.at(-1);
+    if (!nextCard) {
+      throw new Error('Next hand has no cards.');
+    }
+    return this.emit(events, `${BeatTheHouseGame.handName[next]} hand: ${cardLabel(nextCard)}. Hit or stick.`);
   }
 
   private playDealer(previousEvents: GameEvent[]): GameSnapshot {
@@ -537,14 +555,21 @@ export class BeatTheHouseGame {
         mainResult = 'win';
         handReturned += BeatTheHouseGame.wholeChipPayout(bets.main, 1).returned;
       } else {
-        const playerValue = rankValue(hand.finalCard!.rank);
-        const dealerValue = rankValue(this.dealer.finalCard!.rank);
-        if (playerValue > dealerValue) {
-          mainResult = 'win';
-          handReturned += BeatTheHouseGame.wholeChipPayout(bets.main, 1).returned;
-        } else if (playerValue === dealerValue) {
+        const playerFinalCard = hand.finalCard;
+        const dealerFinalCard = this.dealer.finalCard;
+        if (!playerFinalCard || !dealerFinalCard) {
           mainResult = 'push';
           handReturned += Math.floor(bets.main);
+        } else {
+          const playerValue = rankValue(playerFinalCard.rank);
+          const dealerValue = rankValue(dealerFinalCard.rank);
+          if (playerValue > dealerValue) {
+            mainResult = 'win';
+            handReturned += BeatTheHouseGame.wholeChipPayout(bets.main, 1).returned;
+          } else if (playerValue === dealerValue) {
+            mainResult = 'push';
+            handReturned += Math.floor(bets.main);
+          }
         }
       }
 

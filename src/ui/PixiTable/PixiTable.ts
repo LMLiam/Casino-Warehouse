@@ -340,8 +340,15 @@ export class PixiTable {
   private drawHands(snapshot: GameSnapshot): void {
     for (const hand of handLayouts) {
       const playerHand = snapshot.hands[hand.id];
+      if (!playerHand) {
+        continue;
+      }
       playerHand.cards.forEach((card, index) => {
-        const point = toPixels(hand.cards[index]);
+        const layoutPoint = hand.cards[index];
+        if (!layoutPoint) {
+          return;
+        }
+        const point = toPixels(layoutPoint);
         this.cardRenderer.drawCard(
           card,
           point.x,
@@ -369,12 +376,20 @@ export class PixiTable {
 
   private drawDealer(snapshot: GameSnapshot): void {
     if (!snapshot.dealer.holeRevealed && snapshot.dealer.holeCard) {
-      const point = toPixels(dealerSlots[0]);
+      const dealerHolePoint = dealerSlots[0];
+      if (!dealerHolePoint) {
+        return;
+      }
+      const point = toPixels(dealerHolePoint);
       this.cardRenderer.drawBack(point.x, point.y, 'dealer-hole', this.cardAnimationQueue.get('dealer-hole'));
     }
 
     snapshot.dealer.cards.forEach((card, index) => {
-      const point = toPixels(dealerSlots[index]);
+      const dealerPoint = dealerSlots[index];
+      if (!dealerPoint) {
+        return;
+      }
+      const point = toPixels(dealerPoint);
       if (index === 0 && snapshot.dealer.holeRevealed) {
         this.cardRenderer.drawRevealedCard(
           card,

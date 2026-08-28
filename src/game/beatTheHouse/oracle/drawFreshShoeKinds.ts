@@ -17,7 +17,11 @@ export const drawFreshShoeKinds = (counts: FreshShoeCounts): readonly FreshShoeD
       return [];
     }
     const remainingCounts = [...counts];
-    remainingCounts[kindIndex] -= 1;
+    const remainingAtKind = remainingCounts[kindIndex];
+    if (remainingAtKind === undefined) {
+      throw new Error('Oracle card kind index is invalid.');
+    }
+    remainingCounts[kindIndex] = remainingAtKind - 1;
     return [{ kindIndex, probability: count / totalCards, remainingCounts }];
   });
 };

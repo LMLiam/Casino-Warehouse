@@ -5,7 +5,7 @@ import type { FreshShoeOracleContext } from './FreshShoeOracleContext';
 export type FreshShoeSettlementInput = {
   readonly context: FreshShoeOracleContext;
   readonly playerFirstKind: number;
-  readonly playerFinalKind?: number;
+  readonly playerFinalKind?: number | undefined;
   readonly mainMode: FreshShoeMainMode;
   readonly dealer: FreshShoeDealerOutcome;
 };
