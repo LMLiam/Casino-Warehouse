@@ -7,6 +7,7 @@ import type { RoomRole } from '../protocol/RoomRole';
 import type { RoomSeatId } from '../protocol/RoomSeatId';
 import type { RoomSnapshot } from '../protocol/RoomSnapshot';
 import type { CasinoSessionState } from '../../state/session/CasinoSessionState';
+import { profileTokenStorageSchema } from '../../schemas/casinoSchemas/profileTokenStorageSchema';
 import { adminTokenStorageKey } from './adminTokenStorageKey';
 import { defaultRealtimeUrl } from './defaultRealtimeUrl';
 import type { MultiplayerClientEvents } from './MultiplayerClientEvents';
@@ -414,11 +415,11 @@ export class MultiplayerClient {
       return new Map();
     }
     try {
-      const parsed: unknown = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return new Map(parsed.filter(MultiplayerClient.isStoredProfileToken).map((entry) => [entry.profileId, entry.profileToken]));
+      const parsed = profileTokenStorageSchema.safeParse(JSON.parse(value));
+      if (!parsed.success) {
+        return new Map();
       }
-      return MultiplayerClient.isStringRecord(parsed) ? new Map(Object.entries(parsed)) : new Map();
+      return Array.isArray(parsed.data) ? new Map(parsed.data.map((entry) => [entry.profileId, entry.profileToken])) : new Map(Object.entries(parsed.data));
     } catch {
       return new Map();
     }
@@ -454,20 +455,5 @@ export class MultiplayerClient {
     } catch {
       // Browser storage can be unavailable in private contexts; the server remains authoritative.
     }
-  }
-
-  private static isStringRecord(value: unknown): value is Record<string, string> {
-    return typeof value === 'object' && value !== null && Object.values(value).every((recordValue) => typeof recordValue === 'string');
-  }
-
-  private static isStoredProfileToken(value: unknown): value is { readonly profileId: string; readonly profileToken: string } {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      'profileId' in value &&
-      'profileToken' in value &&
-      typeof value.profileId === 'string' &&
-      typeof value.profileToken === 'string'
-    );
   }
 }

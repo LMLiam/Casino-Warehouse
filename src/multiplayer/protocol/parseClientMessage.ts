@@ -1,12 +1,11 @@
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import { clientMessageSchema } from '../../schemas/protocol/clientMessageSchema';
+import type { ClientMessageCandidate } from './ClientMessageCandidate';
 import { currentProtocolVersion } from './currentProtocolVersion';
 import type { ParsedMessage } from './ParsedMessage';
 
-export const parseClientMessage = (value: unknown): ParsedMessage => {
-  const isRecord = (candidate: unknown): candidate is Record<string, unknown> => typeof candidate === 'object' && candidate !== null;
-
-  if (!isRecord(value) || value.version !== currentProtocolVersion || typeof value.type !== 'string') {
+export const parseClientMessage = (value: ClientMessageCandidate | null | undefined): ParsedMessage => {
+  if (!value || value.version !== currentProtocolVersion || typeof value.type !== 'string') {
     return { ok: false, error: 'Message version or type is invalid.' };
   }
   if (value.type === 'join-room' && typeof value.roomId !== 'string') {

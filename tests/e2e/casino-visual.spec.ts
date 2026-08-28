@@ -529,6 +529,13 @@ type E2EServerData = {
   };
 };
 
+type E2EDataStateMessage = {
+  readonly type?: string;
+  readonly authorized?: boolean;
+  readonly profileState?: { readonly profiles?: readonly E2EServerProfile[] };
+  readonly session?: { readonly version?: number };
+};
+
 const waitForRealtime = async (page: Page): Promise<void> => {
   await expect(page.locator('#connectionOverlay')).toBeHidden({ timeout: 10_000 });
 };
@@ -547,7 +554,7 @@ const clearServerData = async (page: Page): Promise<void> => {
         socket.send(JSON.stringify({ version: 1, type: 'authorize-admin', adminToken }));
       });
       socket.addEventListener('message', (event) => {
-        const message = JSON.parse(String(event.data)) as { type?: string; authorized?: boolean; profileState?: { profiles?: unknown[] }; session?: unknown };
+        const message = JSON.parse(String(event.data)) as E2EDataStateMessage;
         if (message.type === 'admin-access' && message.authorized && !authorized) {
           authorized = true;
           socket.send(JSON.stringify({ version: 1, type: 'clear-server-data' }));

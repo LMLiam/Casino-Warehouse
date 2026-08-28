@@ -10,6 +10,7 @@ import { roomGameIdSchema } from '../casinoSchemas/roomGameIdSchema';
 import { roomNameSchema } from '../casinoSchemas/roomNameSchema';
 import { roomRoleSchema } from '../casinoSchemas/roomRoleSchema';
 import { roomSeatIdSchema } from '../casinoSchemas/roomSeatIdSchema';
+import { sessionGameSnapshotSchema } from '../casinoSchemas/sessionGameSnapshotSchema';
 
 export const clientMessageSchema = (() => {
   const baseClientMessageSchema = z.object({
@@ -36,7 +37,7 @@ export const clientMessageSchema = (() => {
     showingGameLobby: z.boolean(),
     wagerLimit: networkCreditSchema,
     wagered: networkCreditSchema,
-    gameSnapshot: z.record(z.string(), z.unknown()).optional(),
+    gameSnapshot: sessionGameSnapshotSchema.optional(),
     room: z
       .object({
         roomId: z

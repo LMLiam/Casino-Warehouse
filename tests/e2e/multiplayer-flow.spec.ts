@@ -695,9 +695,11 @@ const dropChipPercent = async (page: Page, xPercent: number, yPercent: number, a
   );
 };
 
-const parsedDataset = async (page: Page, key: string): Promise<unknown[]> =>
-  page.locator('#tableHost').evaluate((element, datasetKey): unknown[] => {
-    const parsed: unknown = JSON.parse(element.dataset[datasetKey] ?? '[]');
+type TableDatasetEntry = string | number | readonly (string | number)[];
+
+const parsedDataset = async (page: Page, key: string): Promise<TableDatasetEntry[]> =>
+  page.locator('#tableHost').evaluate((element, datasetKey): TableDatasetEntry[] => {
+    const parsed = JSON.parse(element.dataset[datasetKey] ?? '[]');
     return Array.isArray(parsed) ? parsed : [];
   }, key);
 

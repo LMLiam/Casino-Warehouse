@@ -24,7 +24,7 @@ export const serverMessageSchema = (() => {
   const serverDatabaseChoiceSchema = z.enum(['memory', 'sqlite']);
   const roomStatusSchema = z.enum(['waiting', 'betting', 'open', 'in-progress', 'settling', 'complete', 'closed']);
   const roomPhaseSchema = z.enum(['lobby', 'betting', 'playing', 'settled']);
-  const gameSnapshotShapeSchema = z.record(z.string(), z.unknown());
+  const gameSnapshotShapeSchema = z.object({}).passthrough();
   const casinoSessionStateSchema = z.custom<CasinoSessionState>((value) => typeof value === 'object' && value !== null);
   const profileStateSchema = z.custom<CasinoSaveState>((value) => casinoSaveStateSchema.safeParse(value).success);
   const ownedProfileIdsSchema = z.custom<readonly string[]>((value) => z.array(z.string()).safeParse(value).success);

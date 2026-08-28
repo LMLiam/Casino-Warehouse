@@ -11,6 +11,7 @@ import { parseClientMessage } from '../protocol/parseClientMessage';
 import { currentProtocolVersion } from '../protocol/currentProtocolVersion';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { ServerMessage } from '../protocol/ServerMessage';
+import type { ClientMessageCandidate } from '../protocol/ClientMessageCandidate';
 import { createSessionState } from '../../state/session/createSessionState';
 import { createDefaultServerDataStore } from '../../state/serverDataStore/createDefaultServerDataStore';
 import { profileTokenAuth } from '../../state/serverDataStore/profileTokenAuth';
@@ -386,7 +387,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   };
 
   const handlePayload = (peer: Peer, payload: string): void => {
-    let parsedJson: unknown;
+    let parsedJson: ClientMessageCandidate | null;
     try {
       parsedJson = JSON.parse(payload);
     } catch {
