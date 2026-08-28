@@ -96,6 +96,15 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 - Name non-neutral numeric values with the narrowest domain constant, class-private constant, config object, or test fixture. Use same-line `casino-magic-number-allow: <reason>` comments only for intentional inline exceptions.
 - Respect the architecture checker instead of bypassing it.
 
+## Runtime Data Boundaries
+
+- Keep JSON at transport and persistence boundaries. Convert JSON text with `parseJsonText`, then immediately parse it with the exact domain Zod schema.
+- Use strict schemas for persisted profile state, persisted session state, and WebSocket messages. Do not silently strip unrecognised fields.
+- Keep profile state, session state, browser storage keys, and WebSocket messages unversioned. Reject obsolete version fields. Do not add migration dispatch, legacy normalisers, or compatibility aliases for old saved data.
+- Delete invalid SQLite state rows and recover invalid browser state to the documented empty state. Do not convert obsolete records into the current format.
+- Validate every restored Beat the House, Blackjack, and slots snapshot with its complete schema before an engine receives it.
+- Do not use `z.json()`, a record check, a shallow type guard, `z.custom<T>()`, or a type assertion as proof of a domain type. These checks can establish a JSON boundary but cannot establish a profile, session, protocol message, room snapshot, or game snapshot.
+
 ## Testing Guidance
 
 - Add or update tests for behavior changes.
