@@ -1,5 +1,5 @@
-import type { SlotSnapshot } from '../../../game/slots/SlotSnapshot';
 import type { RoomGameSnapshot } from '../../../multiplayer/protocol/RoomGameSnapshot';
+import type { SlotSnapshot } from '../../../game/slots/SlotSnapshot';
 
-export const isSlotSnapshot = (snapshot: RoomGameSnapshot | null): snapshot is SlotSnapshot =>
-  snapshot !== null && 'reels' in snapshot && 'themeId' in snapshot && 'bonusPicksRemaining' in snapshot;
+export const isSlotSnapshot = (snapshot: RoomGameSnapshot): snapshot is SlotSnapshot =>
+  'reels' in snapshot && 'themeId' in snapshot && 'bonusPicksRemaining' in snapshot;

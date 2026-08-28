@@ -2,6 +2,7 @@ import { CasinoAudio } from '../../audio/casinoAudio/CasinoAudio';
 import type { CasinoAudioSettings } from '../../audio/casinoAudio/CasinoAudioSettings';
 import { defaultAudioSettings } from '../../audio/casinoAudio/defaultAudioSettings';
 import { sanitizeAudioSettings } from '../../audio/casinoAudio/sanitizeAudioSettings';
+import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
 import type { AppElements } from '../dom/appElements/AppElements';
 
 export class AudioControls {
@@ -47,7 +48,7 @@ export class AudioControls {
 
   public load(): void {
     try {
-      this.settings = sanitizeAudioSettings(JSON.parse(this.storage?.getItem('casino_audio_settings_v1') ?? '{}'));
+      this.settings = sanitizeAudioSettings(parseJsonText(this.storage?.getItem('casino_audio_settings') ?? '{}'));
     } catch {
       this.settings = defaultAudioSettings();
     }
@@ -86,7 +87,7 @@ export class AudioControls {
     this.audio.updateSettings(this.settings);
     this.audio.toggleMusic(!this.settings.muted && this.settings.musicVolume > 0);
     try {
-      this.storage?.setItem('casino_audio_settings_v1', JSON.stringify(this.settings));
+      this.storage?.setItem('casino_audio_settings', JSON.stringify(this.settings));
     } catch {
       // Persistence can be blocked; the in-memory audio settings already applied.
     }

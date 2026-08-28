@@ -5,7 +5,6 @@ import { SlotsGame } from '../../game/slots/SlotsGame';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
 import type { RealtimeConnectionState } from '../../multiplayer/client/RealtimeConnectionState';
-import { currentProtocolVersion } from '../../multiplayer/protocol/currentProtocolVersion';
 import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
 import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
@@ -191,7 +190,7 @@ export abstract class GameAppRendering {
     this.beatControlsView.render(
       snapshot,
       isBeatTheHouse,
-      () => this.multiplayer.send({ version: currentProtocolVersion, type: 'start-round' }),
+      () => this.multiplayer.send({ type: 'start-round' }),
       controlsAvailable,
       activeRoom,
       profileId,

@@ -13,12 +13,10 @@ import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
 import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
-import { currentProfileStoreVersion } from '../../state/profiles/currentProfileStoreVersion';
 import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
 import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
 import { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
 import type { RealtimeConnectionState } from '../../multiplayer/client/RealtimeConnectionState';
-import { currentProtocolVersion } from '../../multiplayer/protocol/currentProtocolVersion';
 import type { RoomGameId } from '../../multiplayer/protocol/RoomGameId';
 import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
 import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
@@ -78,7 +76,7 @@ export class GameApp extends GameAppSession {
   protected readonly multiplayer: MultiplayerClient;
   protected player: CasinoPlayer | undefined;
   private readonly beatSettlementMetadata = new BeatSettlementMetadataCache();
-  protected profileState: CasinoSaveState = { version: currentProfileStoreVersion, profiles: [] };
+  protected profileState: CasinoSaveState = { profiles: [] };
   protected readonly ownedProfileIds = new Set<string>();
   protected profileAccessReceived = false;
   protected lastSaveError = '';
@@ -172,10 +170,10 @@ export class GameApp extends GameAppSession {
             }
             if (this.activeRoomForGame()) {
               if (chipTarget === 'dealerTip') {
-                this.multiplayer.send({ version: currentProtocolVersion, type: 'place-tip', seatId: handId, amount: selectedChip });
+                this.multiplayer.send({ type: 'place-tip', seatId: handId, amount: selectedChip });
                 this.beatControlsView.markPendingBet('dealerTip');
               } else {
-                this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: handId, betType: chipTarget, amount: selectedChip });
+                this.multiplayer.send({ type: 'place-chip', seatId: handId, betType: chipTarget, amount: selectedChip });
                 this.beatControlsView.markPendingBet(chipTarget);
               }
             }
@@ -266,11 +264,7 @@ export class GameApp extends GameAppSession {
         this.beatControlsView.queueStartRound();
         return;
       }
-      this.multiplayer.send(
-        typeof action === 'string'
-          ? { version: currentProtocolVersion, type: action }
-          : { version: currentProtocolVersion, type: action.type, action: action.action },
-      );
+      this.multiplayer.send(typeof action === 'string' ? { type: action } : { type: action.type, action: action.action });
       return;
     }
     this.showRoomRequiredMessage();
@@ -299,10 +293,10 @@ export class GameApp extends GameAppSession {
     }
     if (activeRoom) {
       if ('dealerTip' in target) {
-        this.multiplayer.send({ version: currentProtocolVersion, type: 'place-tip', seatId: target.handId, amount });
+        this.multiplayer.send({ type: 'place-tip', seatId: target.handId, amount });
         this.beatControlsView.markPendingBet('dealerTip');
       } else {
-        this.multiplayer.send({ version: currentProtocolVersion, type: 'place-chip', seatId: target.handId, betType: target.betType, amount });
+        this.multiplayer.send({ type: 'place-chip', seatId: target.handId, betType: target.betType, amount });
         this.beatControlsView.markPendingBet(target.betType);
       }
     }
@@ -352,7 +346,7 @@ export class GameApp extends GameAppSession {
       this.elements.roomStatus.textContent = 'Join a room before choosing a seat.';
       return;
     }
-    this.multiplayer.send({ version: currentProtocolVersion, type: 'assign-seat', seatId });
+    this.multiplayer.send({ type: 'assign-seat', seatId });
   }
 
   private leaveMultiplayerRoom(): void {
@@ -508,7 +502,7 @@ export class GameApp extends GameAppSession {
 
     const wager = readPositiveCreditInput(this.elements.blackjackWager);
     if (this.activeRoomForGame()?.gameId === 'blackjack') {
-      this.multiplayer.send({ version: currentProtocolVersion, type: 'blackjack-deal', wager });
+      this.multiplayer.send({ type: 'blackjack-deal', wager });
       this.audio.play('deal');
       return;
     }
@@ -520,7 +514,7 @@ export class GameApp extends GameAppSession {
       return;
     }
     if (this.activeRoomForGame()?.gameId === 'blackjack') {
-      this.multiplayer.send({ version: currentProtocolVersion, type: 'blackjack-action', action });
+      this.multiplayer.send({ type: 'blackjack-action', action });
       return;
     }
     this.showRoomRequiredMessage();
@@ -536,7 +530,7 @@ export class GameApp extends GameAppSession {
     }
     if (this.activeRoomForGame()?.gameId === this.activeGame) {
       this.slotsView.playSpinAnimation();
-      this.multiplayer.send({ version: currentProtocolVersion, type: 'slots-spin' });
+      this.multiplayer.send({ type: 'slots-spin' });
       this.audio.play('spin');
       return;
     }
@@ -551,7 +545,7 @@ export class GameApp extends GameAppSession {
       return;
     }
     const wager = readPositiveCreditInput(this.elements.slotsWager);
-    this.multiplayer.send({ version: currentProtocolVersion, type: 'slots-wager', wager });
+    this.multiplayer.send({ type: 'slots-wager', wager });
   }
 
   private readyMultiplayerSlots(): void {
@@ -561,7 +555,7 @@ export class GameApp extends GameAppSession {
     if (this.activeRoomForGame()?.gameId !== this.activeGame) {
       return;
     }
-    this.multiplayer.send({ version: currentProtocolVersion, type: 'slots-ready', ready: true });
+    this.multiplayer.send({ type: 'slots-ready', ready: true });
   }
 
   private pickSlotsBonus(): void {
@@ -569,7 +563,7 @@ export class GameApp extends GameAppSession {
       return;
     }
     if (this.activeRoomForGame()?.gameId === this.activeGame) {
-      this.multiplayer.send({ version: currentProtocolVersion, type: 'slots-pick-bonus' });
+      this.multiplayer.send({ type: 'slots-pick-bonus' });
       return;
     }
     this.showRoomRequiredMessage();
@@ -625,7 +619,7 @@ export class GameApp extends GameAppSession {
       return;
     }
     this.player = undefined;
-    this.profileState = { version: currentProfileStoreVersion, profiles: [] };
+    this.profileState = { profiles: [] };
     this.pendingRoomRestore = undefined;
     this.clearClientSession();
     this.profileSetupView.clearSelection();
