@@ -92,6 +92,7 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 - File-local implementation details must be nested inside the element they support or extracted into focused module files.
 - Avoid vague filenames such as `utils`, `helpers`, `misc`, and `manager`.
 - Do not add barrel files; import focused module files directly.
+- Hard ban: never use the TypeScript `unknown` or `object` types, `z.unknown()`, `as unknown`, or a chained assertion through `unknown` anywhere in source or tests. Use a named domain type, runtime type guard, schema, or type-safe construction instead.
 - Name non-neutral numeric values with the narrowest domain constant, class-private constant, config object, or test fixture. Use same-line `casino-magic-number-allow: <reason>` comments only for intentional inline exceptions.
 - Respect the architecture checker instead of bypassing it.
 
