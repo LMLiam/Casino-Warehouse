@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
+type TestContainer = {
+  readonly children: readonly TestContainer[];
+};
+
+type TestText = TestContainer & {
+  readonly style: { readonly fill?: number };
+  readonly text: string;
+};
+
 vi.mock('pixi.js', () => {
   class Point {
     public x = 0;
@@ -12,10 +21,10 @@ vi.mock('pixi.js', () => {
   }
 
   class Container {
-    public readonly children: unknown[] = [];
+    public readonly children: TestContainer[] = [];
     public readonly position = new Point();
 
-    public addChild(...children: unknown[]): void {
+    public addChild(...children: TestContainer[]): void {
       this.children.push(...children);
     }
   }
@@ -75,8 +84,8 @@ describe('TagRenderer', () => {
       false,
     );
 
-    const group = layer.children[0] as { readonly children: readonly unknown[] };
-    const labels = group.children.filter((child): child is { readonly style: { readonly fill?: number }; readonly text: string } => 'text' in Object(child));
+    const group = layer.children[0] as TestContainer;
+    const labels = group.children.filter((child): child is TestText => 'text' in child);
 
     expect(labels.find((label) => label.text === "Dealer's Thanks +£2")?.style.fill).toBe(COLORS.win);
     expect(labels.find((label) => label.text === 'House Advance payment -£2')?.style.fill).toBe(COLORS.lose);

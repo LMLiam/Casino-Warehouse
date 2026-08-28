@@ -229,6 +229,12 @@ function createClosestButtonEvent(textContent: string): Partial<Event> {
   });
 }
 
-function createTargetEvent(target: unknown): Partial<Event> {
+type AudioEventTarget = {
+  readonly id?: string;
+  readonly matches?: (selector: string) => boolean;
+  readonly closest?: (selector: string) => { readonly textContent?: string } | null;
+};
+
+function createTargetEvent(target: AudioEventTarget): Partial<Event> {
   return { target: target as EventTarget };
 }

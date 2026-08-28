@@ -3,7 +3,8 @@ import type { CasinoAudioSettings } from './CasinoAudioSettings';
 import { defaultAudioSettings } from './defaultAudioSettings';
 
 export const sanitizeAudioSettings = (settings: Partial<CasinoAudioSettings>): CasinoAudioSettings => {
-  const clampVolume = (value: unknown, fallback: number): number => (Number.isFinite(value) ? Math.max(0, Math.min(1, Number(value))) : fallback);
+  const clampVolume = (value: number | undefined, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
   const parsed = audioSettingsSchema.safeParse(settings);
   if (parsed.success) {
     return parsed.data;

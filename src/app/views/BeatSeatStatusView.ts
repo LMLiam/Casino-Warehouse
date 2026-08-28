@@ -4,14 +4,14 @@ import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { escapeHtml } from '../../shared/html';
 import { handLayouts } from '../../ui/layout/handLayouts';
 import { tableSize } from '../../ui/layout/tableSize';
-import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 import { capitalize } from '../format/appText';
+import type { BeatSeatStatusViewElements } from './BeatSeatStatusViewElements';
 
 export class BeatSeatStatusView {
   private static readonly seatPillVerticalOffsetPercent = 2.5;
 
-  public constructor(private readonly elements: AppElements) {}
+  public constructor(private readonly elements: BeatSeatStatusViewElements) {}
 
   public clear(): void {
     this.elements.beatSeatStatus.innerHTML = '';

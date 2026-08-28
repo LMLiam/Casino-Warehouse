@@ -5,6 +5,10 @@ const gsapMocks = vi.hoisted(() => ({
   to: vi.fn(),
 }));
 
+type TestContainer = {
+  readonly children: readonly TestContainer[];
+};
+
 vi.mock('gsap', () => ({ gsap: gsapMocks }));
 
 vi.mock('pixi.js', () => {
@@ -19,13 +23,13 @@ vi.mock('pixi.js', () => {
   }
 
   class Container {
-    public readonly children: unknown[] = [];
+    public readonly children: TestContainer[] = [];
     public readonly position = new Point();
     public readonly scale = new Point();
     public alpha = 1;
     public rotation = 0;
 
-    public addChild(...children: unknown[]): void {
+    public addChild(...children: TestContainer[]): void {
       this.children.push(...children);
     }
   }
@@ -112,8 +116,8 @@ describe('ChipRenderer', () => {
     renderer.drawStack(99999, 120, 320, 20, 'chip-pop');
     renderer.drawStack(99999, 140, 320, 20, 'chip-pop');
 
-    const firstStack = layer.children[0] as { readonly children: unknown[] };
-    const amountTag = firstStack.children.at(-1) as { readonly children: unknown[] };
+    const firstStack = layer.children[0] as TestContainer;
+    const amountTag = firstStack.children.at(-1) as TestContainer;
 
     expect(firstStack.children).toHaveLength(11);
     expect(amountTag.children[0]).toBeInstanceOf(Graphics);
@@ -150,8 +154,8 @@ describe('ChipRenderer', () => {
 
     renderer.drawStack(99999, 120, 320);
 
-    const stack = layer.children[0] as { readonly children: unknown[] };
-    const amountTag = stack.children[0] as { readonly children: unknown[] };
+    const stack = layer.children[0] as TestContainer;
+    const amountTag = stack.children[0] as TestContainer;
     expect(stack.children).toHaveLength(1);
     expect(amountTag.children[1]).toBeInstanceOf(Text);
     expect(amountTag.children[1]).toMatchObject({ text: '£99,999' });

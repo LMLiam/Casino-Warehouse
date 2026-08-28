@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
-import type { AppElements } from '../../../src/app/dom/appElements/AppElements';
 import { BeatSeatStatusView } from '../../../src/app/views/BeatSeatStatusView';
+import type { BeatSeatStatusViewElements } from '../../../src/app/views/BeatSeatStatusViewElements';
 
 describe('BeatSeatStatusView', () => {
   it('marks tipped seats only while the round is active', () => {
-    const statusLayer = {
+    const statusLayer: BeatSeatStatusViewElements['beatSeatStatus'] = {
       innerHTML: '',
-      style: {},
+      style: { width: '', height: '', left: '', top: '' },
       querySelectorAll: () => [],
     };
-    const elements = appElementsTestDouble({
+    const elements: BeatSeatStatusViewElements = {
       tableHost: { clientWidth: 1000, clientHeight: 600 },
       beatSeatStatus: statusLayer,
-    });
+    };
     const base = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
     const active: GameSnapshot = {
       ...base,
@@ -32,15 +32,15 @@ describe('BeatSeatStatusView', () => {
   });
 
   it('uses server Beat readiness instead of local wager state for seat labels', () => {
-    const statusLayer = {
+    const statusLayer: BeatSeatStatusViewElements['beatSeatStatus'] = {
       innerHTML: '',
-      style: {},
+      style: { width: '', height: '', left: '', top: '' },
       querySelectorAll: () => [],
     };
-    const elements = appElementsTestDouble({
+    const elements: BeatSeatStatusViewElements = {
       tableHost: { clientWidth: 1000, clientHeight: 600 },
       beatSeatStatus: statusLayer,
-    });
+    };
     const base = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
     const snapshot: GameSnapshot = {
       ...base,
@@ -83,5 +83,3 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
   game,
   beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 },
 });
-
-const appElementsTestDouble = (implementation: object): AppElements => implementation as AppElements;

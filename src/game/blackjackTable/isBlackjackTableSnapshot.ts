@@ -1,4 +1,5 @@
 import type { BlackjackTableSnapshot } from './BlackjackTableSnapshot';
 
-export const isBlackjackTableSnapshot = (snapshot: unknown): snapshot is BlackjackTableSnapshot =>
-  typeof snapshot === 'object' && snapshot !== null && 'kind' in snapshot && (snapshot as { kind?: unknown }).kind === 'blackjack-table';
+export const isBlackjackTableSnapshot = (
+  snapshot: BlackjackTableSnapshot | { readonly phase?: string; readonly kind?: string } | null,
+): snapshot is BlackjackTableSnapshot => snapshot !== null && snapshot.kind === 'blackjack-table';

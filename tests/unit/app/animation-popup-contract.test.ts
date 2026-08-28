@@ -120,9 +120,10 @@ describe('Beat the House popup and animation behaviour', () => {
     const dependencies: PixiTableDependencies = {
       createCardRenderer: () => cardRenderer,
       createChipRenderer: () => chipRenderer,
-      createEffectRenderer: () => rendererTestDouble({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() }),
+      createEffectRenderer: () =>
+        rendererTestDouble<ReturnType<PixiTableDependencies['createEffectRenderer']>>({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() }),
       createTagRenderer: () =>
-        rendererTestDouble({
+        rendererTestDouble<ReturnType<PixiTableDependencies['createTagRenderer']>>({
           drawMarker: vi.fn(),
           drawPayoutTag: vi.fn(),
           drawResultPopup: vi.fn(),
@@ -512,9 +513,16 @@ const createInitializedTable = () => {
   return { table, host, cardRenderer, chipRenderer, effectRenderer, tagRenderer };
 };
 
-const rendererTestDouble = <Renderer>(implementation: object): Renderer => implementation as Renderer;
+type PixiHostElementDouble = {
+  readonly dataset: Record<string, string>;
+  readonly clientWidth: number;
+  readonly clientHeight: number;
+  readonly classList: { readonly toggle: (token: string, force?: boolean) => boolean };
+};
 
-const hostElementTestDouble = (implementation: object): HTMLElement => implementation as HTMLElement;
+const rendererTestDouble = <Renderer>(implementation: Partial<Renderer> & Record<string, (...args: never[]) => void>): Renderer => implementation as Renderer;
+
+const hostElementTestDouble = (implementation: PixiHostElementDouble): HTMLElement => implementation as HTMLElement;
 
 const pixiTableInternals = (table: PixiTable): { initialized: boolean; chipRenderer: ReturnType<PixiTableDependencies['createChipRenderer']> } =>
-  rendererTestDouble(table);
+  table as PixiTable & { initialized: boolean; chipRenderer: ReturnType<PixiTableDependencies['createChipRenderer']> };
