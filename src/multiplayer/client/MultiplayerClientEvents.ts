@@ -10,7 +10,7 @@ export interface MultiplayerClientEvents {
   readonly onStatus: (status: string) => void;
   readonly onConnectionState: (state: RealtimeConnectionState) => void;
   readonly onDataState: (state: ServerDataState) => void;
-  readonly onProfileAccess: (ownedProfileIds: readonly string[]) => void;
+  readonly onProfileAccess: (ownedProfileIds: readonly ProfileId[]) => void;
   readonly onAdminAccess: (authorized: boolean) => void;
   readonly onRoom: (room: RoomSnapshot) => void;
   readonly onRoomCleared: () => void;
@@ -18,3 +18,4 @@ export interface MultiplayerClientEvents {
   readonly onSettlement: (settlements: readonly RoomSettlement[], room: Pick<ServerMessage & { type: 'settlement' }, 'roomId' | 'sessionId'>) => void;
   readonly onError: (message: string) => void;
 }
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';

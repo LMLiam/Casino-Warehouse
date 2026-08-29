@@ -1,1 +1,3 @@
-export const mainBeatRoomId = 'BEATMAIN';
+import { roomIdSchema } from '../../schemas/casinoSchemas/roomIdSchema';
+
+export const mainBeatRoomId = roomIdSchema.parse('BEATMAIN');

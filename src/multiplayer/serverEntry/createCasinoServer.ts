@@ -6,7 +6,14 @@ import type { Duplex } from 'node:stream';
 import helmet, { type HelmetOptions } from 'helmet';
 import { WebSocket, WebSocketServer, type RawData } from 'ws';
 import type { JsonValue } from '../../schemas/casinoSchemas/JsonValue';
+import type { ConnectionId } from '../../schemas/casinoSchemas/ConnectionId';
+import { authTokenSchema } from '../../schemas/casinoSchemas/authTokenSchema';
+import { connectionIdSchema } from '../../schemas/casinoSchemas/connectionIdSchema';
 import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
+import type { ProfileToken } from '../../schemas/casinoSchemas/ProfileToken';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import { serverInstanceIdSchema } from '../../schemas/casinoSchemas/serverInstanceIdSchema';
 import { RoomAuthority } from '../roomAuthority';
 import type { ClientMessage } from '../protocol/ClientMessage';
 import { parseClientMessage } from '../protocol/parseClientMessage';
@@ -54,8 +61,10 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const authority = options.authority ?? new RoomAuthority(dataStore);
   const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 2_000;
   const heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 30_000;
-  const adminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
-  const serverInstanceId = options.serverInstanceId ?? randomUUID();
+  const configuredAdminToken = options.adminToken ?? process.env.CASINO_ADMIN_TOKEN ?? '';
+  const parsedAdminToken = authTokenSchema.safeParse(configuredAdminToken);
+  const adminToken = parsedAdminToken.success ? parsedAdminToken.data : undefined;
+  const serverInstanceId = serverInstanceIdSchema.parse(options.serverInstanceId ?? randomUUID());
   const publicBaseUrl = (): string => {
     const configuredBaseUrl = typeof options.publicBaseUrl === 'function' ? options.publicBaseUrl() : options.publicBaseUrl;
     return (configuredBaseUrl ?? process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
@@ -69,7 +78,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     const currentPublicBaseUrl = publicBaseUrl();
     return currentPublicBaseUrl ? webSocketUrl(currentPublicBaseUrl) : '';
   };
-  const peers = new Map<string, Peer>();
+  const peers = new Map<ConnectionId, Peer>();
   const websocketServer = new WebSocketServer({
     clientTracking: false,
     maxPayload: maxClientMessageBytes,
@@ -107,7 +116,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     });
   });
 
-  const broadcast = (message: ServerMessage | undefined, recipients?: readonly string[]): void => {
+  const broadcast = (message: ServerMessage | undefined, recipients?: readonly ConnectionId[]): void => {
     if (!message) {
       return;
     }
@@ -207,7 +216,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
           sendProfileAccess(peer);
           return true;
         case 'authorize-admin':
-          peer.isAdmin = adminToken.length > 0 && profileTokenAuth.safeSecretEqual(adminToken, message.adminToken);
+          peer.isAdmin = adminToken !== undefined && profileTokenAuth.safeSecretEqual(adminToken, message.adminToken);
           sendAdminAccess(peer);
           return true;
         case 'request-data':
@@ -287,8 +296,8 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   const authorizeProfiles = (
     peer: Peer,
     profileTokens: readonly {
-      readonly profileId: string;
-      readonly profileToken: string;
+      readonly profileId: ProfileId;
+      readonly profileToken: ProfileToken;
     }[],
   ): void => {
     peer.ownedProfileIds.clear();
@@ -299,7 +308,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
   };
 
-  const requireOwnedProfile = (peer: Peer, profileId: string) => {
+  const requireOwnedProfile = (peer: Peer, profileId: ProfileId) => {
     const profile = requireProfile(profileId);
     if (!peer.ownedProfileIds.has(profileId)) {
       throw new Error('This browser is not authorized to use that profile.');
@@ -313,12 +322,12 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
   };
 
-  const isProfileTokenValid = (profileId: string, profileToken: string): boolean => {
+  const isProfileTokenValid = (profileId: ProfileId, profileToken: ProfileToken): boolean => {
     const expectedHash = dataStore.profileTokenHash(profileId);
     return Boolean(expectedHash) && profileTokenAuth.matches(profileId, profileToken, expectedHash ?? '');
   };
 
-  const applyAdminBankroll = (profileId: string, action: 'add' | 'subtract' | 'reset', amount: number): void => {
+  const applyAdminBankroll = (profileId: ProfileId, action: 'add' | 'subtract' | 'reset', amount: number): void => {
     const profile = requireProfile(profileId);
     const delta =
       action === 'add'
@@ -347,7 +356,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
   };
 
-  const acceptHouseAdvance = (peer: Peer, profileId: string): void => {
+  const acceptHouseAdvance = (peer: Peer, profileId: ProfileId): void => {
     const profile = requireOwnedProfile(peer, profileId);
     const updated = dataStore.acceptHouseAdvance(profile.id);
     if (!updated) {
@@ -361,7 +370,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
   };
 
-  const requireProfile = (profileId: string) => {
+  const requireProfile = (profileId: ProfileId) => {
     const profile = dataStore.snapshot().profileState.profiles.find((candidate) => candidate.id === profileId);
     if (!profile) {
       throw new Error('Profile was not found.');
@@ -452,9 +461,9 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     }
 
     websocketServer.handleUpgrade(request, socket, head, (websocket) => {
-      const peer: Peer = { id: randomUUID(), socket: websocket, ownedProfileIds: new Set(), lastPongAt: Date.now(), isAdmin: false };
-      const clientServerInstanceId = requestUrl.searchParams.get('clientServerInstanceId');
-      if (clientServerInstanceId && clientServerInstanceId !== serverInstanceId) {
+      const peer: Peer = { id: connectionIdSchema.parse(randomUUID()), socket: websocket, ownedProfileIds: new Set(), lastPongAt: Date.now(), isAdmin: false };
+      const clientServerInstanceId = serverInstanceIdSchema.safeParse(requestUrl.searchParams.get('clientServerInstanceId') ?? '');
+      if (clientServerInstanceId.success && clientServerInstanceId.data !== serverInstanceId) {
         send(peer, {
           type: 'reload-required',
           reason: 'server-restarted',
@@ -500,9 +509,9 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
   }
 
   function connectionIds(room: {
-    readonly players: readonly { readonly connectionId: string }[];
-    readonly spectators: readonly { readonly connectionId: string }[];
-  }): readonly string[] {
+    readonly players: readonly { readonly connectionId: ConnectionId }[];
+    readonly spectators: readonly { readonly connectionId: ConnectionId }[];
+  }): readonly ConnectionId[] {
     return [...room.players.map((player) => player.connectionId), ...room.spectators.map((player) => player.connectionId)];
   }
 
@@ -520,7 +529,7 @@ export const createCasinoServer = (options: CasinoServerOptions = {}): CasinoSer
     ];
   }
 
-  function createInvitePath(gameId: string, roomId: string): string {
+  function createInvitePath(gameId: RoomGameId, roomId: RoomId): string {
     const query = `?game=${encodeURIComponent(gameId)}&room=${encodeURIComponent(roomId)}`;
     const currentPublicBaseUrl = publicBaseUrl();
     if (!currentPublicBaseUrl) {

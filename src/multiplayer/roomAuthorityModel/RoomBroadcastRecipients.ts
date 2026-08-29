@@ -1,4 +1,7 @@
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import type { ConnectionId } from '../../schemas/casinoSchemas/ConnectionId';
+
 export interface RoomBroadcastRecipients {
-  readonly roomId: string;
-  readonly connectionIds: readonly string[];
+  readonly roomId: RoomId;
+  readonly connectionIds: readonly ConnectionId[];
 }

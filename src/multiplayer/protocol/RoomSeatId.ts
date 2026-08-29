@@ -1,3 +1,4 @@
-import type { HandId } from '../../game/types/HandId';
+import type { z } from 'zod';
+import { roomSeatIdSchema } from '../../schemas/casinoSchemas/roomSeatIdSchema';
 
-export type RoomSeatId = HandId | `seat-${number}`;
+export type RoomSeatId = z.infer<typeof roomSeatIdSchema>;

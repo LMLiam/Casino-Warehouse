@@ -9,6 +9,11 @@ import type { SlotSnapshot } from '../game/slots/SlotSnapshot';
 import type { GameSnapshot } from '../game/types/GameSnapshot';
 import type { HandId } from '../game/types/HandId';
 import { handIds } from '../game/types/handIds';
+import type { BlackjackSeatId } from '../schemas/casinoSchemas/BlackjackSeatId';
+import { blackjackSeatIdSchema } from '../schemas/casinoSchemas/blackjackSeatIdSchema';
+import type { ConnectionId } from '../schemas/casinoSchemas/ConnectionId';
+import type { ProfileId } from '../schemas/casinoSchemas/ProfileId';
+import type { RoomId } from '../schemas/casinoSchemas/RoomId';
 import type { CasinoProfile } from '../state/profiles/CasinoProfile';
 import { createMemoryServerDataStore } from '../state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../state/serverDataStore/ServerDataStore';
@@ -19,7 +24,8 @@ import type { RoomSettlement } from './protocol/RoomSettlement';
 import type { RoomSnapshot } from './protocol/RoomSnapshot';
 import type { RoomSummary } from './protocol/RoomSummary';
 import type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
-import { createId } from './roomAuthorityModel/createId';
+import { createSessionId } from './roomAuthorityModel/createSessionId';
+import { createSettlementId } from './roomAuthorityModel/createSettlementId';
 import { createServerManagedBeatRoom } from './roomAuthorityModel/createServerManagedBeatRoom';
 import { mainBeatRoomId } from './roomAuthorityModel/mainBeatRoomId';
 import { roomPhase } from './roomAuthorityModel/roomPhase';
@@ -27,10 +33,11 @@ import type { RoomState } from './roomAuthorityModel/RoomState';
 import { roomStatus } from './roomAuthorityModel/roomStatus';
 import { beatNextRoundTimeoutMs } from './roomLimits/beatNextRoundTimeoutMs';
 import { safeBankroll } from './roomAuthorityModel/safeBankroll';
+import { timeoutWithUnrefSchema } from './roomAuthorityModel/timeoutWithUnrefSchema';
 import { totalBeatStake } from './roomAuthorityModel/totalBeatStake';
 
 export abstract class RoomAuthorityBase {
-  protected readonly rooms = new Map<string, RoomState>();
+  protected readonly rooms = new Map<RoomId, RoomState>();
   private asyncResultHandler: ((result: AuthorityResult) => void) | undefined;
 
   public constructor(protected readonly dataStore: ServerDataStore = createMemoryServerDataStore()) {
@@ -49,7 +56,7 @@ export abstract class RoomAuthorityBase {
   }
 
   protected resetRoom(room: RoomState): AuthorityResult {
-    room.sessionId = createId('session');
+    room.sessionId = createSessionId();
     room.settledSessionIds.clear();
     if (room.model.kind === 'beat-the-house') {
       this.clearBeatReadiness(room);
@@ -120,7 +127,7 @@ export abstract class RoomAuthorityBase {
       const houseAdvanceRepayment = player && returned > 0 ? this.applyPlayerSettlement(room, profileId, returned, summary.profit) : 0;
       return [
         {
-          id: createId('settlement'),
+          id: createSettlementId(),
           kind: 'gameplay' as const,
           profileId,
           seatId: summary.handId,
@@ -153,7 +160,7 @@ export abstract class RoomAuthorityBase {
       }
       return [
         {
-          id: createId('settlement'),
+          id: createSettlementId(),
           kind: 'dealer-thanks',
           profileId,
           seatId: handId,
@@ -174,7 +181,7 @@ export abstract class RoomAuthorityBase {
       return [];
     }
     return result.settlements.flatMap((settlement) => {
-      const profileId = room.seats.get(settlement.seatId as RoomSeatId);
+      const profileId = room.seats.get(settlement.seatId);
       if (!profileId) {
         return [];
       }
@@ -182,9 +189,9 @@ export abstract class RoomAuthorityBase {
       const houseAdvanceRepayment = player && settlement.returned > 0 ? this.applyPlayerSettlement(room, profileId, settlement.returned, settlement.profit) : 0;
       return [
         {
-          id: createId('settlement'),
+          id: createSettlementId(),
           profileId,
-          seatId: settlement.seatId as RoomSeatId,
+          seatId: settlement.seatId,
           wagered: settlement.wagered,
           returned: settlement.returned,
           profit: settlement.profit,
@@ -211,9 +218,9 @@ export abstract class RoomAuthorityBase {
       model.returnedByProfileId.set(player.profileId, returned);
       const houseAdvanceRepayment = returned > 0 ? this.applyPlayerSettlement(room, player.profileId, returned, returned - wager) : 0;
       return {
-        id: createId('settlement'),
+        id: createSettlementId(),
         profileId: player.profileId,
-        seatId: this.profileSeatId(room, player.profileId) ?? 'seat-1',
+        seatId: this.profileSeatId(room, player.profileId) ?? blackjackSeatIdSchema.parse('seat-1'),
         wagered: wager,
         returned,
         profit: returned - wager,
@@ -228,7 +235,7 @@ export abstract class RoomAuthorityBase {
     return { broadcasts: [this.snapshot(room)], settlements };
   }
 
-  protected reconcileRooms(reason: string, profileId?: string): AuthorityResult {
+  protected reconcileRooms(reason: string, profileId?: ProfileId): AuthorityResult {
     const profiles = new Map(this.dataStore.snapshot().profileState.profiles.map((profile) => [profile.id, profile]));
     const broadcasts: RoomSnapshot[] = [];
     const roomClosures: Array<NonNullable<AuthorityResult['roomClosures']>[number]> = [];
@@ -238,7 +245,7 @@ export abstract class RoomAuthorityBase {
         continue;
       }
       const beforeConnectionIds = this.roomConnectionIds(room);
-      const removedConnectionIds: string[] = [];
+      const removedConnectionIds: ConnectionId[] = [];
       let changed = false;
 
       for (const memberProfileId of this.roomProfileIds(room)) {
@@ -315,7 +322,7 @@ export abstract class RoomAuthorityBase {
     const beat =
       room.model.kind === 'beat-the-house'
         ? {
-            rebetSeatIds: this.beatRebetSeatIds(room, game as GameSnapshot),
+            rebetSeatIds: this.beatRebetSeatIds(room),
             readyProfileIds: this.beatReadyProfileIds(room),
             readyCount: this.beatReadyProfileIds(room).length,
             playerCount: room.players.size,
@@ -374,9 +381,9 @@ export abstract class RoomAuthorityBase {
 
   protected addMember(
     room: RoomState,
-    connectionId: string,
+    connectionId: ConnectionId,
     role: 'player' | 'spectator',
-    profileId: string,
+    profileId: ProfileId,
     profileName: string,
     bankroll: number,
     sessionStartBankroll?: number,
@@ -400,11 +407,11 @@ export abstract class RoomAuthorityBase {
     }
   }
 
-  protected centralBankroll(profileId: string, profileName: string, fallback: number): number {
+  protected centralBankroll(profileId: ProfileId, profileName: string, fallback: number): number {
     return this.dataStore.ensureProfile(profileId, profileName, fallback).bankroll;
   }
 
-  protected setPlayerBankroll(room: RoomState, profileId: string, bankroll: number): void {
+  protected setPlayerBankroll(room: RoomState, profileId: ProfileId, bankroll: number): void {
     const player = room.players.get(profileId);
     if (!player) {
       return;
@@ -414,7 +421,7 @@ export abstract class RoomAuthorityBase {
     room.players.set(profileId, { ...player, bankroll: updated?.bankroll ?? nextBankroll });
   }
 
-  protected applyPlayerSettlement(room: RoomState, profileId: string, returned: number, profit: number): number {
+  protected applyPlayerSettlement(room: RoomState, profileId: ProfileId, returned: number, profit: number): number {
     const player = room.players.get(profileId);
     if (!player) {
       return 0;
@@ -436,7 +443,7 @@ export abstract class RoomAuthorityBase {
     room.model.game.syncBankroll([...room.players.values()].reduce((total, player) => total + player.bankroll, 0));
   }
 
-  protected removeExistingMember(room: RoomState, profileId: string): void {
+  protected removeExistingMember(room: RoomState, profileId: ProfileId): void {
     const existing = room.players.get(profileId) ?? room.spectators.get(profileId);
     if (existing) {
       room.connectionToMember.delete(existing.connectionId);
@@ -451,7 +458,7 @@ export abstract class RoomAuthorityBase {
     this.removeProfileGameState(room, profileId);
   }
 
-  protected removeProfileGameState(room: RoomState, profileId: string): void {
+  protected removeProfileGameState(room: RoomState, profileId: ProfileId): void {
     if (room.model.kind === 'beat-the-house') {
       room.model.readyProfileIds.delete(profileId);
     }
@@ -467,7 +474,7 @@ export abstract class RoomAuthorityBase {
     room.settledSessionIds.clear();
     room.lastBeatEvents = [];
     room.lastBeatBetOwners = {};
-    room.sessionId = createId('session');
+    room.sessionId = createSessionId();
     if (room.model.kind === 'beat-the-house') {
       this.clearBeatReadiness(room);
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
@@ -491,7 +498,7 @@ export abstract class RoomAuthorityBase {
     room.model.readyPhase = undefined;
   }
 
-  protected clearBeatReadyProfile(room: RoomState, profileId: string): void {
+  protected clearBeatReadyProfile(room: RoomState, profileId: ProfileId): void {
     if (room.model.kind !== 'beat-the-house') {
       return;
     }
@@ -512,7 +519,7 @@ export abstract class RoomAuthorityBase {
     room.model.nextRoundDeadlineAt = undefined;
   }
 
-  protected beatReadyProfileIds(room: RoomState): readonly string[] {
+  protected beatReadyProfileIds(room: RoomState): readonly ProfileId[] {
     if (room.model.kind !== 'beat-the-house') {
       return [];
     }
@@ -528,7 +535,7 @@ export abstract class RoomAuthorityBase {
   }
 
   protected advanceReadyBeatNextRound(room: RoomState): AuthorityResult {
-    room.sessionId = createId('session');
+    room.sessionId = createSessionId();
     this.clearBeatReadiness(room);
     this.syncBeatBankroll(room);
     return this.ownerAction(room, () => (room.model.kind === 'beat-the-house' ? room.model.game.nextRound() : undefined));
@@ -556,7 +563,8 @@ export abstract class RoomAuthorityBase {
         this.asyncResultHandler?.(result);
       }
     }, timeoutMs);
-    if (typeof timer === 'object' && 'unref' in timer && typeof timer.unref === 'function') {
+    const parsedTimer = timeoutWithUnrefSchema.safeParse(timer);
+    if (parsedTimer.success) {
       timer.unref();
     }
     room.model.nextRoundTimer = timer;
@@ -566,37 +574,37 @@ export abstract class RoomAuthorityBase {
     if (room.model.kind === 'beat-the-house') {
       return handIds;
     }
-    return Array.from({ length: room.maxPlayers }, (_, index) => `seat-${index + 1}` as const);
+    return Array.from({ length: room.maxPlayers }, (_, index) => blackjackSeatIdSchema.parse(`seat-${index + 1}`));
   }
 
-  protected profileSeatId(room: RoomState, profileId: string): RoomSeatId | undefined {
+  protected profileSeatId(room: RoomState, profileId: ProfileId): RoomSeatId | undefined {
     return [...room.seats.entries()].find(([, owner]) => owner === profileId)?.[0];
   }
 
-  private roomProfileIds(room: RoomState): readonly string[] {
+  private roomProfileIds(room: RoomState): readonly ProfileId[] {
     return RoomAuthorityBase.unique([
       ...room.players.keys(),
       ...room.spectators.keys(),
-      ...[...room.seats.values()].filter((profileId): profileId is string => Boolean(profileId)),
+      ...[...room.seats.values()].filter((profileId): profileId is ProfileId => Boolean(profileId)),
     ]);
   }
 
-  private roomConnectionIds(room: RoomState): readonly string[] {
+  private roomConnectionIds(room: RoomState): readonly ConnectionId[] {
     return RoomAuthorityBase.unique([
       ...room.connectionToMember.keys(),
       ...[...room.players.values(), ...room.spectators.values()].map((player) => player.connectionId),
     ]);
   }
 
-  private profileConnectionIds(room: RoomState, profileId: string): readonly string[] {
+  private profileConnectionIds(room: RoomState, profileId: ProfileId): readonly ConnectionId[] {
     return RoomAuthorityBase.unique(
-      [room.players.get(profileId)?.connectionId, room.spectators.get(profileId)?.connectionId].filter((connectionId): connectionId is string =>
+      [room.players.get(profileId)?.connectionId, room.spectators.get(profileId)?.connectionId].filter((connectionId): connectionId is ConnectionId =>
         Boolean(connectionId),
       ),
     );
   }
 
-  private roomHasProfile(room: RoomState, profileId: string): boolean {
+  private roomHasProfile(room: RoomState, profileId: ProfileId): boolean {
     return this.roomProfileIds(room).includes(profileId);
   }
 
@@ -634,7 +642,11 @@ export abstract class RoomAuthorityBase {
     return room.model.game.snapshot();
   }
 
-  private beatRebetSeatIds(room: RoomState, snapshot: GameSnapshot): readonly HandId[] {
+  private beatRebetSeatIds(room: RoomState): readonly HandId[] {
+    if (room.model.kind !== 'beat-the-house') {
+      return [];
+    }
+    const snapshot = room.model.game.snapshot([...room.lastBeatEvents]);
     return handIds.filter((handId) => {
       const profileId = room.seats.get(handId);
       return Boolean(profileId && room.lastBeatBetOwners[handId] === profileId && snapshot.rebetAmounts[handId] > 0);
@@ -642,10 +654,15 @@ export abstract class RoomAuthorityBase {
   }
 
   protected blackjackOccupants(room: RoomState): readonly BlackjackTableOccupant[] {
-    return this.seatIds(room).map((seatId) => {
+    return this.seatIds(room).flatMap((candidateSeatId): BlackjackTableOccupant[] => {
+      const parsedSeatId = blackjackSeatIdSchema.safeParse(candidateSeatId);
+      if (!parsedSeatId.success) {
+        return [];
+      }
+      const seatId: BlackjackSeatId = parsedSeatId.data;
       const profileId = room.seats.get(seatId);
       const player = profileId ? room.players.get(profileId) : undefined;
-      return { seatId, profileId, profileName: player?.profileName, bankroll: player?.bankroll };
+      return [{ seatId, profileId, profileName: player?.profileName, bankroll: player?.bankroll }];
     });
   }
 
@@ -661,7 +678,7 @@ export abstract class RoomAuthorityBase {
     return room.model.kind === 'slots' ? action() : this.error('This action only applies to Slots rooms.');
   }
 
-  protected findRoomByConnection(connectionId: string): RoomState | undefined {
+  protected findRoomByConnection(connectionId: ConnectionId): RoomState | undefined {
     return [...this.rooms.values()].find((room) => room.connectionToMember.has(connectionId));
   }
 

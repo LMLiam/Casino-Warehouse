@@ -1,4 +1,7 @@
 import type { ClientMessage } from '../protocol/ClientMessage';
+import type { ProfileToken } from '../../schemas/casinoSchemas/ProfileToken';
+import { authTokenSchema } from '../../schemas/casinoSchemas/authTokenSchema';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
 import { playerGameSnapshotsSchema } from '../../schemas/casinoSchemas/playerGameSnapshotsSchema';
 import { profileTokenStorageSchema } from '../../schemas/casinoSchemas/profileTokenStorageSchema';
@@ -14,6 +17,8 @@ import { defaultRealtimeUrl } from './defaultRealtimeUrl';
 import type { MultiplayerClientEvents } from './MultiplayerClientEvents';
 import { normalizeRealtimeUrl } from './normalizeRealtimeUrl';
 import { profileTokensStorageKey } from './profileTokensStorageKey';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import type { ServerInstanceId } from '../../schemas/casinoSchemas/ServerInstanceId';
 import type { RealtimeConnectionState } from './RealtimeConnectionState';
 
 export class MultiplayerClient {
@@ -24,12 +29,12 @@ export class MultiplayerClient {
 
   private socket?: WebSocket | undefined;
   private lastRoom?: RoomSnapshot | undefined;
-  private readonly ownedProfileIds = new Set<string>();
+  private readonly ownedProfileIds = new Set<ProfileId>();
   private reconnectUrl = '';
   private reconnectTimer: number | undefined;
   private heartbeatTimer: number | undefined;
   private lastHeartbeatAt = 0;
-  private serverInstanceId = '';
+  private serverInstanceId: ServerInstanceId | undefined;
   private adminAuthorized = false;
 
   public constructor(private readonly events: MultiplayerClientEvents) {}
@@ -46,7 +51,7 @@ export class MultiplayerClient {
     return this.adminAuthorized;
   }
 
-  public ownsProfile(profileId: string): boolean {
+  public ownsProfile(profileId: ProfileId): boolean {
     return this.ownedProfileIds.has(profileId);
   }
 
@@ -74,17 +79,17 @@ export class MultiplayerClient {
     this.send({ type: 'create-profile', profileName });
   }
 
-  public renameProfile(profileId: string, profileName: string): void {
+  public renameProfile(profileId: ProfileId, profileName: string): void {
     this.sendOwnedProfileMessage(profileId, { type: 'rename-profile', profileId, profileName });
   }
 
-  public deleteProfile(profileId: string): void {
+  public deleteProfile(profileId: ProfileId): void {
     if (this.sendOwnedProfileMessage(profileId, { type: 'delete-profile', profileId })) {
       this.forgetProfileToken(profileId);
     }
   }
 
-  public acceptHouseAdvance(profileId: string): void {
+  public acceptHouseAdvance(profileId: ProfileId): void {
     this.sendOwnedProfileMessage(profileId, { type: 'house-advance', profileId });
   }
 
@@ -102,7 +107,7 @@ export class MultiplayerClient {
     });
   }
 
-  public adjustBankroll(profileId: string, action: 'add' | 'subtract' | 'reset', amount?: number): void {
+  public adjustBankroll(profileId: ProfileId, action: 'add' | 'subtract' | 'reset', amount?: number): void {
     this.sendAdminMessage({ type: 'admin-bankroll', profileId, action, amount });
   }
 
@@ -122,8 +127,13 @@ export class MultiplayerClient {
       this.events.onError('Enter an admin token first.');
       return;
     }
-    MultiplayerClient.writeStorageValue(adminTokenStorageKey, token);
-    this.send({ type: 'authorize-admin', adminToken: token });
+    const parsedToken = authTokenSchema.safeParse(token);
+    if (!parsedToken.success) {
+      this.events.onError('Admin token is invalid.');
+      return;
+    }
+    MultiplayerClient.writeStorageValue(adminTokenStorageKey, parsedToken.data);
+    this.send({ type: 'authorize-admin', adminToken: parsedToken.data });
   }
 
   private openSocket(url: string, state: RealtimeConnectionState): void {
@@ -178,7 +188,7 @@ export class MultiplayerClient {
     this.send({ type: 'list-rooms', gameId });
   }
 
-  public createRoom(gameId: RoomGameId, roomName: string, maxPlayers: number, profileId: string, profileName: string, bankroll: number): void {
+  public createRoom(gameId: RoomGameId, roomName: string, maxPlayers: number, profileId: ProfileId, profileName: string, bankroll: number): void {
     this.sendOwnedProfileMessage(profileId, {
       type: 'create-room',
       gameId,
@@ -191,7 +201,7 @@ export class MultiplayerClient {
     });
   }
 
-  public joinRoom(gameId: RoomGameId, roomId: string, role: RoomRole, profileId: string, profileName: string, bankroll: number, seatId?: RoomSeatId): void {
+  public joinRoom(gameId: RoomGameId, roomId: RoomId, role: RoomRole, profileId: ProfileId, profileName: string, bankroll: number, seatId?: RoomSeatId): void {
     this.sendOwnedProfileMessage(profileId, {
       type: 'join-room',
       gameId,
@@ -222,7 +232,7 @@ export class MultiplayerClient {
     return true;
   }
 
-  private sendOwnedProfileMessage(profileId: string, message: ClientMessage): boolean {
+  private sendOwnedProfileMessage(profileId: ProfileId, message: ClientMessage): boolean {
     if (!this.ownsProfile(profileId)) {
       this.events.onError('This browser does not own that server profile.');
       return false;
@@ -371,18 +381,19 @@ export class MultiplayerClient {
 
   private authorizeStoredAdminToken(): void {
     const adminToken = MultiplayerClient.readStorageValue(adminTokenStorageKey);
-    if (adminToken) {
-      this.send({ type: 'authorize-admin', adminToken });
+    const parsedToken = authTokenSchema.safeParse(adminToken);
+    if (parsedToken.success) {
+      this.send({ type: 'authorize-admin', adminToken: parsedToken.data });
     }
   }
 
-  private storeProfileToken(profileId: string, profileToken: string): void {
+  private storeProfileToken(profileId: ProfileId, profileToken: ProfileToken): void {
     const profileTokens = MultiplayerClient.readProfileTokens();
     profileTokens.set(profileId, profileToken);
     MultiplayerClient.writeProfileTokens(profileTokens);
   }
 
-  private forgetProfileToken(profileId: string): void {
+  private forgetProfileToken(profileId: ProfileId): void {
     const profileTokens = MultiplayerClient.readProfileTokens();
     profileTokens.delete(profileId);
     MultiplayerClient.writeProfileTokens(profileTokens);
@@ -395,7 +406,7 @@ export class MultiplayerClient {
     this.events.onProfileAccess([]);
   }
 
-  private pruneStoredProfileTokens(ownedProfileIds: readonly string[]): void {
+  private pruneStoredProfileTokens(ownedProfileIds: readonly ProfileId[]): void {
     const owned = new Set(ownedProfileIds);
     const profileTokens = MultiplayerClient.readProfileTokens();
     for (const profileId of profileTokens.keys()) {
@@ -406,7 +417,7 @@ export class MultiplayerClient {
     MultiplayerClient.writeProfileTokens(profileTokens);
   }
 
-  private static readProfileTokens(): Map<string, string> {
+  private static readProfileTokens(): Map<ProfileId, ProfileToken> {
     const value = MultiplayerClient.readStorageValue(profileTokensStorageKey);
     if (!value) {
       return new Map();
@@ -419,11 +430,13 @@ export class MultiplayerClient {
     }
   }
 
-  private static writeProfileTokens(profileTokens: ReadonlyMap<string, string>): void {
+  private static writeProfileTokens(profileTokens: ReadonlyMap<ProfileId, ProfileToken>): void {
     MultiplayerClient.writeStorageValue(profileTokensStorageKey, JSON.stringify(MultiplayerClient.profileTokenEntries(profileTokens)));
   }
 
-  private static profileTokenEntries(profileTokens: ReadonlyMap<string, string>): { readonly profileId: string; readonly profileToken: string }[] {
+  private static profileTokenEntries(
+    profileTokens: ReadonlyMap<ProfileId, ProfileToken>,
+  ): { readonly profileId: ProfileId; readonly profileToken: ProfileToken }[] {
     return [...profileTokens.entries()].map(([profileId, profileToken]) => ({ profileId, profileToken }));
   }
 

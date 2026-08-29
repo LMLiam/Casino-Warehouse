@@ -1,4 +1,5 @@
 import type { ServerDataStore } from '../../state/serverDataStore/ServerDataStore';
+import type { ServerInstanceId } from '../../schemas/casinoSchemas/ServerInstanceId';
 import type { CasinoRoomAuthority } from './CasinoRoomAuthority';
 
 export interface CasinoServerOptions {
@@ -8,7 +9,7 @@ export interface CasinoServerOptions {
   readonly heartbeatIntervalMs?: number | undefined;
   readonly heartbeatTimeoutMs?: number | undefined;
   readonly adminToken?: string | undefined;
-  readonly serverInstanceId?: string | undefined;
+  readonly serverInstanceId?: ServerInstanceId | undefined;
   readonly publicBaseUrl?: string | (() => string) | undefined;
   readonly publicWebSocketUrl?: string | (() => string) | undefined;
 }
