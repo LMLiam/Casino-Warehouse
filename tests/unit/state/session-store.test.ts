@@ -12,6 +12,7 @@ import { parseSessionState } from '../../../src/state/session/parseSessionState'
 import { saveSessionState } from '../../../src/state/session/saveSessionState';
 import { createProfile } from '../../../src/state/profiles/createProfile';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
+import { testProfileId, testRoomId } from '../schemas/testIds';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 
@@ -31,14 +32,14 @@ describe('session store', () => {
   it('persists the current single-profile session separately from profile records', () => {
     const storage = new MemoryStorage();
     const session = createSessionState(
-      'profile-a',
+      testProfileId('profile-a'),
       {
         activeGame: 'blackjack',
         showingGameLobby: false,
         wagerLimit: 500,
         wagered: 125,
         room: {
-          roomId: 'abc123',
+          roomId: testRoomId('abc123'),
           gameId: 'blackjack',
           role: 'player',
         },
@@ -68,7 +69,7 @@ describe('session store', () => {
   });
 
   it('stores one selected profile and clamps invalid wager values', () => {
-    const session = createSessionState('a', {
+    const session = createSessionState(testProfileId('a'), {
       wagerLimit: -1,
       wagered: Number.NaN,
     });
@@ -80,6 +81,9 @@ describe('session store', () => {
 
   it('uses the profile bankroll instead of stale Beat the House session bankrolls', () => {
     const profile = createProfile({ profiles: [] }, 'Central Wallet', 467).profiles[0];
+    if (!profile) {
+      throw new Error('Missing profile.');
+    }
     const staleSnapshot = new BeatTheHouseGame({ initialBankroll: 2169 }).saveState();
 
     const player = createPlayerFromProfile(profile, { beatTheHouse: staleSnapshot });
@@ -89,8 +93,14 @@ describe('session store', () => {
 
   it('restores saved Blackjack and slot snapshots for a profile session', () => {
     const profile = createProfile({ profiles: [] }, 'Saved Table', 700).profiles[0];
+    if (!profile) {
+      throw new Error('Missing profile.');
+    }
     const blackjackSnapshot = new BlackjackGame().deal(25, rigDeck([card('10', 'spades'), card('9', 'hearts'), card('6', 'clubs'), card('8', 'diamonds')]));
     const slotTheme = slotThemes[0];
+    if (!slotTheme) {
+      throw new Error('Missing slotTheme.');
+    }
     const slotSnapshot = new SlotsGame({ theme: slotTheme }).spin(10, [
       'lotus',
       'lotus',
@@ -115,7 +125,11 @@ describe('session store', () => {
     });
 
     expect(player.blackjack.snapshot()).toEqual(blackjackSnapshot);
-    expect(player.slots[slotTheme.id].snapshot()).toEqual(slotSnapshot);
+    const slotGame = player.slots.get(slotTheme.id);
+    if (!slotGame) {
+      throw new Error('Missing slot game.');
+    }
+    expect(slotGame.snapshot()).toEqual(slotSnapshot);
   });
 
   it('recovers gracefully from corrupt session storage', () => {

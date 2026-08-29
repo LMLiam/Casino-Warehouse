@@ -10,6 +10,27 @@ import { cardLabel } from '../../../src/game/cards/cardLabel';
 import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { SlotsGame } from '../../../src/game/slots/SlotsGame';
+import type { SlotTheme } from '../../../src/game/slots/SlotTheme';
+import { testBlackjackSeatId, testProfileId } from '../schemas/testIds';
+
+const aliceId = testProfileId('alice');
+const bobId = testProfileId('bob');
+
+const requireSlotTheme = (index: number): SlotTheme => {
+  const theme = slotThemes[index];
+  if (!theme) {
+    throw new Error(`Missing slot theme at index ${index}.`);
+  }
+  return theme;
+};
+
+const requireBlackjackSeat = <T>(snapshot: { readonly seats: readonly T[] }, index: number): T => {
+  const seat = snapshot.seats[index];
+  if (!seat) {
+    throw new Error(`Missing blackjack seat at index ${index}.`);
+  }
+  return seat;
+};
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 
@@ -109,39 +130,50 @@ describe('BlackjackGame', () => {
 });
 
 describe('BlackjackTable', () => {
+  const seat1 = testBlackjackSeatId('seat-1');
+  const seat2 = testBlackjackSeatId('seat-2');
+  const seat3 = testBlackjackSeatId('seat-3');
   const seats = [
-    { seatId: 'seat-1', profileId: 'alice', profileName: 'Alice', bankroll: 500 },
-    { seatId: 'seat-2', profileId: 'bob', profileName: 'Bob', bankroll: 500 },
+    { seatId: seat1, profileId: aliceId, profileName: 'Alice', bankroll: 500 },
+    { seatId: seat2, profileId: bobId, profileName: 'Bob', bankroll: 500 },
   ];
+
+  const requireSeat = (index: number) => {
+    const seat = seats[index];
+    if (!seat) {
+      throw new Error(`Missing seat at index ${index}.`);
+    }
+    return seat;
+  };
 
   it('rejects invalid deals and starts turns only after occupied seats wager', () => {
     const table = new BlackjackTable({
       deck: rigDeck([card('9', 'clubs'), card('7', 'diamonds'), card('10', 'spades'), card('6', 'hearts'), card('8', 'clubs'), card('5', 'spades')]),
     });
 
-    expect(table.deal('seat-3', 10, seats).error).toBe('Claim a Blackjack seat before dealing.');
-    expect(table.deal('seat-1', 0, seats).error).toBe('Blackjack wager is invalid.');
-    expect(table.deal('seat-1', 10, seats).snapshot.phase).toBe('betting');
-    const ready = table.deal('seat-2', 20, seats);
+    expect(table.deal(seat3, 10, seats).error).toBe('Claim a Blackjack seat before dealing.');
+    expect(table.deal(seat1, 0, seats).error).toBe('Blackjack wager is invalid.');
+    expect(table.deal(seat1, 10, seats).snapshot.phase).toBe('betting');
+    const ready = table.deal(seat2, 20, seats);
 
     expect(ready.snapshot.phase).toBe('playing');
     expect(ready.snapshot.dealerCards.map(cardLabel)).toEqual(['9♣', '7♦']);
     expect(ready.snapshot.seats.map((seat) => seat.wager)).toEqual([10, 20]);
-    expect(table.deal('seat-1', 10, seats).error).toBe('This Blackjack seat already has a wager.');
+    expect(table.deal(seat1, 10, seats).error).toBe('This Blackjack seat already has a wager.');
   });
 
   it('stands on shared-table dealer soft 17', () => {
     const table = new BlackjackTable({
       deck: rigDeck([card('A', 'clubs'), card('6', 'diamonds'), card('10', 'spades'), card('7', 'hearts'), card('5', 'clubs')]),
     });
-    const oneSeat = [seats[0]];
-    table.deal('seat-1', 10, oneSeat);
+    const oneSeat = [requireSeat(0)];
+    table.deal(seat1, 10, oneSeat);
 
-    const stood = table.act('stand', 'seat-1', oneSeat);
+    const stood = table.act('stand', seat1, oneSeat);
 
     expect(stood.settlements[0]).toMatchObject({ seatId: 'seat-1', returned: 10, profit: 0 });
     expect(stood.snapshot.dealerCards.map(cardLabel)).toEqual(['A♣', '6♦']);
-    expect(stood.snapshot.seats[0].status).toBe('17 pushes dealer 17.');
+    expect(requireBlackjackSeat(stood.snapshot, 0).status).toBe('17 pushes dealer 17.');
   });
 
   it('covers hit bust, wrong turn, double, reset, and settled-state deal rejection', () => {
@@ -159,18 +191,22 @@ describe('BlackjackTable', () => {
         card('8', 'diamonds'),
       ]),
     });
-    table.deal('seat-1', 10, seats);
-    table.deal('seat-2', 20, seats);
+    table.deal(seat1, 10, seats);
+    table.deal(seat2, 20, seats);
 
-    expect(table.act('hit', 'seat-2', seats).error).toBe('It is not your Blackjack turn.');
-    const busted = table.act('hit', 'seat-1', seats);
+    expect(table.act('hit', seat2, seats).error).toBe('It is not your Blackjack turn.');
+    const busted = table.act('hit', seat1, seats);
     expect(busted.settlements[0]).toMatchObject({ seatId: 'seat-1', wagered: 10, returned: 0, profit: -10 });
-    const doubled = table.act('double', 'seat-2', seats);
+    const doubled = table.act('double', seat2, seats);
     expect(doubled.debit).toBe(20);
     expect(doubled.snapshot.phase).toBe('settled');
-    expect(doubled.settlements[0].seatId).toBe('seat-2');
-    expect(table.deal('seat-1', 10, seats).error).toBe('Start a new Blackjack table before dealing again.');
-    expect(table.act('new-hand', 'seat-1', seats).snapshot.phase).toBe('betting');
+    const doubledSettlement = doubled.settlements[0];
+    if (!doubledSettlement) {
+      throw new Error('Missing doubled settlement.');
+    }
+    expect(doubledSettlement.seatId).toBe('seat-2');
+    expect(table.deal(seat1, 10, seats).error).toBe('Start a new Blackjack table before dealing again.');
+    expect(table.act('new-hand', seat1, seats).snapshot.phase).toBe('betting');
   });
 
   it('covers split, insurance, dealer blackjack, and spectator snapshots', () => {
@@ -187,49 +223,49 @@ describe('BlackjackTable', () => {
         card('K', 'hearts'),
       ]),
     });
-    const oneSeat = [seats[0]];
-    splitTable.deal('seat-1', 10, oneSeat);
-    const split = splitTable.act('split', 'seat-1', oneSeat);
+    const oneSeat = [requireSeat(0)];
+    splitTable.deal(seat1, 10, oneSeat);
+    const split = splitTable.act('split', seat1, oneSeat);
     expect(split.debit).toBe(10);
     expect(split.snapshot.phase).toBe('settled');
-    expect(split.snapshot.seats[0].splitHands).toHaveLength(2);
+    expect(requireBlackjackSeat(split.snapshot, 0).splitHands).toHaveLength(2);
 
     const insuranceTable = new BlackjackTable({
       deck: rigDeck([card('A', 'clubs'), card('K', 'diamonds'), card('9', 'spades'), card('8', 'hearts')]),
     });
-    const dealerBlackjack = insuranceTable.deal('seat-1', 10, oneSeat);
+    const dealerBlackjack = insuranceTable.deal(seat1, 10, oneSeat);
     expect(dealerBlackjack.settlements[0]).toMatchObject({ seatId: 'seat-1', returned: 0, profit: -10 });
-    expect(insuranceTable.snapshot([{ seatId: 'seat-2' }]).seats[0].status).toBe('Open seat.');
+    expect(requireBlackjackSeat(insuranceTable.snapshot([{ seatId: seat2 }]), 0).status).toBe('Open seat.');
   });
 
   it('covers natural Blackjack, dealer Blackjack push, and insurance placement', () => {
     const naturalTable = new BlackjackTable({
       deck: rigDeck([card('9', 'clubs'), card('7', 'diamonds'), card('A', 'spades'), card('K', 'hearts')]),
     });
-    const oneSeat = [seats[0]];
-    const natural = naturalTable.deal('seat-1', 20, oneSeat);
+    const oneSeat = [requireSeat(0)];
+    const natural = naturalTable.deal(seat1, 20, oneSeat);
     expect(natural.settlements[0]).toMatchObject({ seatId: 'seat-1', returned: 50, profit: 30 });
     expect(natural.snapshot.phase).toBe('settled');
 
     const pushTable = new BlackjackTable({
       deck: rigDeck([card('A', 'clubs'), card('K', 'diamonds'), card('A', 'spades'), card('Q', 'hearts')]),
     });
-    const push = pushTable.deal('seat-1', 20, oneSeat);
+    const push = pushTable.deal(seat1, 20, oneSeat);
     expect(push.settlements[0]).toMatchObject({ seatId: 'seat-1', returned: 20, profit: 0 });
 
     const insuranceTable = new BlackjackTable({
       deck: rigDeck([card('A', 'clubs'), card('9', 'diamonds'), card('10', 'spades'), card('6', 'hearts'), card('8', 'clubs')]),
     });
-    insuranceTable.deal('seat-1', 20, oneSeat);
-    const insured = insuranceTable.act('insurance', 'seat-1', oneSeat);
+    insuranceTable.deal(seat1, 20, oneSeat);
+    const insured = insuranceTable.act('insurance', seat1, oneSeat);
     expect(insured.debit).toBe(10);
-    expect(insured.snapshot.seats[0].insuranceWager).toBe(10);
-    expect(insuranceTable.act('insurance', 'seat-1', oneSeat).error).toBe('Insurance is not available.');
+    expect(requireBlackjackSeat(insured.snapshot, 0).insuranceWager).toBe(10);
+    expect(insuranceTable.act('insurance', seat1, oneSeat).error).toBe('Insurance is not available.');
   });
 
   it('validates Blackjack table snapshot and card guards', () => {
     const table = new BlackjackTable();
-    const snapshot = table.snapshot([{ seatId: 'seat-1' }]);
+    const snapshot = table.snapshot([{ seatId: seat1 }]);
 
     expect(isBlackjackTableSnapshot(snapshot)).toBe(true);
     expect(isBlackjackTableSnapshot({ kind: 'blackjack' })).toBe(false);
@@ -270,7 +306,7 @@ describe('SlotsGame', () => {
   });
 
   it('registers only the Thai Princess slot theme', () => {
-    const game = new SlotsGame({ theme: slotThemes[0] });
+    const game = new SlotsGame({ theme: requireSlotTheme(0) });
 
     const snapshot = game.spin(2, [
       'temple',
@@ -298,6 +334,9 @@ describe('SlotsGame', () => {
 
   it('supports Thai Princess wild rows and lotus scatter behaviour', () => {
     const thaiPrincess = slotThemes.find((theme) => theme.id === 'thai-princess');
+    if (!thaiPrincess) {
+      throw new Error('Missing thai princess theme.');
+    }
     const game = new SlotsGame({ theme: thaiPrincess });
 
     const wildLine = game.spin(2, [

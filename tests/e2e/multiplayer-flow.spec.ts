@@ -3,6 +3,9 @@ import type { AddressInfo } from 'node:net';
 import type { Card } from '../../src/game/cards/Card';
 import { rigDeck } from '../../src/game/cards/rigDeck';
 import type { JsonValue } from '../../src/schemas/casinoSchemas/JsonValue';
+import type { ProfileId } from '../../src/schemas/casinoSchemas/ProfileId';
+import { connectionIdSchema } from '../../src/schemas/casinoSchemas/connectionIdSchema';
+import { profileIdSchema } from '../../src/schemas/casinoSchemas/profileIdSchema';
 import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer } from '../../src/multiplayer/serverEntry';
 import { RoomAuthority } from '../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../src/multiplayer/protocol/ClientMessage';
@@ -67,12 +70,19 @@ test('multiplayer room lobby supports create, join, seat choice, spectate, leave
     await expect(host.locator('.blackjack-table-seat')).toHaveCount(5);
     await expect(host.locator('.blackjack-table-seat')).toContainText(['Alice', 'Bob']);
 
-    await openHudOverflow(players[1]);
-    await players[1].locator('#leaveRoomBtn').click();
-    await expect(players[1].locator('#roomLobby')).toBeVisible();
-    await expect(players[1].locator('#blackjackView')).toBeHidden();
+    const secondPlayer = players[1];
+    if (!secondPlayer) {
+      throw new Error('Expected second player.');
+    }
+    await openHudOverflow(secondPlayer);
+    await secondPlayer.locator('#leaveRoomBtn').click();
+    await expect(secondPlayer.locator('#roomLobby')).toBeVisible();
+    await expect(secondPlayer.locator('#blackjackView')).toBeHidden();
 
     const reconnected = players[1];
+    if (!reconnected) {
+      throw new Error('Expected reconnected player.');
+    }
     await reconnected.reload({ waitUntil: 'domcontentloaded' });
     await reconnected.waitForFunction(() => document.body.dataset.appReady === 'true');
     await waitForRealtime(reconnected);
@@ -449,8 +459,9 @@ test('Beat the House win popup includes House Advance repayment from authoritati
   if (!profileAuth) {
     throw new Error('Expected seeded House Advance profile auth.');
   }
-  dataStore.setProfileBankroll(profileAuth.profileId, 0);
-  dataStore.acceptHouseAdvance(profileAuth.profileId);
+  const profileId = profileIdSchema.parse(profileAuth.profileId);
+  dataStore.setProfileBankroll(profileId, 0);
+  dataStore.acceptHouseAdvance(profileId);
   const authority = new RiggedBeatRoundAuthority(dataStore, [
     { rank: 'A', suit: 'spades' },
     { rank: 'A', suit: 'hearts' },
@@ -540,7 +551,7 @@ test('multiplayer Slots exposes shared readiness, spin result, spectating, and n
 });
 
 type SeededProfileAuth = {
-  readonly profileId: string;
+  readonly profileId: ProfileId;
   readonly profileToken: string;
 };
 
@@ -614,7 +625,7 @@ const newPlayerContext = async (browser: Browser, wsUrl: string, profileAuth?: S
       }
       localStorage.setItem('casino_realtime_url', url);
       if (auth) {
-        localStorage.setItem(profileTokensKey, JSON.stringify({ [auth.profileId]: auth.profileToken }));
+        localStorage.setItem(profileTokensKey, JSON.stringify([{ profileId: auth.profileId, profileToken: auth.profileToken }]));
       }
     },
     { auth: profileAuth, profileTokensKey: profileTokensStorageKey, url: wsUrl },
@@ -842,6 +853,6 @@ class RiggedBeatRoundAuthority extends RoomAuthority {
   }
 
   private roomForConnection(connectionId: string): RoomState | undefined {
-    return [...this.rooms.values()].find((room) => room.connectionToMember.has(connectionId));
+    return [...this.rooms.values()].find((room) => room.connectionToMember.has(connectionIdSchema.parse(connectionId)));
   }
 }

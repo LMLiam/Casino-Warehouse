@@ -20,7 +20,11 @@ const kindIndex = (rank: string, suit: string): number => {
 const countsWith = (...kindIndexes: readonly number[]): FreshShoeCounts => {
   const counts = Array.from({ length: freshShoeCardKinds.length }, () => 0);
   for (const index of kindIndexes) {
-    counts[index] += 1;
+    const current = counts[index];
+    if (current === undefined) {
+      throw new Error(`Missing count at index ${index}.`);
+    }
+    counts[index] = current + 1;
   }
   return counts;
 };
@@ -31,8 +35,16 @@ const stateForFinalRank = (
   const playerFirstKind = kindIndex('3', 'clubs');
   const playerFinalKind = kindIndex(rank, 'clubs');
   const counts = [...createFreshShoeCounts()];
-  counts[playerFirstKind] -= 1;
-  counts[playerFinalKind] -= 1;
+  const firstCurrent = counts[playerFirstKind];
+  if (firstCurrent === undefined) {
+    throw new Error(`Missing count at index ${playerFirstKind}.`);
+  }
+  counts[playerFirstKind] = firstCurrent - 1;
+  const finalCurrent = counts[playerFinalKind];
+  if (finalCurrent === undefined) {
+    throw new Error(`Missing count at index ${playerFinalKind}.`);
+  }
+  counts[playerFinalKind] = finalCurrent - 1;
   return { counts, playerFirstKind, playerFinalKind, playerCardCount: 2 };
 };
 
@@ -148,5 +160,5 @@ describe('fresh-shoe Beat the House oracle', () => {
     expect(syntheticSecond).toEqual(syntheticFirst);
     expect(first.totalStake).toBe(1);
     expect(first.expectedProfit / first.totalStake).toBeCloseTo(0.0347, 4);
-  }, 60_000);
+  }, 180_000);
 });

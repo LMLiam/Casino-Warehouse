@@ -3,6 +3,14 @@ import type { Card } from '../../../src/game/cards/Card';
 import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 
+const requireSummary = <T>(snapshot: { readonly summaries: readonly T[] }): T => {
+  const summary = snapshot.summaries[0];
+  if (!summary) {
+    throw new Error('Missing summary.');
+  }
+  return summary;
+};
+
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 
 describe('BeatTheHouseGame', () => {
@@ -15,7 +23,7 @@ describe('BeatTheHouseGame', () => {
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('win');
     expect(snapshot.bankroll).toBe(110);
-    expect(snapshot.summaries[0].profit).toBe(10);
+    expect(requireSummary(snapshot).profit).toBe(10);
   });
 
   it('keeps a player black-Ace automatic win when the dealer opens with a black Ace', () => {
@@ -27,7 +35,7 @@ describe('BeatTheHouseGame', () => {
 
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('win');
-    expect(snapshot.summaries[0].sideWins).toEqual([{ betType: 'aceFlash', label: 'Ace Flash', profit: 50, returned: 51 }]);
+    expect(requireSummary(snapshot).sideWins).toEqual([{ betType: 'aceFlash', label: 'Ace Flash', profit: 50, returned: 51 }]);
     expect(snapshot.bankroll).toBe(160);
   });
 
@@ -41,7 +49,7 @@ describe('BeatTheHouseGame', () => {
 
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('push');
-    expect(snapshot.summaries[0].profit).toBe(18);
+    expect(requireSummary(snapshot).profit).toBe(18);
     expect(snapshot.bankroll).toBe(118);
   });
 
@@ -55,8 +63,8 @@ describe('BeatTheHouseGame', () => {
     const snapshot = game.stick();
 
     expect(snapshot.hands.left.result).toBe('push');
-    expect(snapshot.summaries[0].sideWins).toEqual([{ betType: 'matchPush', label: 'Match Push', profit: 9, returned: 10 }]);
-    expect(snapshot.summaries[0].profit).toBe(8);
+    expect(requireSummary(snapshot).sideWins).toEqual([{ betType: 'matchPush', label: 'Match Push', profit: 9, returned: 10 }]);
+    expect(requireSummary(snapshot).profit).toBe(8);
     expect(snapshot.bankroll).toBe(108);
   });
 
@@ -113,7 +121,7 @@ describe('BeatTheHouseGame', () => {
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('win');
     expect(snapshot.dealer.bust).toBe(true);
-    expect(snapshot.summaries[0].sideWins).toEqual([
+    expect(requireSummary(snapshot).sideWins).toEqual([
       { betType: 'dealerBust', label: 'Dealer Bust', profit: 8, returned: 10 },
       { betType: 'dealerSevens', label: 'Dealer Sevens (1)', profit: 6, returned: 8 },
     ]);
@@ -128,7 +136,7 @@ describe('BeatTheHouseGame', () => {
 
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('lose');
-    expect(snapshot.summaries[0].profit).toBe(-10);
+    expect(requireSummary(snapshot).profit).toBe(-10);
     expect(snapshot.bankroll).toBe(90);
   });
 
@@ -212,7 +220,7 @@ describe('BeatTheHouseGame', () => {
     const snapshot = game.deal(rigDeck([card('2', 'diamonds'), card('K', 'spades')]));
 
     expect(snapshot.phase).toBe('roundOver');
-    expect(snapshot.summaries[0]).toMatchObject({ handId: 'left', mainResult: 'lose', profit: -10 });
+    expect(requireSummary(snapshot)).toMatchObject({ handId: 'left', mainResult: 'lose', profit: -10 });
     expect(snapshot.bankroll).toBe(95);
     expect(snapshot.dealerTips.left).toBe(5);
     expect(snapshot.dealerTipRewards.left).toBe(10);
@@ -270,7 +278,7 @@ describe('BeatTheHouseGame', () => {
     game.placeBet('left', 'aceFlash', 2);
     game.deal(rigDeck([card('A', 'spades'), card('Q', 'hearts')]));
 
-    expect(game.snapshot().summaries[0].sideWins).toEqual([{ betType: 'aceFlash', label: 'Ace Flash', profit: 20, returned: 22 }]);
+    expect(requireSummary(game.snapshot()).sideWins).toEqual([{ betType: 'aceFlash', label: 'Ace Flash', profit: 20, returned: 22 }]);
 
     game = new BeatTheHouseGame({ initialBankroll: 100 });
     game.placeBet('left', 'main', 10);
@@ -279,7 +287,7 @@ describe('BeatTheHouseGame', () => {
 
     const threeSevens = game.stick();
     expect(threeSevens.dealer.cards.map((dealerCard) => dealerCard.rank)).toEqual(['7', '7', '7', 'Q']);
-    expect(threeSevens.summaries[0].sideWins).toEqual([{ betType: 'dealerSevens', label: 'Dealer Sevens (3)', profit: 150, returned: 151 }]);
+    expect(requireSummary(threeSevens).sideWins).toEqual([{ betType: 'dealerSevens', label: 'Dealer Sevens (3)', profit: 150, returned: 151 }]);
   });
 
   it('covers defensive phase guards and default bankroll paths', () => {

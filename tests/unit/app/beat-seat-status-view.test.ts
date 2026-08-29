@@ -4,6 +4,9 @@ import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import { BeatSeatStatusView } from '../../../src/app/views/BeatSeatStatusView';
 import type { BeatSeatStatusViewElements } from '../../../src/app/views/BeatSeatStatusViewElements';
+import { testConnectionId, testProfileId, testRoomId, testSessionId } from '../schemas/testIds';
+
+const aliceId = testProfileId('alice');
 
 describe('BeatSeatStatusView', () => {
   it('marks tipped seats only while the round is active', () => {
@@ -24,10 +27,10 @@ describe('BeatSeatStatusView', () => {
     };
     const view = new BeatSeatStatusView(elements);
 
-    view.render(active, createRoom(active), 'alice');
+    view.render(active, createRoom(active), aliceId);
     expect(statusLayer.innerHTML).toContain('dealer-tipped');
 
-    view.render({ ...active, phase: 'roundOver' }, createRoom({ ...active, phase: 'roundOver' }), 'alice');
+    view.render({ ...active, phase: 'roundOver' }, createRoom({ ...active, phase: 'roundOver' }), aliceId);
     expect(statusLayer.innerHTML).not.toContain('dealer-tipped');
   });
 
@@ -50,36 +53,36 @@ describe('BeatSeatStatusView', () => {
     new BeatSeatStatusView(elements).render(
       snapshot,
       { ...createRoom(snapshot), beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 } },
-      'alice',
+      aliceId,
     );
     expect(statusLayer.innerHTML).toContain('Wagered');
 
     new BeatSeatStatusView(elements).render(
       snapshot,
-      { ...createRoom(snapshot), beat: { rebetSeatIds: [], readyProfileIds: ['alice'], readyCount: 1, playerCount: 1, readyPhase: 'betting' } },
-      'alice',
+      { ...createRoom(snapshot), beat: { rebetSeatIds: [], readyProfileIds: [aliceId], readyCount: 1, playerCount: 1, readyPhase: 'betting' } },
+      aliceId,
     );
     expect(statusLayer.innerHTML).toContain('Ready');
   });
 });
 
 const createRoom = (game: GameSnapshot): RoomSnapshot => ({
-  roomId: 'ROOM42',
+  roomId: testRoomId('ROOM42'),
   roomName: 'Beat Room',
-  hostProfileId: 'alice',
+  hostProfileId: aliceId,
   gameId: 'beat-the-house',
   gameTitle: 'Beat the House',
   status: 'in-progress',
   phase: 'playing',
-  sessionId: 'session-1',
+  sessionId: testSessionId('session-1'),
   revision: 1,
   maxPlayers: 3,
   allowSpectators: true,
   createdAt: 1,
   updatedAt: 1,
-  players: [{ connectionId: 'a', profileId: 'alice', profileName: 'Alice', bankroll: 95, sessionStartBankroll: 100, role: 'player' }],
+  players: [{ connectionId: testConnectionId('a'), profileId: aliceId, profileName: 'Alice', bankroll: 95, sessionStartBankroll: 100, role: 'player' }],
   spectators: [],
-  seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'centre' }, { seatId: 'right' }],
+  seats: [{ seatId: 'left', profileId: aliceId }, { seatId: 'centre' }, { seatId: 'right' }],
   game,
   beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 },
 });

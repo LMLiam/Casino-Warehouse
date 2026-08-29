@@ -11,6 +11,23 @@ import { replaceProfile } from '../../../src/state/profiles/replaceProfile';
 import { saveProfileStore } from '../../../src/state/profiles/saveProfileStore';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
 import { createStateId } from '../../../src/state/profiles/createStateId';
+import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
+
+const requireProfileAt = (profiles: readonly CasinoProfile[], index: number): CasinoProfile => {
+  const profile = profiles[index];
+  if (!profile) {
+    throw new Error(`Missing profile at index ${index}.`);
+  }
+  return profile;
+};
+
+const requireTransactionAt = (profile: CasinoProfile, index: number): CasinoProfile['transactions'][number] => {
+  const transaction = profile.transactions[index];
+  if (!transaction) {
+    throw new Error(`Missing transaction at index ${index}.`);
+  }
+  return transaction;
+};
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -35,27 +52,27 @@ describe('profile store', () => {
 
     expect(loaded.recovered).toBe(false);
     expect(loaded.state.profiles).toHaveLength(1);
-    expect(loaded.state.profiles[0].name).toBe('Liam');
-    expect(loaded.state.profiles[0].bankroll).toBe(1500);
-    expect(loaded.state.profiles[0].houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
+    expect(requireProfileAt(loaded.state.profiles, 0).name).toBe('Liam');
+    expect(requireProfileAt(loaded.state.profiles, 0).bankroll).toBe(1500);
+    expect(requireProfileAt(loaded.state.profiles, 0).houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
   });
 
   it('renames and deletes profiles without touching other records', () => {
     let state = createProfile({ profiles: [] }, 'One', 100, new Date('2026-05-04T12:00:00Z'));
     state = createProfile(state, 'Two', 200, new Date('2026-05-04T12:01:00Z'));
-    const secondId = state.profiles[1].id;
+    const secondId = requireProfileAt(state.profiles, 1).id;
 
     state = renameProfile(state, secondId, 'VIP Two', new Date('2026-05-04T12:02:00Z'));
-    state = deleteProfile(state, state.profiles[0].id);
+    state = deleteProfile(state, requireProfileAt(state.profiles, 0).id);
 
     expect(state.profiles).toHaveLength(1);
-    expect(state.profiles[0].name).toBe('VIP Two');
-    expect(state.profiles[0].bankroll).toBe(200);
+    expect(requireProfileAt(state.profiles, 0).name).toBe('VIP Two');
+    expect(requireProfileAt(state.profiles, 0).bankroll).toBe(200);
   });
 
   it('records bankroll transaction history and stats', () => {
     const state = createProfile({ profiles: [] }, 'Stats', 1000, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       profile,
@@ -77,12 +94,12 @@ describe('profile store', () => {
     expect(profile.stats.gamesPlayed).toBe(1);
     expect(profile.stats.perGame.blackjack).toMatchObject({ gamesPlayed: 1, wagered: 25, won: 50, netProfit: 25 });
     expect(profile.transactions.map((tx) => tx.balanceAfter)).toEqual([1025, 975]);
-    expect(profile.transactions[0]).toMatchObject({ profileId: profile.id, balanceBefore: 975, description: 'Blackjack win' });
+    expect(requireTransactionAt(profile, 0)).toMatchObject({ profileId: profile.id, balanceBefore: 975, description: 'Blackjack win' });
   });
 
   it('keeps House Advance credits and repayments out of gameplay stats', () => {
     const state = createProfile({ profiles: [] }, 'Advance Stats', 0, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       { ...profile, houseAdvance: { outstandingBalance: 100, activeCount: 1 } },
@@ -116,7 +133,7 @@ describe('profile store', () => {
 
   it('keeps dealer tips and Dealer Thanks rewards out of wager and winnings stats', () => {
     const state = createProfile({ profiles: [] }, 'Tip Stats', 100, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       profile,
@@ -168,11 +185,11 @@ describe('profile store', () => {
     try {
       const now = new Date('2026-05-04T12:00:00Z');
       const state = createProfile(createProfile({ profiles: [] }, 'One', 100, now), 'Two', 200, now);
-      const firstProfile = state.profiles[0];
-      const secondProfile = state.profiles[1];
+      const firstProfile = requireProfileAt(state.profiles, 0);
+      const secondProfile = requireProfileAt(state.profiles, 1);
       const updated = recordTransaction(
-        recordTransaction(firstProfile, { gameId: 'slots', type: 'wager', amount: -10, description: 'Spin', metadata: {} }, now),
-        { gameId: 'slots', type: 'payout', amount: 20, description: 'Win', metadata: {} },
+        recordTransaction(firstProfile, { gameId: 'slots:thai-princess', type: 'wager', amount: -10, description: 'Spin', metadata: {} }, now),
+        { gameId: 'slots:thai-princess', type: 'payout', amount: 20, description: 'Win', metadata: {} },
         now,
       );
 
@@ -199,14 +216,14 @@ describe('profile store', () => {
     const idGenerator = vi.fn((prefix: string, now: Date) => `${prefix}-${now.toISOString()}`);
     const state = createProfile({ profiles: [] }, 'Deterministic', 1000, profileNow, idGenerator);
     const profile = recordTransaction(
-      state.profiles[0],
+      requireProfileAt(state.profiles, 0),
       { gameId: 'blackjack', type: 'wager', amount: -25, description: 'Wager', metadata: {} },
       transactionNow,
       idGenerator,
     );
 
-    expect(state.profiles[0].id).toBe('profile-2026-05-04T12:00:00.000Z');
-    expect(profile.transactions[0].id).toBe('tx-2026-05-04T12:01:00.000Z');
+    expect(requireProfileAt(state.profiles, 0).id).toBe('profile-2026-05-04T12:00:00.000Z');
+    expect(requireTransactionAt(profile, 0).id).toBe('tx-2026-05-04T12:01:00.000Z');
     expect(idGenerator).toHaveBeenNthCalledWith(1, 'profile', profileNow);
     expect(idGenerator).toHaveBeenNthCalledWith(2, 'tx', transactionNow);
   });
@@ -244,7 +261,7 @@ describe('profile store', () => {
 
   it('does not count pushes or admin adjustments as gambling wins', () => {
     const state = createProfile({ profiles: [] }, 'Clean stats', 100, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       profile,
@@ -300,14 +317,14 @@ describe('profile store', () => {
   it('replaces one profile in a save state', () => {
     const state = createProfile({ profiles: [] }, 'A', 100, new Date('2026-05-04T12:00:00Z'));
     const updated = recordTransaction(
-      state.profiles[0],
-      { gameId: 'slots', type: 'bonus', amount: 500, description: 'Bonus win', metadata: { slotTheme: 'thai-princess' } },
+      requireProfileAt(state.profiles, 0),
+      { gameId: 'slots:thai-princess', type: 'bonus', amount: 500, description: 'Bonus win', metadata: { slotTheme: 'thai-princess' } },
       new Date('2026-05-04T12:01:00Z'),
     );
 
     const next = replaceProfile(state, updated);
 
-    expect(next.profiles[0].bankroll).toBe(600);
-    expect(next.profiles[0].transactions[0].description).toBe('Bonus win');
+    expect(requireProfileAt(next.profiles, 0).bankroll).toBe(600);
+    expect(requireTransactionAt(requireProfileAt(next.profiles, 0), 0).description).toBe('Bonus win');
   });
 });

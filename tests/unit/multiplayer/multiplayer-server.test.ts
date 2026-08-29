@@ -15,6 +15,10 @@ import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapsho
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
+import { testConnectionId, testProfileId, testRoomId, testServerInstanceId, testSessionId, testSettlementId } from '../schemas/testIds';
+
+const aliceId = testProfileId('alice');
+const room42 = testRoomId('ROOM42');
 
 class SocketProbe {
   private readonly messages: ServerMessage[] = [];
@@ -200,8 +204,16 @@ class RawSocketProbe {
   private readFrames(): void {
     let offset = 0;
     while (offset + RawSocketProbe.minimumFrameHeaderLength <= this.buffer.length) {
-      const first = this.buffer[offset];
-      const second = this.buffer[offset + 1];
+      const firstByte = this.buffer[offset];
+      if (firstByte === undefined) {
+        throw new Error(`Missing byte at offset ${offset}.`);
+      }
+      const first = firstByte;
+      const secondByte = this.buffer[offset + 1];
+      if (secondByte === undefined) {
+        throw new Error(`Missing byte at offset ${offset + 1}.`);
+      }
+      const second = secondByte;
       const opcode = first & RawSocketProbe.opcodeMask;
       const masked = Boolean(second & RawSocketProbe.maskBit);
       let length = second & RawSocketProbe.payloadLengthMask;
@@ -231,7 +243,15 @@ class RawSocketProbe {
       if (masked) {
         const mask = this.buffer.subarray(offset + headerLength, offset + headerLength + RawSocketProbe.maskingKeyBytes);
         for (let index = 0; index < payload.length; index += 1) {
-          payload[index] ^= mask[index % RawSocketProbe.maskingKeyBytes];
+          const payloadByte = payload[index];
+          if (payloadByte === undefined) {
+            throw new Error(`Missing payload byte at index ${index}.`);
+          }
+          const maskByte = mask[index % RawSocketProbe.maskingKeyBytes];
+          if (maskByte === undefined) {
+            throw new Error(`Missing mask byte at index ${index % RawSocketProbe.maskingKeyBytes}.`);
+          }
+          payload[index] = (payloadByte ^ maskByte) & 255; // casino-magic-number-allow: 8-bit mask
         }
       }
       this.recordFrame(opcode, payload);
@@ -462,7 +482,7 @@ describe('multiplayer WebSocket server', () => {
     const badMessage = await alice.waitFor((message) => message.type === 'error' && message.code === 'bad-message');
     expect(badMessage.type === 'error' ? badMessage.message : '').toBe('Unrecognized key: "version"');
 
-    alice.send({ type: 'create-room', gameId: 'beat-the-house', profileId: 'missing-profile', profileName: 'Missing', bankroll: 500 });
+    alice.send({ type: 'create-room', gameId: 'beat-the-house', profileId: testProfileId('missing-profile'), profileName: 'Missing', bankroll: 500 });
     const unknownProfile = await alice.waitFor(
       (message) => message.type === 'error' && message.code === 'rejected' && message.message === 'Profile was not found.',
     );
@@ -516,7 +536,11 @@ describe('multiplayer WebSocket server', () => {
 
     bob.close();
     const afterDisconnect = await waitForRoom(alice, (room) => room.players.length === 1);
-    expect(afterDisconnect.players[0].profileId).toBe(aliceProfile.id);
+    const afterDisconnectPlayer = afterDisconnect.players[0];
+    if (!afterDisconnectPlayer) {
+      throw new Error('Missing afterDisconnect player.');
+    }
+    expect(afterDisconnectPlayer.profileId).toBe(aliceProfile.id);
   });
 
   it('rejects second-socket profile impersonation and locks admin-only data actions', async () => {
@@ -1018,7 +1042,7 @@ describe('multiplayer WebSocket server', () => {
   });
 
   it('tells clients from a previous server instance to reload on reconnect', async () => {
-    const baseUrl = await startServer('.', undefined, { serverInstanceId: 'server-after-restart' });
+    const baseUrl = await startServer('.', undefined, { serverInstanceId: testServerInstanceId('server-after-restart') });
 
     const current = await connect(`${baseUrl.ws}?clientServerInstanceId=server-after-restart`);
     await expect(current.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({
@@ -1074,11 +1098,11 @@ describe('multiplayer WebSocket server', () => {
 
   it('broadcasts authoritative settlement events returned by the room layer', async () => {
     const authority: CasinoRoomAuthority = {
-      handle: (connectionId: string) => {
+      handle: (connectionId) => {
         const room = createRoomSnapshot(connectionId);
         return {
           broadcasts: [room],
-          settlements: [{ id: 'settlement-1', profileId: 'alice', seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
+          settlements: [{ id: testSettlementId('settlement-1'), profileId: aliceId, seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
         };
       },
       disconnect: () => ({ broadcasts: [], settlements: [] }),
@@ -1093,7 +1117,14 @@ describe('multiplayer WebSocket server', () => {
     alice.send({ type: 'resync' });
     const settlement = await alice.waitFor((message) => message.type === 'settlement');
 
-    expect(settlement.type === 'settlement' ? settlement.settlements[0].profit : 0).toBe(25);
+    if (settlement.type !== 'settlement') {
+      throw new Error('Expected settlement message.');
+    }
+    const settlementEntry = settlement.settlements[0];
+    if (!settlementEntry) {
+      throw new Error('Missing settlement.');
+    }
+    expect(settlementEntry.profit).toBe(25);
   });
 });
 
@@ -1384,7 +1415,15 @@ const encodeClientFrame = (payload: string | Buffer, options: { readonly fin?: b
   const mask = Buffer.from([0x12, 0x34, 0x56, 0x78]);
   mask.copy(frame, headerLength);
   for (let index = 0; index < data.length; index += 1) {
-    frame[headerLength + maskLength + index] = data[index] ^ mask[index % 4];
+    const dataByte = data[index];
+    if (dataByte === undefined) {
+      throw new Error(`Missing data byte at index ${index}.`);
+    }
+    const maskByte = mask[index % 4];
+    if (maskByte === undefined) {
+      throw new Error(`Missing mask byte at index ${index % 4}.`);
+    }
+    frame[headerLength + maskLength + index] = dataByte ^ maskByte;
   }
   return frame;
 };
@@ -1392,21 +1431,23 @@ const encodeClientFrame = (payload: string | Buffer, options: { readonly fin?: b
 const beat = (room: RoomSnapshot) => room.game as ReturnType<BeatTheHouseGame['snapshot']>;
 
 const createRoomSnapshot = (connectionId: string): RoomSnapshot => ({
-  roomId: 'ROOM42',
+  roomId: room42,
   roomName: 'Room 42',
-  hostProfileId: 'alice',
+  hostProfileId: aliceId,
   gameId: 'beat-the-house',
   gameTitle: 'Beat the House',
   status: 'complete',
   phase: 'settled',
-  sessionId: 'session-1',
+  sessionId: testSessionId('session-1'),
   revision: 1,
   maxPlayers: 3,
   allowSpectators: true,
   createdAt: 1,
   updatedAt: 2,
-  players: [{ connectionId, profileId: 'alice', profileName: 'Alice', bankroll: 525, sessionStartBankroll: 500, role: 'player' }],
+  players: [
+    { connectionId: testConnectionId(connectionId), profileId: aliceId, profileName: 'Alice', bankroll: 525, sessionStartBankroll: 500, role: 'player' },
+  ],
   spectators: [],
-  seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'centre' }, { seatId: 'right' }],
+  seats: [{ seatId: 'left', profileId: aliceId }, { seatId: 'centre' }, { seatId: 'right' }],
   game: new BeatTheHouseGame({ initialBankroll: 0 }).snapshot(),
 });

@@ -64,6 +64,9 @@ describe('Beat the House popup and animation behaviour', () => {
 
     const settled = game.stick();
     const summary = settled.summaries[0];
+    if (!summary) {
+      throw new Error('Missing summary.');
+    }
 
     expect(summary.mainResult).toBe('win');
     expect(summary.sideWins).toEqual([{ betType: 'dealerSevens', label: 'Dealer Sevens (1)', profit: 6, returned: 8 }]);

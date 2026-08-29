@@ -5,9 +5,9 @@ vi.mock('pixi.js', () => {
     public x = 0;
     public y = 0;
 
-    public set(x: number, y = x): void {
+    public set(x: number, y?: number): void {
       this.x = x;
-      this.y = y;
+      this.y = y ?? x;
     }
   }
 
@@ -35,9 +35,9 @@ vi.mock('pixi.js', () => {
   }
 
   class TextStyle {
-    public readonly fill?: number;
+    public readonly fill?: number | undefined;
 
-    public constructor(options: { readonly fill?: number } = {}) {
+    public constructor(options: { readonly fill?: number | undefined } = {}) {
       this.fill = options.fill;
     }
   }

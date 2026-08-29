@@ -17,10 +17,20 @@ import { roomPhase } from '../../../src/multiplayer/roomAuthorityModel/roomPhase
 import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
 import { safeBankroll } from '../../../src/multiplayer/roomAuthorityModel/safeBankroll';
 import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
+import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
+import { testBlackjackSeatId, testConnectionId, testProfileId, testRoomId } from '../schemas/testIds';
+
+const requireProfile = (profiles: readonly CasinoProfile[], index: number): CasinoProfile => {
+  const profile = profiles[index];
+  if (!profile) {
+    throw new Error(`Missing profile at index ${index}.`);
+  }
+  return profile;
+};
 
 const player = (profileId: string): RoomPlayer => ({
-  connectionId: `conn-${profileId}`,
-  profileId,
+  connectionId: testConnectionId(`conn-${profileId}`),
+  profileId: testProfileId(profileId),
   profileName: profileId.toUpperCase(),
   bankroll: 100,
   sessionStartBankroll: 100,
@@ -29,7 +39,7 @@ const player = (profileId: string): RoomPlayer => ({
 
 const room = (overrides: Partial<RoomState> = {}): RoomState => ({
   ...createServerManagedBeatRoom(),
-  roomId: 'ROOM01',
+  roomId: testRoomId('ROOM01'),
   serverManaged: false,
   createdAt: 1,
   updatedAt: 1,
@@ -46,11 +56,11 @@ class AuthorityHarness extends RoomAuthorityBase {
   private static readonly missingPlayerBankroll = 50;
 
   public addPlayer(room: RoomState): void {
-    this.addMember(room, 'conn-alice', 'player', 'alice', 'ALICE', AuthorityHarness.addedPlayerBankroll);
+    this.addMember(room, testConnectionId('conn-alice'), 'player', testProfileId('alice'), 'ALICE', AuthorityHarness.addedPlayerBankroll);
   }
 
   public setMissingPlayerBankroll(room: RoomState): void {
-    this.setPlayerBankroll(room, 'missing', AuthorityHarness.missingPlayerBankroll);
+    this.setPlayerBankroll(room, testProfileId('missing'), AuthorityHarness.missingPlayerBankroll);
   }
 
   public settleBeatFor(room: RoomState, snapshot: GameSnapshot) {
@@ -66,7 +76,7 @@ class AuthorityHarness extends RoomAuthorityBase {
   }
 
   public applySettlementFor(room: RoomState, profileId: string, returned: number, profit: number): number {
-    return this.applyPlayerSettlement(room, profileId, returned, profit);
+    return this.applyPlayerSettlement(room, testProfileId(profileId), returned, profit);
   }
 }
 
@@ -76,16 +86,16 @@ describe('room authority model helpers', () => {
   });
 
   it('orders active rooms before inactive rooms in both comparison directions', () => {
-    const active = room({ roomId: 'ACTIVE', players: new Map([['alice', player('alice')]]) });
-    const inactive = room({ roomId: 'EMPTY' });
+    const active = room({ roomId: testRoomId('ACTIVE'), players: new Map([[testProfileId('alice'), player('alice')]]) });
+    const inactive = room({ roomId: testRoomId('EMPTY') });
 
     expect(compareRoomListOrder(active, inactive)).toBe(-1);
     expect(compareRoomListOrder(inactive, active)).toBe(1);
   });
 
   it('orders user-managed rooms before server-managed rooms', () => {
-    const serverManaged = room({ roomId: 'SERVER', serverManaged: true });
-    const userManaged = room({ roomId: 'USER', serverManaged: false });
+    const serverManaged = room({ roomId: testRoomId('SERVER'), serverManaged: true });
+    const userManaged = room({ roomId: testRoomId('USER'), serverManaged: false });
 
     expect(compareRoomListOrder(serverManaged, userManaged)).toBe(1);
     expect(compareRoomListOrder(userManaged, serverManaged)).toBe(-1);
@@ -94,8 +104,8 @@ describe('room authority model helpers', () => {
   it('retries generated room ids until an unused id is available', () => {
     const firstValue = 18_000;
     const secondValue = 24_000;
-    const first = generatedId(firstValue);
-    const second = generatedId(secondValue);
+    const first = testRoomId(generatedId(firstValue));
+    const second = testRoomId(generatedId(secondValue));
     const randomInt = vi.fn().mockReturnValueOnce(firstValue).mockReturnValueOnce(secondValue);
 
     expect(createRoomId(new Map([[first, room({ roomId: first })]]), randomInt)).toBe(second);
@@ -105,7 +115,7 @@ describe('room authority model helpers', () => {
 
   it('uses the first generated room id when it is unused', () => {
     const firstValue = 30_000;
-    const first = generatedId(firstValue);
+    const first = testRoomId(generatedId(firstValue));
     const randomInt = vi.fn().mockReturnValueOnce(firstValue);
 
     expect(createRoomId(new Map(), randomInt)).toBe(first);
@@ -144,8 +154,8 @@ describe('room authority model helpers', () => {
     harness.addPlayer(target);
     harness.setMissingPlayerBankroll(target);
 
-    expect(target.players.get('alice')).toMatchObject({ profileId: 'alice', role: 'player', bankroll: 100 });
-    expect(target.spectators.has('alice')).toBe(false);
+    expect(target.players.get(testProfileId('alice'))).toMatchObject({ profileId: 'alice', role: 'player', bankroll: 100 });
+    expect(target.spectators.has(testProfileId('alice'))).toBe(false);
   });
 
   it('skips beat settlements that are already settled or have no claimed seat', () => {
@@ -168,7 +178,7 @@ describe('room authority model helpers', () => {
     const result: BlackjackTableActionResult = {
       snapshot: new BlackjackTable().snapshot([]),
       debit: 0,
-      settlements: [{ seatId: 'seat-1', wagered: 10, returned: 20, profit: 10 }],
+      settlements: [{ seatId: testBlackjackSeatId('seat-1'), wagered: 10, returned: 20, profit: 10 }],
     };
 
     expect(harness.applyBlackjackFor(room(), result)).toEqual([]);
@@ -198,7 +208,7 @@ describe('room authority model helpers', () => {
 
   it('withholds House Advance repayments through the authoritative settlement path', () => {
     const store = createMemoryServerDataStore();
-    const profile = store.createProfile('House Advance Player', 0).profileState.profiles[0];
+    const profile = requireProfile(store.createProfile('House Advance Player', 0).profileState.profiles, 0);
     store.acceptHouseAdvance(profile.id);
     const harness = new AuthorityHarness(store);
     const target = room({ players: new Map([[profile.id, { ...player(profile.id), bankroll: 100 }]]) });
@@ -207,7 +217,7 @@ describe('room authority model helpers', () => {
 
     expect(repayment).toBe(5);
     expect(target.players.get(profile.id)?.bankroll).toBe(145);
-    expect(store.snapshot().profileState.profiles[0]).toMatchObject({
+    expect(requireProfile(store.snapshot().profileState.profiles, 0)).toMatchObject({
       bankroll: 145,
       houseAdvance: { outstandingBalance: 95, activeCount: 1 },
       transactions: expect.arrayContaining([expect.objectContaining({ type: 'house_advance_repayment', amount: -5 })]),
@@ -216,7 +226,7 @@ describe('room authority model helpers', () => {
 
   it('records Dealer Thanks as a separate idempotent settlement without House Advance repayment', () => {
     const store = createMemoryServerDataStore();
-    const profile = store.createProfile('Dealer Thanks Player', 0).profileState.profiles[0];
+    const profile = requireProfile(store.createProfile('Dealer Thanks Player', 0).profileState.profiles, 0);
     store.acceptHouseAdvance(profile.id);
     store.setProfileBankroll(profile.id, 80);
     const harness = new AuthorityHarness(store);
@@ -251,12 +261,14 @@ describe('room authority model helpers', () => {
         }),
       ]),
     );
-    expect(store.snapshot().profileState.profiles[0]).toMatchObject({
+    expect(requireProfile(store.snapshot().profileState.profiles, 0)).toMatchObject({
       bankroll: 90,
       houseAdvance: { outstandingBalance: 100, activeCount: 1 },
       transactions: expect.arrayContaining([expect.objectContaining({ type: 'dealer_thanks', amount: 10 })]),
     });
-    expect(store.snapshot().profileState.profiles[0].transactions.some((transaction) => transaction.type === 'house_advance_repayment')).toBe(false);
+    expect(requireProfile(store.snapshot().profileState.profiles, 0).transactions.some((transaction) => transaction.type === 'house_advance_repayment')).toBe(
+      false,
+    );
     expect(harness.settleBeatFor(target, snapshot)).toEqual([]);
   });
 });

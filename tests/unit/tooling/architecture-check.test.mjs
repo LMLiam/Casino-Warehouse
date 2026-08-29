@@ -25,6 +25,13 @@ export const scoreTotal = (value: number): number => value * privateScale;
     expect(topLevelElementErrors('src/game/ignored.ts', '')).toEqual([]);
   });
 
+  it('accepts anonymous declarations and let or var declarations', () => {
+    expect(topLevelElementErrors('src/ui/Example.tsx', 'export default class {}')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'export default function () { return 1; }')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'let score = 1;')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'var score = 1;')).toEqual([]);
+  });
+
   it('rejects multiple top-level elements', () => {
     const errors = topLevelElementErrors(
       'src/game/example.ts',
