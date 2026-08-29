@@ -1,5 +1,6 @@
-import type { CasinoGameId } from '../ids';
 import { gameCatalogSchema } from '../../schemas/casinoSchemas/gameCatalogSchema';
+import { hexColourSchema } from '../../schemas/casinoSchemas/hexColourSchema';
+import { roomGameIdSchema } from '../../schemas/casinoSchemas/roomGameIdSchema';
 import type { GameCatalogEntry } from './GameCatalogEntry';
 import { slotThemes } from './slotThemes';
 
@@ -9,7 +10,7 @@ export const gameCatalog: readonly GameCatalogEntry[] = [
     title: 'Beat the House',
     kind: 'beat-the-house',
     description: 'Multi-hand Beat the House table with side bets.',
-    accent: '#ffd56b',
+    accent: hexColourSchema.parse('#ffd56b'),
     rules: [
       'Play up to three hands at once, each with independent main and side bets.',
       'A first-card black Ace wins automatically; any 2 immediately loses that hand.',
@@ -26,7 +27,7 @@ export const gameCatalog: readonly GameCatalogEntry[] = [
     title: 'Blackjack',
     kind: 'blackjack',
     description: 'Standalone Blackjack table with dealer rules.',
-    accent: '#75ff92',
+    accent: hexColourSchema.parse('#75ff92'),
     rules: [
       'Beat the dealer without going over 21.',
       'The dealer reveals the hole card after the player stands or busts.',
@@ -36,7 +37,7 @@ export const gameCatalog: readonly GameCatalogEntry[] = [
   },
   ...slotThemes.map(
     (slotTheme): GameCatalogEntry => ({
-      id: `slots:${slotTheme.id}` as CasinoGameId,
+      id: roomGameIdSchema.parse(`slots:${slotTheme.id}`),
       title: slotTheme.title,
       kind: 'slots',
       description: 'Themed slot machine with jackpots and bonus picks.',

@@ -16,10 +16,13 @@ import { handIds } from '../types/handIds';
 import type { PlayerHand } from '../types/PlayerHand';
 import type { RoundSummary } from '../types/RoundSummary';
 import type { SideBetState } from '../types/SideBetState';
+import type { SideBetType } from '../types/SideBetType';
 import type { SideStates } from '../types/SideStates';
+import { sideBetTypes } from '../types/sideBetTypes';
 import type { BeatTheHouseSaveState } from './BeatTheHouseSaveState';
 import { betTypeLabel } from './betTypeLabel';
 import type { GameOptions } from './GameOptions';
+import { resolveSideBets } from './beatTheHouseSideBetResolver';
 
 export class BeatTheHouseGame {
   private static readonly defaultInitialBankroll = 100;
@@ -35,8 +38,6 @@ export class BeatTheHouseGame {
     dealerBust: 4,
     matchPush: 9,
   } as const;
-
-  private static readonly sideBetTypes = betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[];
 
   private static readonly handName: Record<HandId, string> = {
     left: 'Left',
@@ -80,9 +81,7 @@ export class BeatTheHouseGame {
         ...this.dealer,
         cards: [...this.dealer.cards],
       },
-      sideStates: Object.fromEntries(
-        handIds.map((handId) => [handId, { ...(this.sideStates[handId] ?? BeatTheHouseGame.emptySideState()) }]),
-      ) as SideStates,
+      sideStates: BeatTheHouseGame.handRecord((handId) => ({ ...(this.sideStates[handId] ?? BeatTheHouseGame.emptySideState()) })),
       summaries: [...this.summaries],
       lastEvents,
       status: this.status,
@@ -111,9 +110,7 @@ export class BeatTheHouseGame {
     this.hands = BeatTheHouseGame.cloneHands(state.hands);
     this.dealer = { ...state.dealer, cards: [...state.dealer.cards] };
     this.activeHand = state.activeHand;
-    this.sideStates = Object.fromEntries(
-        handIds.map((handId) => [handId, { ...(state.sideStates[handId] ?? BeatTheHouseGame.emptySideState()) }]),
-      ) as SideStates;
+    this.sideStates = BeatTheHouseGame.handRecord((handId) => ({ ...(state.sideStates[handId] ?? BeatTheHouseGame.emptySideState()) }));
     this.summaries = [...state.summaries];
     this.status = state.status;
     return this.snapshot();
@@ -241,9 +238,7 @@ export class BeatTheHouseGame {
       return this.emit([{ type: 'message', message: 'Place a main bet on at least one hand.' }], 'Place a main bet on at least one hand.');
     }
 
-    const orphanedSideBet = handIds.some(
-      (handId) => this.bets[handId].main === 0 && BeatTheHouseGame.sideBetTypes.some((betType) => this.bets[handId][betType] > 0),
-    );
+    const orphanedSideBet = handIds.some((handId) => this.bets[handId].main === 0 && sideBetTypes.some((betType) => this.bets[handId][betType] > 0));
     if (orphanedSideBet) {
       return this.emit([{ type: 'message', message: 'Side bets need a main bet on the same hand.' }], 'Side bets need a main bet on the same hand.');
     }
@@ -402,24 +397,51 @@ export class BeatTheHouseGame {
     this.bankroll = Math.max(0, Math.floor(amount));
   }
 
+  private static handRecord<Value>(valueFor: (handId: HandId) => Value): Record<HandId, Value> {
+    return {
+      left: valueFor('left'),
+      centre: valueFor('centre'),
+      right: valueFor('right'),
+    };
+  }
+
+  private static betRecord<Value>(valueFor: (betType: BetType) => Value): Record<BetType, Value> {
+    return {
+      main: valueFor('main'),
+      aceFlash: valueFor('aceFlash'),
+      dealerBust: valueFor('dealerBust'),
+      matchPush: valueFor('matchPush'),
+      dealerSevens: valueFor('dealerSevens'),
+    };
+  }
+
+  private static sideBetRecord<Value>(valueFor: (betType: SideBetType) => Value): Record<SideBetType, Value> {
+    return {
+      aceFlash: valueFor('aceFlash'),
+      dealerBust: valueFor('dealerBust'),
+      matchPush: valueFor('matchPush'),
+      dealerSevens: valueFor('dealerSevens'),
+    };
+  }
+
   private static emptyBets(): Bets {
-    return Object.fromEntries(handIds.map((handId) => [handId, BeatTheHouseGame.emptyHandBets()])) as Bets;
+    return BeatTheHouseGame.handRecord(() => BeatTheHouseGame.emptyHandBets());
   }
 
   private static emptyDealerTips(): DealerTips {
-    return Object.fromEntries(handIds.map((handId) => [handId, 0])) as DealerTips;
+    return BeatTheHouseGame.handRecord(() => 0);
   }
 
   private static emptyHandBets(): Bets[HandId] {
-    return Object.fromEntries(betTypes.map((betType) => [betType, 0])) as Bets[HandId];
+    return BeatTheHouseGame.betRecord(() => 0);
   }
 
   private static emptySideState(state: SideBetState = 'idle'): SideStates[HandId] {
-    return Object.fromEntries(BeatTheHouseGame.sideBetTypes.map((betType) => [betType, state])) as SideStates[HandId];
+    return BeatTheHouseGame.sideBetRecord(() => state);
   }
 
   private static emptySideStates(state: SideBetState = 'idle'): SideStates {
-    return Object.fromEntries(handIds.map((handId) => [handId, BeatTheHouseGame.emptySideState(state)])) as SideStates;
+    return BeatTheHouseGame.handRecord(() => BeatTheHouseGame.emptySideState(state));
   }
 
   private static createHand(id: HandId): PlayerHand {
@@ -461,19 +483,19 @@ export class BeatTheHouseGame {
   }
 
   private static cloneBets(bets: Bets): Bets {
-    return Object.fromEntries(handIds.map((handId) => [handId, { ...bets[handId] }])) as Bets;
+    return BeatTheHouseGame.handRecord((handId) => ({ ...bets[handId] }));
   }
 
   private static cloneDealerTips(dealerTips: DealerTips): DealerTips {
-    return Object.fromEntries(handIds.map((handId) => [handId, Math.max(0, Math.floor(dealerTips[handId] ?? 0))])) as DealerTips;
+    return BeatTheHouseGame.handRecord((handId) => Math.max(0, Math.floor(dealerTips[handId] ?? 0)));
   }
 
   private static restoredDealerTips(state: BeatTheHouseSaveState, key: 'dealerTips' | 'dealerTipRewards'): DealerTips {
-    return ((state as BeatTheHouseSaveState & Partial<Record<typeof key, DealerTips>>)[key] ?? BeatTheHouseGame.emptyDealerTips()) as DealerTips;
+    return state[key];
   }
 
   private static cloneHands(hands: Record<HandId, PlayerHand>): Record<HandId, PlayerHand> {
-    return Object.fromEntries(handIds.map((handId) => [handId, { ...hands[handId], cards: [...hands[handId].cards] }])) as Record<HandId, PlayerHand>;
+    return BeatTheHouseGame.handRecord((handId) => ({ ...hands[handId], cards: [...hands[handId].cards] }));
   }
 
   private advanceFromPlayer(events: GameEvent[]): GameSnapshot {
@@ -574,7 +596,7 @@ export class BeatTheHouseGame {
       }
 
       this.hands[handId] = { ...hand, result: mainResult };
-      const sideResult = this.resolveSideBets(handId, mainResult);
+      const sideResult = resolveSideBets(this.bets[handId], hand, this.dealer, mainResult, BeatTheHouseGame.sideBetMultipliers);
       handReturned += sideResult.returned;
       returned += handReturned;
       sideStates[handId] = sideResult.states;
@@ -603,74 +625,12 @@ export class BeatTheHouseGame {
   }
 
   private resolveDealerThanks(): DealerTips {
-    return Object.fromEntries(
-      handIds.map((handId) => {
-        const tip = this.dealerTips[handId];
-        const reward =
-          tip > 0 && this.randomInt(BeatTheHouseGame.dealerThanksChanceDenominator) === BeatTheHouseGame.dealerThanksWinningRoll
-            ? tip * BeatTheHouseGame.dealerThanksMultiplier
-            : 0;
-        return [handId, reward];
-      }),
-    ) as DealerTips;
-  }
-
-  private resolveSideBets(handId: HandId, mainResult: RoundSummary['mainResult']) {
-    const bets = this.bets[handId];
-    const hand = this.hands[handId];
-    const playerFirst = hand.cards[0];
-    const dealerFirst = this.dealer.cards[0];
-    const wins: RoundSummary['sideWins'] = [];
-    const states = Object.fromEntries(BeatTheHouseGame.sideBetTypes.map((betType) => [betType, bets[betType] > 0 ? 'lose' : 'idle'])) as SideStates[HandId];
-    let returned = 0;
-
-    const win = (betType: Exclude<BetType, 'main'>, label: string, multiplier: number) => {
-      const stake = bets[betType];
-      if (stake <= 0) {
-        return;
-      }
-
-      const { profit, returned: amountReturned } = BeatTheHouseGame.wholeChipPayout(stake, multiplier);
-      states[betType] = 'win';
-      returned += amountReturned;
-      wins.push({ betType, label, profit, returned: amountReturned });
-    };
-
-    if (bets.aceFlash > 0) {
-      const playerAce = isBlackAce(playerFirst);
-      const dealerAce = isBlackAce(dealerFirst);
-      if (playerAce && dealerAce) {
-        win('aceFlash', 'Ace Flash', BeatTheHouseGame.sideBetMultipliers.aceFlashBoth);
-      } else if (playerAce || dealerAce) {
-        win('aceFlash', 'Ace Flash', BeatTheHouseGame.sideBetMultipliers.aceFlashSingle);
-      }
-    }
-
-    if (bets.dealerBust > 0 && this.dealer.bust) {
-      win('dealerBust', 'Dealer Bust', BeatTheHouseGame.sideBetMultipliers.dealerBust);
-    }
-
-    if (
-      bets.matchPush > 0 &&
-      mainResult !== 'lose' &&
-      !this.dealer.bust &&
-      !this.dealer.blackAce &&
-      hand.finalCard &&
-      this.dealer.finalCard &&
-      rankValue(hand.finalCard.rank) === rankValue(this.dealer.finalCard.rank)
-    ) {
-      win('matchPush', 'Match Push', BeatTheHouseGame.sideBetMultipliers.matchPush);
-    }
-
-    if (bets.dealerSevens > 0) {
-      const sevenCount = this.dealer.cards.filter((card) => card.rank === '7').length;
-      const multiplier = { 1: 3, 2: 18, 3: 150, 4: 1000 }[sevenCount] ?? 0;
-      if (multiplier > 0) {
-        win('dealerSevens', `Dealer Sevens (${sevenCount})`, multiplier);
-      }
-    }
-
-    return { returned, states, wins };
+    return BeatTheHouseGame.handRecord((handId) => {
+      const tip = this.dealerTips[handId];
+      return tip > 0 && this.randomInt(BeatTheHouseGame.dealerThanksChanceDenominator) === BeatTheHouseGame.dealerThanksWinningRoll
+        ? tip * BeatTheHouseGame.dealerThanksMultiplier
+        : 0;
+    });
   }
 
   private emit(events: GameEvent[], status: string): GameSnapshot {
@@ -698,10 +658,7 @@ export class BeatTheHouseGame {
   }
 
   private rebetAmounts(): Record<HandId, number> {
-    return Object.fromEntries(handIds.map((handId) => [handId, this.lastBets ? BeatTheHouseGame.handStake(this.lastBets, handId) : 0])) as Record<
-      HandId,
-      number
-    >;
+    return BeatTheHouseGame.handRecord((handId) => (this.lastBets ? BeatTheHouseGame.handStake(this.lastBets, handId) : 0));
   }
 
   private static wholeChipPayout(stake: number, multiplier: number): { readonly profit: number; readonly returned: number } {

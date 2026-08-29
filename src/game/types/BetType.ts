@@ -1,3 +1,4 @@
-import { betTypes } from './betTypes';
+import type { z } from 'zod';
+import { betTypeSchema } from '../../schemas/casinoSchemas/betTypeSchema';
 
-export type BetType = (typeof betTypes)[number];
+export type BetType = z.infer<typeof betTypeSchema>;

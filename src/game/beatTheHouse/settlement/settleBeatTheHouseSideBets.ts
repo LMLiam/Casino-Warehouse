@@ -9,6 +9,7 @@ import { wholeChipToHalfUnits } from '../wholeChipToHalfUnits';
 import type { BeatTheHouseSideSettlement } from './BeatTheHouseSideSettlement';
 import type { BeatTheHouseSideSettlementInput } from './BeatTheHouseSideSettlementInput';
 import type { BeatTheHouseSideWin } from './BeatTheHouseSideWin';
+import { sideBetTypes } from '../../types/sideBetTypes';
 
 export const settleBeatTheHouseSideBets = (input: BeatTheHouseSideSettlementInput): BeatTheHouseSideSettlement => {
   const dealerFirstCard = input.dealer.cards[0];
@@ -26,7 +27,6 @@ export const settleBeatTheHouseSideBets = (input: BeatTheHouseSideSettlementInpu
     throw new Error('Beat the House side settlement state is invalid.');
   }
 
-  const sideBetTypes = ['aceFlash', 'dealerBust', 'matchPush', 'dealerSevens'] as const;
   const stakeHalfUnits = asNonNegativeHalfUnits(sideBetTypes.reduce((total, betType) => total + wholeChipToHalfUnits(input.sideBets[betType]), 0));
   const wins: BeatTheHouseSideWin[] = [];
   const addWin = (betType: BeatTheHouseSideWin['betType'], multiplier: number): void => {

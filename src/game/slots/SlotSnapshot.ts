@@ -1,9 +1,10 @@
 import type { JackpotWin } from './JackpotWin';
+import type { SlotThemeId } from '../../schemas/casinoSchemas/SlotThemeId';
 import type { SlotPhase } from './SlotPhase';
 import type { SlotSymbol } from './SlotSymbol';
 
 export interface SlotSnapshot {
-  readonly themeId: string;
+  readonly themeId: SlotThemeId;
   readonly themeTitle: string;
   readonly phase: SlotPhase;
   readonly wager: number;

@@ -1,1 +1,4 @@
-export type BlackjackSeatPhase = 'empty' | 'betting' | 'player' | 'stood' | 'settled';
+import type { z } from 'zod';
+import { blackjackSeatPhaseSchema } from '../../schemas/casinoSchemas/blackjackSeatPhaseSchema';
+
+export type BlackjackSeatPhase = z.infer<typeof blackjackSeatPhaseSchema>;

@@ -3,6 +3,7 @@ import { createDeck } from '../cards/createDeck';
 import type { Rng } from '../rng/Rng';
 import { bestTotal } from '../blackjack/bestTotal';
 import type { BlackjackResult } from '../blackjack/BlackjackResult';
+import type { BlackjackSeatId } from '../../schemas/casinoSchemas/BlackjackSeatId';
 import { dealerMustHit } from '../blackjack/dealerMustHit';
 import { handText } from '../blackjack/handText';
 import { isBlackjack } from '../blackjack/isBlackjack';
@@ -23,9 +24,9 @@ export class BlackjackTable {
   private deck: Card[] = [];
   private dealerCards: Card[] = [];
   private dealerHoleHidden = false;
-  private activeSeatId?: string | undefined;
+  private activeSeatId?: BlackjackSeatId | undefined;
   private phase: BlackjackTablePhase = 'betting';
-  private readonly seats = new Map<string, BlackjackSeatState>();
+  private readonly seats = new Map<BlackjackSeatId, BlackjackSeatState>();
 
   private readonly rng?: Rng | undefined;
   private readonly deckOverride?: readonly Card[] | undefined;
@@ -79,7 +80,7 @@ export class BlackjackTable {
     return { snapshot: this.snapshot(occupants), debit: 0, settlements: [] };
   }
 
-  public deal(seatId: string, wager: number, occupants: readonly BlackjackTableOccupant[]): BlackjackTableActionResult {
+  public deal(seatId: BlackjackSeatId, wager: number, occupants: readonly BlackjackTableOccupant[]): BlackjackTableActionResult {
     if (this.phase === 'settled') {
       return { snapshot: this.snapshot(occupants), debit: 0, settlements: [], error: 'Start a new Blackjack table before dealing again.' };
     }
@@ -116,7 +117,7 @@ export class BlackjackTable {
 
   public act(
     action: 'hit' | 'stand' | 'double' | 'split' | 'insurance' | 'new-hand',
-    seatId: string,
+    seatId: BlackjackSeatId,
     occupants: readonly BlackjackTableOccupant[],
   ): BlackjackTableActionResult {
     if (action === 'new-hand') {
@@ -257,7 +258,7 @@ export class BlackjackTable {
     return this.playDealerAndSettle(occupiedSeatIds);
   }
 
-  private playDealerAndSettle(occupiedSeatIds: readonly string[]): readonly BlackjackTableSettlement[] {
+  private playDealerAndSettle(occupiedSeatIds: readonly BlackjackSeatId[]): readonly BlackjackTableSettlement[] {
     this.dealerHoleHidden = false;
     while (dealerMustHit(this.dealerCards)) {
       this.dealerCards = [...this.dealerCards, this.draw()];
@@ -275,7 +276,7 @@ export class BlackjackTable {
     return settlements;
   }
 
-  private resolveSeatAgainstDealer(seatId: string, seat: BlackjackSeatState): BlackjackTableSettlement {
+  private resolveSeatAgainstDealer(seatId: BlackjackSeatId, seat: BlackjackSeatState): BlackjackTableSettlement {
     const dealerTotal = bestTotal(this.dealerCards);
     if (seat.splitHands.length > 0) {
       const returned = seat.splitHands.reduce((sum, hand) => sum + BlackjackTable.settleHandReturn(hand, dealerTotal, seat.wager / 2), 0);
@@ -295,7 +296,7 @@ export class BlackjackTable {
     return this.settleSeat(seatId, seat, 'lose', 0, `Dealer ${dealerTotal} beats ${playerTotal}.`);
   }
 
-  private settleSeat(seatId: string, seat: BlackjackSeatState, result: BlackjackResult, returned: number, status: string): BlackjackTableSettlement {
+  private settleSeat(seatId: BlackjackSeatId, seat: BlackjackSeatState, result: BlackjackResult, returned: number, status: string): BlackjackTableSettlement {
     seat.phase = 'settled';
     seat.result = result;
     seat.returned = Math.floor(returned);

@@ -1,10 +1,12 @@
 import type { Card } from '../cards/Card';
 import type { BlackjackResult } from '../blackjack/BlackjackResult';
+import type { BlackjackSeatId } from '../../schemas/casinoSchemas/BlackjackSeatId';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { BlackjackSeatPhase } from './BlackjackSeatPhase';
 
 export interface BlackjackTableSeatSnapshot {
-  readonly seatId: string;
-  readonly profileId?: string | undefined;
+  readonly seatId: BlackjackSeatId;
+  readonly profileId?: ProfileId | undefined;
   readonly profileName?: string | undefined;
   readonly bankroll?: number | undefined;
   readonly phase: BlackjackSeatPhase;
