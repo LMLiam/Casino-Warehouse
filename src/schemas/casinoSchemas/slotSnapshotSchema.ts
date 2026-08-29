@@ -1,13 +1,15 @@
 import { z } from 'zod';
 import type { SlotSnapshot } from '../../game/slots/SlotSnapshot';
+import { slotPhaseSchema } from './slotPhaseSchema';
 import { jackpotTierSchema } from './jackpotTierSchema';
 import { slotSymbolSchema } from './slotSymbolSchema';
+import { slotThemeIdSchema } from './slotThemeIdSchema';
 
 export const slotSnapshotSchema = z
   .object({
-    themeId: z.string(),
+    themeId: slotThemeIdSchema,
     themeTitle: z.string(),
-    phase: z.enum(['idle', 'spun', 'bonus']),
+    phase: slotPhaseSchema,
     wager: z.number().finite(),
     columns: z.number().int().positive(),
     rows: z.number().int().positive(),

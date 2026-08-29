@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ProfileStats } from '../../state/profiles/ProfileStats';
 import { creditSchema } from './creditSchema';
+import { roomGameIdSchema } from './roomGameIdSchema';
 
 export const profileStatsSchema = z
   .object({
@@ -10,8 +11,8 @@ export const profileStatsSchema = z
     biggestWin: creditSchema,
     biggestWager: creditSchema,
     gamesPlayed: creditSchema,
-    perGame: z.record(
-      z.string(),
+    perGame: z.partialRecord(
+      roomGameIdSchema,
       z
         .object({
           gamesPlayed: creditSchema,
@@ -21,6 +22,6 @@ export const profileStatsSchema = z
         })
         .strict(),
     ),
-    favouriteGame: z.string().optional(),
+    favouriteGame: roomGameIdSchema.optional(),
   })
   .strict() satisfies z.ZodType<ProfileStats>;

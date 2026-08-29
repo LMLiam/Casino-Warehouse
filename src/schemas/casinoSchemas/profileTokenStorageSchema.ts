@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { profileIdSchema } from './profileIdSchema';
+import { profileTokenSchema } from './profileTokenSchema';
 
 export const profileTokenStorageSchema = z.array(
   z
     .object({
-      profileId: z.string().min(1),
-      profileToken: z.string().min(1),
+      profileId: profileIdSchema,
+      profileToken: profileTokenSchema,
     })
     .strict(),
 );
