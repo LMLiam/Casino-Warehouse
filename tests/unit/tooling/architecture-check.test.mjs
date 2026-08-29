@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { magicNumberErrors } from '../../../scripts/magic-number-check.mjs';
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
+import { zodObjectErrors } from '../../../scripts/zod-object-check.mjs';
 
 describe('topLevelElementErrors', () => {
   it('rejects a file with one exported top-level element and a private helper', () => {
@@ -172,5 +173,44 @@ export function timeoutMs(seconds) {
     ).toEqual([
       'scripts/example.mjs:3:20 uses unexplained numeric literal 1000. Name the value with a domain constant/config/fixture, or add "casino-magic-number-allow: <reason>" for an intentional inline exception.',
     ]);
+  });
+});
+
+describe('zodObjectErrors', () => {
+  it('rejects z.object calls without a strict chain', () => {
+    expect(zodObjectErrors('src/schemas/example.ts', 'const schema = z.object({ value: z.string() });')).toEqual([
+      'src/schemas/example.ts:1:16 calls z.object without .strict(). Add .strict() to reject unrecognised keys.',
+    ]);
+  });
+
+  it('accepts multiline strict chains and ignores unrelated object text', () => {
+    expect(
+      zodObjectErrors(
+        'src/schemas/example.ts',
+        `
+const plainObject = { value: 'text' };
+const schema = z
+  .object({ value: z.string() })
+  .strict()
+  .optional();
+`,
+      ),
+    ).toEqual([]);
+  });
+
+  it('checks TSX files and rejects incomplete strict chains', () => {
+    expect(zodObjectErrors('scripts/example.mjs', 'z.object({ value: 1 });')).toEqual([]);
+    expect(
+      zodObjectErrors(
+        'tests/unit/tooling/example.tsx',
+        `
+const plain = object({ value: 'text' });
+const other = otherNamespace.object({ value: 'text' });
+const extended = z.object({ value: z.string() }).extend({ label: z.string() });
+const property = z.object({ value: z.string() }).strict;
+const chainedProperty = z.object({ value: z.string() }).strict.call(null);
+`,
+      ),
+    ).toHaveLength(3);
   });
 });

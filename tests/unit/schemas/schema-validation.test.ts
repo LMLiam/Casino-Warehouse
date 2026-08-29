@@ -9,6 +9,7 @@ import { profileNameSchema } from '../../../src/schemas/casinoSchemas/profileNam
 import { roomNameSchema } from '../../../src/schemas/casinoSchemas/roomNameSchema';
 import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
 import { transactionTypeSchema } from '../../../src/schemas/casinoSchemas/transactionTypeSchema';
+import { audioSettingsSchema } from '../../../src/schemas/casinoSchemas/audioSettingsSchema';
 import { zodErrorSummary } from '../../../src/schemas/casinoSchemas/zodErrorSummary';
 import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
@@ -128,6 +129,7 @@ describe('Zod-backed runtime validation', () => {
 
   it('validates settings and game/slot configuration at runtime boundaries', () => {
     expect(sanitizeAudioSettings({ masterVolume: 99, musicVolume: 0.4 }).masterVolume).toBe(1);
+    expect(audioSettingsSchema.safeParse({ unexpected: true }).success).toBe(false);
     expect(gameCatalogSchema.parse(gameCatalog)).toHaveLength(gameCatalog.length);
     expect(() => slotThemeSchema.parse({ id: 'bad', title: 'Bad', accent: 'purple', reelStrip: [], payouts: {}, jackpots: {}, bonus: {} })).toThrow();
   });

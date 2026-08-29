@@ -3,6 +3,7 @@ import { dirname, extname, join, normalize, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url';
 import { magicNumberErrors } from './magic-number-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
+import { zodObjectErrors } from './zod-object-check.mjs';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
 const sourceRoot = join(workspaceRoot, 'src');
@@ -13,6 +14,7 @@ const sourceFiles = listFiles(sourceRoot).filter((file) => ['.ts', '.tsx'].inclu
 const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const scriptFiles = listFiles(scriptRoot).filter((file) => extname(file) === '.mjs');
 const magicNumberFiles = [...sourceFiles, ...testFiles, ...scriptFiles];
+const zodObjectFiles = [...sourceFiles, ...testFiles];
 const relativeSourceFiles = new Set(sourceFiles.map(toWorkspacePath));
 const errors = [];
 const appModuleFolders = new Set(['actions', 'dom', 'format', 'input', 'rooms', 'shell', 'state', 'views']);
@@ -36,6 +38,7 @@ function main() {
 
   checkTestFolderLayout();
   checkMagicNumbers();
+  checkZodObjects();
   checkCycles();
 
   if (errors.length > 0) {
@@ -151,6 +154,12 @@ function checkBrandedIds(relativePath, source) {
 function checkMagicNumbers() {
   for (const file of magicNumberFiles) {
     errors.push(...magicNumberErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
+  }
+}
+
+function checkZodObjects() {
+  for (const file of zodObjectFiles) {
+    errors.push(...zodObjectErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
   }
 }
 

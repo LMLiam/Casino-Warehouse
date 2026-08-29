@@ -33,7 +33,7 @@ import type { RoomState } from './roomAuthorityModel/RoomState';
 import { roomStatus } from './roomAuthorityModel/roomStatus';
 import { beatNextRoundTimeoutMs } from './roomLimits/beatNextRoundTimeoutMs';
 import { safeBankroll } from './roomAuthorityModel/safeBankroll';
-import { timeoutWithUnrefSchema } from './roomAuthorityModel/timeoutWithUnrefSchema';
+import { unrefFunctionSchema } from './roomAuthorityModel/unrefFunctionSchema';
 import { totalBeatStake } from './roomAuthorityModel/totalBeatStake';
 
 export abstract class RoomAuthorityBase {
@@ -563,8 +563,8 @@ export abstract class RoomAuthorityBase {
         this.asyncResultHandler?.(result);
       }
     }, timeoutMs);
-    const parsedTimer = timeoutWithUnrefSchema.safeParse(timer);
-    if (parsedTimer.success) {
+    const parsedUnrefFunction = unrefFunctionSchema.safeParse(timer.unref);
+    if (parsedUnrefFunction.success) {
       timer.unref();
     }
     room.model.nextRoundTimer = timer;
