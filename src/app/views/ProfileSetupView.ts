@@ -1,5 +1,7 @@
 import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
 import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
@@ -20,9 +22,9 @@ export class ProfileSetupView {
   public render(
     profileState: CasinoSaveState,
     lastSaveError: string,
-    ownedProfileIds: ReadonlySet<string>,
-    onRename: (profileId: string, nextName: string) => void,
-    onDelete: (profileId: string) => void,
+    ownedProfileIds: ReadonlySet<ProfileId>,
+    onRename: (profileId: ProfileId, nextName: string) => void,
+    onDelete: (profileId: ProfileId) => void,
   ): void {
     this.rememberCheckedProfiles();
     this.pruneDeletedSelections(profileState);
@@ -43,10 +45,11 @@ export class ProfileSetupView {
 
     this.elements.profileList.querySelectorAll<HTMLButtonElement>('[data-profile-action]').forEach((button) => {
       button.addEventListener('click', () => {
-        const profileId = button.dataset.profileId;
-        if (!profileId) {
+        const parsedProfileId = profileIdSchema.safeParse(button.dataset.profileId ?? '');
+        if (!parsedProfileId.success) {
           return;
         }
+        const profileId = parsedProfileId.data;
         if (button.dataset.profileAction === 'rename') {
           this.pendingRenameProfileId = profileId;
           this.pendingDeleteProfileId = '';
@@ -87,7 +90,10 @@ export class ProfileSetupView {
           const nextName = input.value.trim();
           if (nextName) {
             this.pendingRenameProfileId = '';
-            onRename(input.dataset.profileRenameInput ?? '', nextName);
+            const parsedProfileId = profileIdSchema.safeParse(input.dataset.profileRenameInput ?? '');
+            if (parsedProfileId.success) {
+              onRename(parsedProfileId.data, nextName);
+            }
           }
         }
       });
@@ -145,18 +151,20 @@ export class ProfileSetupView {
 
   private pruneDeletedSelections(profileState: CasinoSaveState): void {
     const currentProfileIds = new Set(profileState.profiles.map((profile) => profile.id));
-    if (this.selectedProfileId && !currentProfileIds.has(this.selectedProfileId)) {
+    const selectedProfileId = profileIdSchema.safeParse(this.selectedProfileId);
+    if (selectedProfileId.success && !currentProfileIds.has(selectedProfileId.data)) {
       this.selectedProfileId = '';
     }
   }
 
-  private pruneUnownedSelection(ownedProfileIds: ReadonlySet<string>): void {
-    if (this.selectedProfileId && !ownedProfileIds.has(this.selectedProfileId)) {
+  private pruneUnownedSelection(ownedProfileIds: ReadonlySet<ProfileId>): void {
+    const selectedProfileId = profileIdSchema.safeParse(this.selectedProfileId);
+    if (selectedProfileId.success && !ownedProfileIds.has(selectedProfileId.data)) {
       this.selectedProfileId = '';
     }
   }
 
-  private selectFirstOwnedProfile(profileState: CasinoSaveState, ownedProfileIds: ReadonlySet<string>): void {
+  private selectFirstOwnedProfile(profileState: CasinoSaveState, ownedProfileIds: ReadonlySet<ProfileId>): void {
     if (this.selectedProfileId) {
       return;
     }

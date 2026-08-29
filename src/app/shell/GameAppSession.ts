@@ -1,5 +1,9 @@
 import { findGame } from '../../game/catalog/findGame';
 import { findSlotTheme } from '../../game/catalog/findSlotTheme';
+import { createIsoTimestamp } from '../../schemas/casinoSchemas/createIsoTimestamp';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import { roomIdSchema } from '../../schemas/casinoSchemas/roomIdSchema';
 import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
 import type { ServerDataState } from '../../multiplayer/client/ServerDataState';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
@@ -22,7 +26,7 @@ export abstract class GameAppSession extends GameAppRendering {
   protected abstract returnHomeOnServerResync: boolean;
   protected abstract restoringRoomAfterReconnect: boolean;
   protected abstract pendingRoomRestore: CasinoSessionRoomState | undefined;
-  protected abstract pendingInviteRoomCode: string;
+  protected abstract pendingInviteRoomCode: RoomId | '';
   protected abstract pendingInviteServerUrl: string;
   protected abstract pendingInviteAttempted: boolean;
   protected abstract realtimeUrlError: string;
@@ -169,7 +173,8 @@ export abstract class GameAppSession extends GameAppRendering {
     this.realtimeUrl = inviteUrl.url ?? (this.realtimeUrlError ? '' : defaultRealtimeUrl());
     this.pendingInviteServerUrl = this.realtimeUrl;
     const params = new URLSearchParams(window.location.search);
-    const roomId = params.get('room')?.trim().toUpperCase() ?? '';
+    const parsedRoomId = roomIdSchema.safeParse(params.get('room')?.trim() ?? '');
+    const roomId = parsedRoomId.success ? parsedRoomId.data : '';
     const gameId = parseGameId(params.get('game')?.trim());
     if (!roomId) {
       if (this.realtimeUrlError) {
@@ -197,7 +202,10 @@ export abstract class GameAppSession extends GameAppRendering {
     this.showingGameLobby = false;
     this.renderCasino();
     this.realtimeUrl = this.pendingInviteServerUrl || this.realtimeUrl || defaultRealtimeUrl();
-    this.joinMultiplayerRoom(this.pendingInviteRoomCode, 'player');
+    const roomId = this.pendingInviteRoomCode;
+    if (roomId) {
+      this.joinMultiplayerRoom(roomId, 'player');
+    }
   }
 
   protected syncCurrentRoomBankroll(room: RoomSnapshot): void {
@@ -213,7 +221,7 @@ export abstract class GameAppSession extends GameAppRendering {
     }
   }
 
-  protected syncProfileBankroll(profileId: string, bankroll: number): void {
+  protected syncProfileBankroll(profileId: ProfileId, bankroll: number): void {
     const profile = this.profileState.profiles.find((candidate) => candidate.id === profileId);
     const nextBankroll = Math.max(0, Math.floor(bankroll));
     if (this.player?.profileId === profileId) {
@@ -226,7 +234,7 @@ export abstract class GameAppSession extends GameAppRendering {
     this.profileState = {
       ...this.profileState,
       profiles: this.profileState.profiles.map((candidate) =>
-        candidate.id === profile.id ? { ...profile, bankroll: nextBankroll, updatedAt: new Date().toISOString() } : candidate,
+        candidate.id === profile.id ? { ...profile, bankroll: nextBankroll, updatedAt: createIsoTimestamp(new Date()) } : candidate,
       ),
     };
     this.saveSession();
@@ -234,7 +242,7 @@ export abstract class GameAppSession extends GameAppRendering {
 
   protected currentSlots(): SlotsGame {
     const theme = findSlotTheme(this.activeGame);
-    return this.currentPlayer?.slots[theme.id] ?? new SlotsGame({ theme });
+    return this.currentPlayer?.slots.get(theme.id) ?? new SlotsGame({ theme });
   }
 
   protected saveSession(): void {
@@ -254,7 +262,7 @@ export abstract class GameAppSession extends GameAppRendering {
           gameSnapshot: {
             blackjack: player.blackjack.snapshot(),
             beatTheHouse: player.beatTheHouse.saveState(),
-            slots: Object.fromEntries(Object.entries(player.slots).map(([themeId, slots]) => [themeId, slots.snapshot()])),
+            slots: Object.fromEntries([...player.slots.entries()].map(([themeId, slots]) => [themeId, slots.snapshot()])),
           },
         }),
       );

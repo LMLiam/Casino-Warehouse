@@ -14,10 +14,13 @@ import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
 import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import type { SessionId } from '../../schemas/casinoSchemas/SessionId';
 import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
 import { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
 import type { RealtimeConnectionState } from '../../multiplayer/client/RealtimeConnectionState';
-import type { RoomGameId } from '../../multiplayer/protocol/RoomGameId';
 import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
 import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
 import type { RoomSettlement } from '../../multiplayer/protocol/RoomSettlement';
@@ -77,10 +80,10 @@ export class GameApp extends GameAppSession {
   protected player: CasinoPlayer | undefined;
   private readonly beatSettlementMetadata = new BeatSettlementMetadataCache();
   protected profileState: CasinoSaveState = { profiles: [] };
-  protected readonly ownedProfileIds = new Set<string>();
+  protected readonly ownedProfileIds = new Set<ProfileId>();
   protected profileAccessReceived = false;
   protected lastSaveError = '';
-  protected pendingInviteRoomCode = '';
+  protected pendingInviteRoomCode: RoomId | '' = '';
   protected pendingInviteServerUrl = '';
   protected pendingInviteAttempted = false;
   protected multiplayerRooms: readonly RoomSummary[] = [];
@@ -316,7 +319,7 @@ export class GameApp extends GameAppSession {
     if (!this.canUseServer()) {
       return;
     }
-    const gameId = this.activeGame as RoomGameId;
+    const gameId = this.activeGame;
     const roomName = this.elements.roomNameInput.value.trim() || `${findGame(gameId).title} Room`;
     const maxPlayers = normalizeRoomMaxPlayers(gameId, readCreditInput(this.elements.roomMaxPlayersInput, defaultRoomMaxPlayers(gameId)));
     this.elements.roomMaxPlayersInput.value = String(maxPlayers);
@@ -324,7 +327,7 @@ export class GameApp extends GameAppSession {
     this.multiplayer.createRoom(gameId, roomName, maxPlayers, profile.id, profile.name, profile.bankroll);
   }
 
-  protected joinMultiplayerRoom(roomId: string, role: RoomRole = 'player'): void {
+  protected joinMultiplayerRoom(roomId: RoomId, role: RoomRole = 'player'): void {
     const profile = this.currentProfile();
     if (!profile || !roomId) {
       this.elements.roomStatus.textContent = 'Select a profile and choose a room first.';
@@ -333,9 +336,9 @@ export class GameApp extends GameAppSession {
     if (!this.canUseServer()) {
       return;
     }
-    const gameId = this.activeGame as RoomGameId;
+    const gameId = this.activeGame;
     this.ensureRealtimeConnected();
-    this.multiplayer.joinRoom(gameId, roomId.toUpperCase(), role, profile.id, profile.name, profile.bankroll);
+    this.multiplayer.joinRoom(gameId, roomId, role, profile.id, profile.name, profile.bankroll);
   }
 
   protected claimRoomSeat(seatId: RoomSeatId): void {
@@ -405,7 +408,7 @@ export class GameApp extends GameAppSession {
       return;
     }
     this.ensureRealtimeConnected();
-    this.multiplayer.listRooms(this.activeGame as RoomGameId);
+    this.multiplayer.listRooms(this.activeGame);
   }
 
   private ensureRealtimeConnected(): void {
@@ -431,11 +434,11 @@ export class GameApp extends GameAppSession {
     this.refreshMultiplayerRooms();
   }
 
-  protected beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: string | undefined): readonly PixiTableSettlementMetadata[] {
+  protected beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: ProfileId | undefined): readonly PixiTableSettlementMetadata[] {
     return this.beatSettlementMetadata.get(room, profileId);
   }
 
-  private applyRoomSettlements(settlements: readonly RoomSettlement[], roomId: string, sessionId: string): void {
+  private applyRoomSettlements(settlements: readonly RoomSettlement[], roomId: RoomId, sessionId: SessionId): void {
     const profileId = this.currentPlayer?.profileId;
     if (!profileId) {
       return;
@@ -465,9 +468,9 @@ export class GameApp extends GameAppSession {
       return;
     }
 
-    const selectedId = this.elements.profileList.querySelector<HTMLInputElement>('[data-profile-select]:checked')?.value ?? '';
+    const selectedId = profileIdSchema.safeParse(this.elements.profileList.querySelector<HTMLInputElement>('[data-profile-select]:checked')?.value ?? '');
     const ownedIds = this.profileState.profiles.filter((profile) => this.ownedProfileIds.has(profile.id)).map((profile) => profile.id);
-    const profileId = selectedId ? (this.ownedProfileIds.has(selectedId) ? selectedId : '') : (ownedIds[0] ?? '');
+    const profileId = selectedId.success && this.ownedProfileIds.has(selectedId.data) ? selectedId.data : ownedIds[0];
     const profile = profileId ? this.profileState.profiles.find((candidate) => candidate.id === profileId) : undefined;
     if (!profile) {
       this.lastSaveError = 'Create or unlock a profile in this browser before starting a session.';
@@ -629,7 +632,7 @@ export class GameApp extends GameAppSession {
     this.renderProfileSetup();
   }
 
-  private applyProfileAccess(ownedProfileIds: readonly string[]): void {
+  private applyProfileAccess(ownedProfileIds: readonly ProfileId[]): void {
     this.profileAccessReceived = true;
     this.ownedProfileIds.clear();
     ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));

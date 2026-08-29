@@ -1,6 +1,8 @@
 import type { BeatTheHouseChipTarget } from '../../game/types/BeatTheHouseChipTarget';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { HandId } from '../../game/types/HandId';
+import { handIdSchema } from '../../schemas/casinoSchemas/handIdSchema';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import { handLayouts } from '../../ui/layout/handLayouts';
 import { tableSize } from '../../ui/layout/tableSize';
@@ -74,7 +76,7 @@ export class BeatControlsView {
     onConfirmedStartRound: () => void,
     controlsAvailable = true,
     activeRoom?: RoomSnapshot,
-    profileId?: string,
+    profileId?: ProfileId,
     bankroll?: number,
   ): void {
     const wageredOnTable = totalOnTable(snapshot);
@@ -178,9 +180,10 @@ export class BeatControlsView {
     return this.totalHandBet(snapshot.bets[handId]) + snapshot.dealerTips[handId];
   }
 
-  private activeHandId(room: RoomSnapshot, profileId: string | undefined): keyof GameSnapshot['bets'] | undefined {
+  private activeHandId(room: RoomSnapshot, profileId: ProfileId | undefined): keyof GameSnapshot['bets'] | undefined {
     const seatId = room.seats.find((seat) => seat.profileId === profileId)?.seatId;
-    return seatId === 'left' || seatId === 'centre' || seatId === 'right' ? seatId : undefined;
+    const parsed = handIdSchema.safeParse(seatId);
+    return parsed.success ? parsed.data : undefined;
   }
 
   private canRebet(

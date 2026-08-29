@@ -18,7 +18,7 @@ export const createPlayerFromProfile = (profile: CasinoProfile, snapshots?: Play
     blackjack.restore(snapshots.blackjack);
   }
 
-  const slots = Object.fromEntries(
+  const slots = new Map(
     slotThemes.map((theme) => {
       const game = new SlotsGame({ theme });
       const snapshot = snapshots?.slots?.[theme.id];
@@ -27,7 +27,7 @@ export const createPlayerFromProfile = (profile: CasinoProfile, snapshots?: Play
       }
       return [theme.id, game];
     }),
-  ) as Readonly<Record<string, SlotsGame>>;
+  );
 
   return {
     profileId: profile.id,

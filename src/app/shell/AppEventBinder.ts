@@ -1,4 +1,4 @@
-import type { CasinoGameId } from '../../game/ids';
+import { roomGameIdSchema } from '../../schemas/casinoSchemas/roomGameIdSchema';
 import type { AppElements } from '../dom/appElements/AppElements';
 import type { AppEventCallbacks } from './AppEventCallbacks';
 
@@ -63,7 +63,10 @@ export class AppEventBinder {
   private bindGameTabs(): void {
     this.elements.gameTabs.forEach((button) => {
       button.addEventListener('click', () => {
-        this.callbacks.openRoomLobby(button.dataset.game as CasinoGameId);
+        const gameId = roomGameIdSchema.safeParse(button.dataset.game);
+        if (gameId.success) {
+          this.callbacks.openRoomLobby(gameId.data);
+        }
       });
     });
   }

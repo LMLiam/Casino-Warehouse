@@ -1,6 +1,8 @@
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { HandId } from '../../game/types/HandId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import { handIdSchema } from '../../schemas/casinoSchemas/handIdSchema';
 import { escapeHtml } from '../../shared/html';
 import { handLayouts } from '../../ui/layout/handLayouts';
 import { tableSize } from '../../ui/layout/tableSize';
@@ -17,7 +19,7 @@ export class BeatSeatStatusView {
     this.elements.beatSeatStatus.innerHTML = '';
   }
 
-  public render(snapshot: GameSnapshot, room: RoomSnapshot | undefined, profileId: string, onClaimSeat?: (seatId: HandId) => void): void {
+  public render(snapshot: GameSnapshot, room: RoomSnapshot | undefined, profileId: ProfileId, onClaimSeat?: (seatId: HandId) => void): void {
     this.layout();
     if (!room || room.gameId !== 'beat-the-house') {
       this.clear();
@@ -57,8 +59,7 @@ export class BeatSeatStatusView {
           : 'Open';
         const mine = owner?.profileId === profileId ? ' mine' : '';
         const occupied = owner ? ' occupied' : '';
-        const tipped =
-          snapshot.phase !== 'betting' && snapshot.phase !== 'roundOver' && (snapshot.dealerTips[hand.id] ?? 0) > 0 ? ' dealer-tipped' : '';
+        const tipped = snapshot.phase !== 'betting' && snapshot.phase !== 'roundOver' && (snapshot.dealerTips[hand.id] ?? 0) > 0 ? ' dealer-tipped' : '';
         const sessionDelta = owner ? owner.bankroll - owner.sessionStartBankroll : 0;
         const deltaClass = sessionDelta > 0 ? ' gain' : sessionDelta < 0 ? ' loss' : '';
         const deltaText = sessionDelta === 0 ? 'even' : `${sessionDelta > 0 ? '+' : '-'}${money(Math.abs(sessionDelta))}`;
@@ -87,7 +88,12 @@ export class BeatSeatStatusView {
       })
       .join('');
     this.elements.beatSeatStatus.querySelectorAll<HTMLButtonElement>('[data-claim-seat]').forEach((button) => {
-      button.addEventListener('click', () => onClaimSeat?.(button.dataset.claimSeat as HandId));
+      button.addEventListener('click', () => {
+        const seatId = handIdSchema.safeParse(button.dataset.claimSeat);
+        if (seatId.success) {
+          onClaimSeat?.(seatId.data);
+        }
+      });
     });
   }
 

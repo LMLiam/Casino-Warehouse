@@ -4,6 +4,7 @@ import type { CasinoGameId } from '../../game/ids';
 import type { SlotSnapshot } from '../../game/slots/SlotSnapshot';
 import { symbolLabel } from '../../game/slots/symbolLabel';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
@@ -28,7 +29,7 @@ export class SlotsView {
     }, SlotsView.spinAnimationMs);
   }
 
-  public render(snapshot: SlotSnapshot, activeGame: CasinoGameId, activeRoom?: RoomSnapshot, profileId = ''): void {
+  public render(snapshot: SlotSnapshot, activeGame: CasinoGameId, activeRoom?: RoomSnapshot, profileId?: ProfileId): void {
     this.elements.slotsTitle.textContent = snapshot.themeTitle;
     this.elements.slotsView.classList.toggle('slot-win', snapshot.returned > 0);
     this.elements.slotsView.classList.toggle('slot-bonus', snapshot.phase === 'bonus' || snapshot.bonusBank > 0);
@@ -63,7 +64,7 @@ export class SlotsView {
     });
     this.elements.slotsResult.textContent = `${snapshot.jackpotWin ? `${snapshot.jackpotWin.label} • ` : ''}Line ${money(snapshot.lineWin)} • Bonus ${money(snapshot.bonusBank)} • Free spins ${snapshot.freeSpinsRemaining} • Returned ${money(snapshot.returned)}`;
 
-    if (activeRoom?.slots && activeRoom.gameId === activeGame) {
+    if (activeRoom?.slots && activeRoom.gameId === activeGame && profileId) {
       this.renderRoomPlayers(snapshot, activeRoom, profileId);
     } else {
       this.renderSoloControls(snapshot);
@@ -71,7 +72,7 @@ export class SlotsView {
     this.elements.bonusPickButtons.forEach((button) => this.setActionButton(button, snapshot.phase === 'bonus' && snapshot.bonusPicksRemaining > 0));
   }
 
-  private renderRoomPlayers(snapshot: SlotSnapshot, activeRoom: RoomSnapshot, profileId: string): void {
+  private renderRoomPlayers(snapshot: SlotSnapshot, activeRoom: RoomSnapshot, profileId: ProfileId): void {
     const readyCount = activeRoom.slots?.readyProfileIds.length ?? 0;
     const myWager = activeRoom.slots?.wagersByProfileId[profileId] ?? 0;
     const canPlay = activeRoom.players.some((roomPlayer) => roomPlayer.profileId === profileId);

@@ -2,6 +2,7 @@ import type { CasinoGameId } from '../../game/ids';
 import type { SlotSymbol } from '../../game/slots/SlotSymbol';
 import type { CasinoAsset } from './CasinoAsset';
 import { createCasinoAsset } from './createCasinoAsset';
+import { slotThemeIdSchema } from '../../schemas/casinoSchemas/slotThemeIdSchema';
 
 export const casinoAssets = {
   lobbyBackground: createCasinoAsset('lobby.background', '/assets/lobby/warehouse-lobby.png', 'lobby', 'background', 'generated-final', 'imagegen', '1672x941'),
@@ -55,7 +56,7 @@ export const casinoAssets = {
     ),
   } satisfies Record<CasinoGameId, CasinoAsset>,
   slotFrames: {
-    'thai-princess': createCasinoAsset(
+    [slotThemeIdSchema.parse('thai-princess')]: createCasinoAsset(
       'slots.thai-princess.frame',
       '/assets/slots/thai-princess/frame.png',
       'slots',

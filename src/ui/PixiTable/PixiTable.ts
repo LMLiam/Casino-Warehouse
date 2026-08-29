@@ -8,6 +8,7 @@ import type { GameEvent } from '../../game/types/GameEvent';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { HandId } from '../../game/types/HandId';
 import type { RoundSummary } from '../../game/types/RoundSummary';
+import { sideBetTypes } from '../../game/types/sideBetTypes';
 import { chipCropByValue } from '../chips/chipCropByValue';
 import type { ChipValue } from '../chips/ChipValue';
 import { chipValues } from '../chips/chipValues';
@@ -192,7 +193,8 @@ export class PixiTable {
   private drawBettingZones(snapshot: GameSnapshot): void {
     const wagerAmounts: string[] = [];
     for (const hand of handLayouts) {
-      for (const [betType, zone] of Object.entries(hand.zones) as [BetType, (typeof hand.zones)[BetType]][]) {
+      for (const betType of betTypes) {
+        const zone = hand.zones[betType];
         const px = rectToPixels(zone);
         const centerX = px.x + px.width / 2;
         const centerY = px.y + px.height / 2;
@@ -587,10 +589,7 @@ export class PixiTable {
 
   private static settlementPopupForSummary(snapshot: GameSnapshot, summary: RoundSummary, settlementMetadata: readonly PixiTableSettlementMetadata[] = []) {
     const mainStake = snapshot.bets[summary.handId].main;
-    const sideStake = (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).reduce(
-      (total, betType) => total + snapshot.bets[summary.handId][betType],
-      0,
-    );
+    const sideStake = sideBetTypes.reduce((total, betType) => total + snapshot.bets[summary.handId][betType], 0);
     const dealerThanks = snapshot.dealerTipRewards[summary.handId];
     const mainProfit = PixiTable.mainProfitForSummary(summary.mainResult, mainStake);
     const sideProfit = summary.profit - mainProfit;
@@ -655,7 +654,7 @@ export class PixiTable {
   }
 
   private static sideLinesForSummary(snapshot: GameSnapshot, summary: RoundSummary): string[] {
-    return (betTypes.filter((betType) => betType !== 'main') as Exclude<BetType, 'main'>[]).flatMap((betType) => {
+    return sideBetTypes.flatMap((betType) => {
       const stake = snapshot.bets[summary.handId][betType];
       const sideWin = summary.sideWins.find((win) => win.betType === betType);
       if (sideWin) {
@@ -670,7 +669,7 @@ export class PixiTable {
     return (maxOrder * CARD_ANIMATION.delayStep + CARD_ANIMATION.duration + PixiTable.settlementRevealPauseSeconds) * PixiTable.millisecondsPerSecond;
   }
 
-  private static betTypeLabel(betType: Exclude<BetType, 'main'>): string {
+  private static betTypeLabel(betType: (typeof sideBetTypes)[number]): string {
     return {
       aceFlash: 'Ace Flash',
       dealerBust: 'Dealer Bust',
