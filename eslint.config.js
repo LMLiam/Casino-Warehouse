@@ -56,6 +56,7 @@ export default [
     },
     rules: {
       'local/require-zod-record-key-value': 'error',
+      'no-throw-literal': 'error',
       'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',

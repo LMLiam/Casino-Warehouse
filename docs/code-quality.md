@@ -29,6 +29,7 @@ The app is organised by domain first. New modules should go into the narrowest f
 - No non-null assertions (`!`) — use a guard or fallback.
 - No `typeof x === 'object'` — use a Zod schema (`cardSchema.safeParse`) or a strict `in` guard (`'bets' in snapshot`), see `src/multiplayer/roomAuthorityModel/timeoutWithUnrefSchema.ts:4`.
 - No `Math.random()` inside `src/game/` — use `src/game/rng.ts` and inject deterministic RNG in tests.
+- No literal throws. State loader modules under `src/state/**/load*.ts` must return recovery results instead of throwing on invalid saved data.
 
 `scripts/architecture-check.mjs` enforces domain and structural rules:
 

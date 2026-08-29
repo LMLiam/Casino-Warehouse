@@ -3,6 +3,7 @@ import { dirname, extname, join, normalize, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url';
 import { finiteNumberErrors } from './finite-number-check.mjs';
 import { magicNumberErrors } from './magic-number-check.mjs';
+import { stateLoaderErrors } from './state-loader-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
 import { zodObjectErrors } from './zod-object-check.mjs';
 
@@ -36,6 +37,7 @@ function main() {
     checkVagueFilename(relativePath);
     checkAppFolderLayout(relativePath);
     checkBrandedIds(relativePath, source);
+    errors.push(...stateLoaderErrors(relativePath, source));
   }
 
   checkTestFolderLayout();

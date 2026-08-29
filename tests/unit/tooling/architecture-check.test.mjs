@@ -5,6 +5,7 @@ import { finiteNumberErrors } from '../../../scripts/finite-number-check.mjs';
 import { magicNumberErrors } from '../../../scripts/magic-number-check.mjs';
 import requireZodRecordKeyValue from '../../../scripts/require-zod-record-key-value.mjs';
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
+import { stateLoaderErrors } from '../../../scripts/state-loader-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
 import { zodObjectErrors } from '../../../scripts/zod-object-check.mjs';
 
@@ -109,6 +110,19 @@ describe('mathRandomErrors', () => {
   it('allows direct Math.random only in visual effect renderers', () => {
     expect(mathRandomErrors('src/ui/renderers/EffectRenderer.ts', 'const offset = Math.random() * 10;')).toEqual([]);
     expect(mathRandomErrors('src/state/profiles/createStateId.ts', 'const id = crypto.randomUUID();')).toEqual([]);
+  });
+});
+
+describe('stateLoaderErrors', () => {
+  it('rejects throws from state loader modules', () => {
+    expect(stateLoaderErrors('src/state/profiles/loadProfileStore.ts', 'export const loadProfileStore = () => { throw new Error("bad"); };')).toEqual([
+      'src/state/profiles/loadProfileStore.ts:1:41 throws from a state loader. Return a Result and let the caller recover or delete invalid state.',
+    ]);
+  });
+
+  it('allows result-based recovery and non-loader writes', () => {
+    expect(stateLoaderErrors('src/state/session/loadSessionState.ts', 'export const loadSessionState = () => ({ recovered: true });')).toEqual([]);
+    expect(stateLoaderErrors('src/state/session/saveSessionState.ts', 'export const saveSessionState = () => { throw new Error("bad"); };')).toEqual([]);
   });
 });
 
