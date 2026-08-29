@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { finiteNumberErrors } from '../../../scripts/finite-number-check.mjs';
 import { magicNumberErrors } from '../../../scripts/magic-number-check.mjs';
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
@@ -212,5 +213,26 @@ const chainedProperty = z.object({ value: z.string() }).strict.call(null);
 `,
       ),
     ).toHaveLength(3);
+  });
+});
+
+describe('finiteNumberErrors', () => {
+  it('rejects direct finite-number declarations outside the shared primitive', () => {
+    expect(finiteNumberErrors('src/schemas/example.ts', 'const schema = z.number().finite().int();')).toEqual([
+      'src/schemas/example.ts:1:16 uses z.number().finite() directly. Import finiteNumberSchema from src/schemas/casinoSchemas/finiteNumberSchema instead.',
+    ]);
+  });
+
+  it('allows the shared primitive, coercing schemas, and custom finite errors', () => {
+    expect(finiteNumberErrors('src/schemas/casinoSchemas/finiteNumberSchema.ts', 'export const schema = z.number().finite();')).toEqual([]);
+    expect(
+      finiteNumberErrors(
+        'tests/unit/schemas/example.tsx',
+        `
+const coerced = z.coerce.number().finite();
+const custom = z.number().finite('Amount must be finite.');
+`,
+      ),
+    ).toEqual([]);
   });
 });

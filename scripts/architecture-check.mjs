@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { finiteNumberErrors } from './finite-number-check.mjs';
 import { magicNumberErrors } from './magic-number-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
 import { zodObjectErrors } from './zod-object-check.mjs';
@@ -15,6 +16,7 @@ const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(
 const scriptFiles = listFiles(scriptRoot).filter((file) => extname(file) === '.mjs');
 const magicNumberFiles = [...sourceFiles, ...testFiles, ...scriptFiles];
 const zodObjectFiles = [...sourceFiles, ...testFiles];
+const finiteNumberFiles = [...sourceFiles, ...testFiles];
 const relativeSourceFiles = new Set(sourceFiles.map(toWorkspacePath));
 const errors = [];
 const appModuleFolders = new Set(['actions', 'dom', 'format', 'input', 'rooms', 'shell', 'state', 'views']);
@@ -39,6 +41,7 @@ function main() {
   checkTestFolderLayout();
   checkMagicNumbers();
   checkZodObjects();
+  checkFiniteNumbers();
   checkCycles();
 
   if (errors.length > 0) {
@@ -160,6 +163,12 @@ function checkMagicNumbers() {
 function checkZodObjects() {
   for (const file of zodObjectFiles) {
     errors.push(...zodObjectErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
+  }
+}
+
+function checkFiniteNumbers() {
+  for (const file of finiteNumberFiles) {
+    errors.push(...finiteNumberErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
   }
 }
 

@@ -3,6 +3,7 @@ import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import { cardSchema } from './cardSchema';
 import { betTypeSchema } from './betTypeSchema';
 import { gameEventTypeSchema } from './gameEventTypeSchema';
+import { finiteNumberSchema } from './finiteNumberSchema';
 import { handIdSchema } from './handIdSchema';
 import { handResultSchema } from './handResultSchema';
 import { phaseSchema } from './phaseSchema';
@@ -10,17 +11,16 @@ import { sideBetStateSchema } from './sideBetStateSchema';
 import { sideBetTypeSchema } from './sideBetTypeSchema';
 
 export const gameSnapshotSchema = (() => {
-  const finiteNumber = z.number().finite();
-  const bets = z.record(handIdSchema, z.record(betTypeSchema, finiteNumber));
-  const dealerTips = z.record(handIdSchema, finiteNumber);
-  const sideWin = z.object({ betType: sideBetTypeSchema, label: z.string(), profit: finiteNumber, returned: finiteNumber }).strict();
+  const bets = z.record(handIdSchema, z.record(betTypeSchema, finiteNumberSchema));
+  const dealerTips = z.record(handIdSchema, finiteNumberSchema);
+  const sideWin = z.object({ betType: sideBetTypeSchema, label: z.string(), profit: finiteNumberSchema, returned: finiteNumberSchema }).strict();
   const roundSummary = z
     .object({
       handId: handIdSchema,
       mainResult: handResultSchema,
-      stake: finiteNumber,
-      returned: finiteNumber,
-      profit: finiteNumber,
+      stake: finiteNumberSchema,
+      returned: finiteNumberSchema,
+      profit: finiteNumberSchema,
       sideWins: z.array(sideWin),
     })
     .strict();
@@ -50,20 +50,20 @@ export const gameSnapshotSchema = (() => {
       message: z.string().optional(),
       handId: handIdSchema.optional(),
       betType: betTypeSchema.optional(),
-      amount: finiteNumber.optional(),
+      amount: finiteNumberSchema.optional(),
       card: cardSchema.optional(),
-      cardIndex: finiteNumber.optional(),
+      cardIndex: finiteNumberSchema.optional(),
       result: handResultSchema.optional(),
       summaries: z.array(roundSummary).optional(),
-      totalProfit: finiteNumber.optional(),
-      dealerThanksTotal: finiteNumber.optional(),
+      totalProfit: finiteNumberSchema.optional(),
+      dealerThanksTotal: finiteNumberSchema.optional(),
     })
     .strict();
 
   return z
     .object({
       phase: phaseSchema,
-      bankroll: finiteNumber,
+      bankroll: finiteNumberSchema,
       bets,
       dealerTips,
       dealerTipRewards: dealerTips,
@@ -75,7 +75,7 @@ export const gameSnapshotSchema = (() => {
       lastEvents: z.array(gameEvent),
       status: z.string(),
       canRebet: z.boolean(),
-      rebetAmounts: z.record(handIdSchema, finiteNumber),
+      rebetAmounts: z.record(handIdSchema, finiteNumberSchema),
     })
     .strict() satisfies z.ZodType<GameSnapshot>;
 })();

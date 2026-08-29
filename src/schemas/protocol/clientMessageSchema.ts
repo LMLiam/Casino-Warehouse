@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { betTypeSchema } from '../casinoSchemas/betTypeSchema';
 import { authTokenSchema } from '../casinoSchemas/authTokenSchema';
+import { finiteNumberSchema } from '../casinoSchemas/finiteNumberSchema';
 import { handIdSchema } from '../casinoSchemas/handIdSchema';
 import { networkCreditSchema } from '../casinoSchemas/networkCreditSchema';
 import { playerGameSnapshotsSchema } from '../casinoSchemas/playerGameSnapshotsSchema';
@@ -73,7 +74,7 @@ export const clientMessageSchema = (() => {
     }),
     baseClientMessageSchema.extend({ type: z.literal('admin-reset-all') }),
     baseClientMessageSchema.extend({ type: z.literal('clear-server-data') }),
-    baseClientMessageSchema.extend({ type: z.literal('heartbeat-ack'), sentAt: networkCreditSchema }),
+    baseClientMessageSchema.extend({ type: z.literal('heartbeat-ack'), sentAt: finiteNumberSchema }),
     baseClientMessageSchema.extend({ type: z.literal('list-rooms'), gameId: roomGameIdSchema }),
     baseClientMessageSchema
       .extend({

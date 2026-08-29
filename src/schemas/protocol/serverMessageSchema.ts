@@ -3,6 +3,7 @@ import { blackjackSnapshotSchema } from '../casinoSchemas/blackjackSnapshotSchem
 import { blackjackTableSnapshotSchema } from '../casinoSchemas/blackjackTableSnapshotSchema';
 import { casinoSaveStateSchema } from '../casinoSchemas/casinoSaveStateSchema';
 import { connectionIdSchema } from '../casinoSchemas/connectionIdSchema';
+import { finiteNumberSchema } from '../casinoSchemas/finiteNumberSchema';
 import { gameSnapshotSchema } from '../casinoSchemas/gameSnapshotSchema';
 import { handIdSchema } from '../casinoSchemas/handIdSchema';
 import { profileTokenSchema } from '../casinoSchemas/profileTokenSchema';
@@ -21,8 +22,6 @@ import { sessionStateSchema } from '../casinoSchemas/sessionStateSchema';
 import { slotSnapshotSchema } from '../casinoSchemas/slotSnapshotSchema';
 
 export const serverMessageSchema = (() => {
-  const finiteNumberSchema = z.number().finite();
-
   const baseServerMessageSchema = z
     .object({
       type: z.string(),

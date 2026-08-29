@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { BankrollTransaction } from '../../state/profiles/BankrollTransaction';
 import { creditSchema } from './creditSchema';
+import { finiteNumberSchema } from './finiteNumberSchema';
 import { isoTimestampSchema } from './isoTimestampSchema';
 import { metadataSchema } from './metadataSchema';
 import { profileIdSchema } from './profileIdSchema';
@@ -19,7 +20,7 @@ export const bankrollTransactionSchema = z
     roomId: roomIdSchema.optional(),
     sessionId: sessionIdSchema.optional(),
     type: transactionTypeSchema,
-    amount: z.number().finite().int(),
+    amount: finiteNumberSchema.int(),
     balanceBefore: creditSchema,
     balanceAfter: creditSchema,
     description: z.string(),

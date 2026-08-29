@@ -134,6 +134,13 @@ describe('Zod-backed runtime validation', () => {
     expect(() => slotThemeSchema.parse({ id: 'bad', title: 'Bad', accent: 'purple', reelStrip: [], payouts: {}, jackpots: {}, bonus: {} })).toThrow();
   });
 
+  it('preserves finite heartbeat timestamps without applying credit normalization', () => {
+    expect(parseClientMessage({ type: 'heartbeat-ack', sentAt: 1.5 })).toEqual({
+      ok: true,
+      message: { type: 'heartbeat-ack', sentAt: 1.5 },
+    });
+  });
+
   it('rejects incomplete persisted records and invalid parser envelopes directly', () => {
     expect(() => casinoProfileSchema.parse({ id: 'profile-a', name: 'Alice' })).toThrow();
     expect(() => bankrollTransactionSchema.parse({ id: 'tx-a', gameId: 'admin', type: 'invalid', amount: 1 })).toThrow();

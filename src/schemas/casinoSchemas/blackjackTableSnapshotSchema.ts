@@ -5,6 +5,7 @@ import { blackjackResultSchema } from './blackjackResultSchema';
 import { blackjackSeatIdSchema } from './blackjackSeatIdSchema';
 import { blackjackSeatPhaseSchema } from './blackjackSeatPhaseSchema';
 import { blackjackTablePhaseSchema } from './blackjackTablePhaseSchema';
+import { finiteNumberSchema } from './finiteNumberSchema';
 import { profileIdSchema } from './profileIdSchema';
 
 export const blackjackTableSnapshotSchema = (() => {
@@ -13,14 +14,14 @@ export const blackjackTableSnapshotSchema = (() => {
       seatId: blackjackSeatIdSchema,
       profileId: profileIdSchema.optional(),
       profileName: z.string().optional(),
-      bankroll: z.number().finite().optional(),
+      bankroll: finiteNumberSchema.optional(),
       phase: blackjackSeatPhaseSchema,
-      wager: z.number().finite(),
+      wager: finiteNumberSchema,
       playerCards: z.array(cardSchema),
-      insuranceWager: z.number().finite(),
+      insuranceWager: finiteNumberSchema,
       splitHands: z.array(z.array(cardSchema)),
       result: blackjackResultSchema.optional(),
-      returned: z.number().finite(),
+      returned: finiteNumberSchema,
       status: z.string(),
       isTurn: z.boolean(),
     })
