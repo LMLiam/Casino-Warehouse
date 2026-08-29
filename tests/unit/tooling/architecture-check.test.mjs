@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { RuleTester } from 'eslint';
 
 import { finiteNumberErrors } from '../../../scripts/finite-number-check.mjs';
 import { magicNumberErrors } from '../../../scripts/magic-number-check.mjs';
+import requireZodRecordKeyValue from '../../../scripts/require-zod-record-key-value.mjs';
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
 import { zodObjectErrors } from '../../../scripts/zod-object-check.mjs';
@@ -234,5 +236,22 @@ const custom = z.number().finite('Amount must be finite.');
 `,
       ),
     ).toEqual([]);
+  });
+});
+
+describe('requireZodRecordKeyValue', () => {
+  const ruleTester = new RuleTester();
+  ruleTester.run('require-zod-record-key-value', requireZodRecordKeyValue, {
+    valid: ['z.record(z.string(), z.number());', 'other.record(z.number());'],
+    invalid: [
+      {
+        code: 'z.record(z.number());',
+        errors: [{ messageId: 'missingKeyValueSchemas' }],
+      },
+      {
+        code: 'z.record();',
+        errors: [{ messageId: 'missingKeyValueSchemas' }],
+      },
+    ],
   });
 });

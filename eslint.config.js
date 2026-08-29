@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import requireZodRecordKeyValue from './scripts/require-zod-record-key-value.mjs';
 
 const globals = {
   AudioContext: 'readonly',
@@ -46,7 +47,15 @@ export default [
     languageOptions: {
       globals,
     },
+    plugins: {
+      local: {
+        rules: {
+          'require-zod-record-key-value': requireZodRecordKeyValue,
+        },
+      },
+    },
     rules: {
+      'local/require-zod-record-key-value': 'error',
       'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
