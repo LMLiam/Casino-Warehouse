@@ -11,6 +11,7 @@ import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
 import { parseSessionState } from '../session/parseSessionState';
+import type { ParseError } from '../ParseError';
 import type { GameplaySettlementContext } from './GameplaySettlementContext';
 import type { GameplaySettlementResult } from './GameplaySettlementResult';
 import { MemoryServerDataStore } from './MemoryServerDataStore';
@@ -135,11 +136,10 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     const rows = z.array(z.object({ key: z.string(), value: z.string() }).strict()).parse(this.db.prepare('SELECT key, value FROM server_state').all());
     const stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] } = {};
     for (const row of rows) {
-      try {
-        this.assignStoredStateValue(stored, row.key, row.value);
-      } catch (error) {
+      const parseError = this.assignStoredStateValue(stored, row.key, row.value);
+      if (parseError) {
         this.db.prepare('DELETE FROM server_state WHERE key = ?').run(row.key);
-        console.warn(`SQLite server_state row "${row.key}" could not be parsed and was deleted.`, error);
+        console.warn(`SQLite server_state row "${row.key}" could not be parsed and was deleted.`, parseError);
       }
     }
     return stored;
@@ -149,19 +149,41 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] },
     key: string,
     value: string,
-  ): void {
+  ): ParseError | undefined {
     const storedKey = SqliteServerDataStore.storedStateKey(key);
     if (storedKey === 'profileState') {
-      stored.profileState = parseProfileStoreJson(value);
-      return;
+      const parsed = parseProfileStoreJson(value);
+      if (!parsed.ok) {
+        return parsed.error;
+      }
+      stored.profileState = parsed.value;
+      return undefined;
     }
     if (storedKey === 'profileAuth') {
-      stored.profileAuth = z.record(profileIdSchema, profileTokenHashSchema).parse(parseJsonText(value));
-      return;
+      try {
+        const parsed = z.record(profileIdSchema, profileTokenHashSchema).safeParse(parseJsonText(value));
+        if (!parsed.success) {
+          return new Error(parsed.error.message);
+        }
+        stored.profileAuth = parsed.data;
+        return undefined;
+      } catch (error) {
+        return error instanceof Error ? error : new Error('Profile authentication data is invalid.');
+      }
     }
     if (storedKey === 'session') {
-      stored.session = parseSessionState(parseJsonText(value));
+      try {
+        const parsed = parseSessionState(parseJsonText(value));
+        if (!parsed.ok) {
+          return parsed.error;
+        }
+        stored.session = parsed.value;
+        return undefined;
+      } catch (error) {
+        return error instanceof Error ? error : new Error('Session data is invalid.');
+      }
     }
+    return undefined;
   }
 
   private writeValue<Value>(key: string, value: Value): void {

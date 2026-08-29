@@ -5,13 +5,17 @@ import type { SessionLoadResult } from './SessionLoadResult';
 import { sessionStorageKey } from './sessionStorageKey';
 
 export const loadSessionState = (storage: StorageLike, key = sessionStorageKey): SessionLoadResult => {
-  const raw = storage.getItem(key);
-  if (!raw) {
-    return { recovered: false };
-  }
-
   try {
-    return { session: parseSessionState(parseJsonText(raw)), recovered: false };
+    const raw = storage.getItem(key);
+    if (!raw) {
+      return { recovered: false };
+    }
+
+    const parsed = parseSessionState(parseJsonText(raw));
+    if (!parsed.ok) {
+      return { recovered: true, error: parsed.error.message };
+    }
+    return { session: parsed.value, recovered: false };
   } catch (error) {
     return {
       recovered: true,

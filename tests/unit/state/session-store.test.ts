@@ -146,7 +146,7 @@ describe('session store', () => {
   it('rejects invalid session fields and malformed nested snapshots', () => {
     const storage = new MemoryStorage();
     expect(loadSessionState(storage)).toEqual({ recovered: false });
-    expect(() =>
+    expect(
       parseSessionState({
         profileId: 'a',
         activeGame: 'not-real',
@@ -155,8 +155,8 @@ describe('session store', () => {
         wagered: 0,
         updatedAt: '2026-05-04T12:00:00Z',
       }),
-    ).toThrow('Session data is not valid');
-    expect(() =>
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('Session data is not valid') } });
+    expect(
       parseSessionState({
         profileId: 'a',
         activeGame: 'slots:thai-princess',
@@ -166,11 +166,11 @@ describe('session store', () => {
         gameSnapshot: { slots: { 'thai-princess': { themeId: 'thai-princess' } } },
         updatedAt: '2026-05-04T12:00:00Z',
       }),
-    ).toThrow('Session data is not valid');
+    ).toMatchObject({ ok: false, error: { message: expect.stringContaining('Session data is not valid') } });
   });
 
   it('rejects obsolete version fields instead of dispatching migrations', () => {
-    expect(() => parseSessionState({ version: 2 })).toThrow('Session data is not valid');
-    expect(() => parseSessionState({ profileIds: [] })).toThrow('Session data is not valid');
+    expect(parseSessionState({ version: 2 })).toMatchObject({ ok: false, error: { message: expect.stringContaining('Session data is not valid') } });
+    expect(parseSessionState({ profileIds: [] })).toMatchObject({ ok: false, error: { message: expect.stringContaining('Session data is not valid') } });
   });
 });

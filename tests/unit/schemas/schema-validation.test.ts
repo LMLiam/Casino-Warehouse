@@ -118,13 +118,22 @@ describe('Zod-backed runtime validation', () => {
     expect(loaded.recovered).toBe(true);
     expect(loaded.error).toContain('Profile id is required');
 
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Unrecognized key: "version"');
+    expect(parseProfileStoreJson('{"version":2,"profiles":[]}')).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Unrecognized key: "version"') },
+    });
   });
 
   it('rejects obsolete version fields at every boundary', () => {
     expect(parseClientMessage({ version: 2, type: 'request-data' })).toMatchObject({ ok: false });
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Unrecognized key: "version"');
-    expect(() => parseSessionState({ version: 1, profileIds: [] })).toThrow('Session data is not valid');
+    expect(parseProfileStoreJson('{"version":2,"profiles":[]}')).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Unrecognized key: "version"') },
+    });
+    expect(parseSessionState({ version: 1, profileIds: [] })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Session data is not valid') },
+    });
   });
 
   it('validates settings and game/slot configuration at runtime boundaries', () => {
@@ -152,7 +161,13 @@ describe('Zod-backed runtime validation', () => {
     expect(roomNameSchema.parse('  Late    Table  ')).toBe('Late Table');
     expect(roomNameSchema.parse(undefined)).toBeUndefined();
     expect(zodErrorSummary(new ZodError([]))).toBe('Payload is invalid.');
-    expect(() => parseCasinoSaveState(null)).toThrow('Save data is not a casino profile store: Invalid input: expected object, received null');
-    expect(() => parseSessionState(null)).toThrow('Session data is not valid: Invalid input: expected object, received null');
+    expect(parseCasinoSaveState(null)).toMatchObject({
+      ok: false,
+      error: { message: 'Save data is not a casino profile store: Invalid input: expected object, received null' },
+    });
+    expect(parseSessionState(null)).toMatchObject({
+      ok: false,
+      error: { message: 'Session data is not valid: Invalid input: expected object, received null' },
+    });
   });
 });

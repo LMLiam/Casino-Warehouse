@@ -284,12 +284,18 @@ describe('profile store', () => {
 
     const imported = parseProfileStoreJson(JSON.stringify(state));
 
-    expect(imported).toEqual(state);
+    expect(imported).toEqual({ ok: true, value: state });
   });
 
   it('rejects obsolete and malformed profile stores instead of migrating them', () => {
-    expect(() => parseCasinoSaveState({ version: 1, profiles: [] })).toThrow('Unrecognized key: "version"');
-    expect(() => parseProfileStoreJson('{"profiles":[{"id":1}]}')).toThrow('Save data is not a casino profile store');
+    expect(parseCasinoSaveState({ version: 1, profiles: [] })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Unrecognized key: "version"') },
+    });
+    expect(parseProfileStoreJson('{"profiles":[{"id":1}]}')).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Save data is not a casino profile store') },
+    });
   });
 
   it('recovers gracefully from corrupted storage data', () => {

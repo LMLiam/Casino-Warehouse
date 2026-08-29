@@ -59,13 +59,23 @@ export class MemoryServerDataStore implements ServerDataStore {
   }
 
   protected loadProfilesFromJson(profileStoreJson: string): ServerDataSnapshot {
-    this.profileState = parseProfileStoreJson(profileStoreJson);
+    const parsed = parseProfileStoreJson(profileStoreJson);
+    if (!parsed.ok) {
+      this.profileState = emptySaveState();
+      this.session = undefined;
+      return this.snapshot();
+    }
+    this.profileState = parsed.value;
     this.session = undefined;
     return this.snapshot();
   }
 
   public saveSession(session: CasinoSessionState): ServerDataSnapshot {
-    this.session = parseSessionState(session);
+    const parsed = parseSessionState(session);
+    if (!parsed.ok) {
+      throw new Error(parsed.error.message);
+    }
+    this.session = parsed.value;
     return this.snapshot();
   }
 

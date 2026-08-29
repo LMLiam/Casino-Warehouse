@@ -4,5 +4,9 @@ import { profileStorageKey } from './profileStorageKey';
 import type { StorageLike } from './StorageLike';
 
 export const saveProfileStore = (storage: StorageLike, state: CasinoSaveState, key = profileStorageKey): void => {
-  storage.setItem(key, JSON.stringify(parseCasinoSaveState(state)));
+  const parsed = parseCasinoSaveState(state);
+  if (!parsed.ok) {
+    throw new Error(parsed.error.message);
+  }
+  storage.setItem(key, JSON.stringify(parsed.value));
 };

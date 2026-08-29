@@ -5,13 +5,17 @@ import type { ProfileStoreResult } from './ProfileStoreResult';
 import type { StorageLike } from './StorageLike';
 
 export const loadProfileStore = (storage: StorageLike, key = profileStorageKey): ProfileStoreResult => {
-  const raw = storage.getItem(key);
-  if (!raw) {
-    return { state: emptySaveState(), recovered: false };
-  }
-
   try {
-    return { state: parseProfileStoreJson(raw), recovered: false };
+    const raw = storage.getItem(key);
+    if (!raw) {
+      return { state: emptySaveState(), recovered: false };
+    }
+
+    const parsed = parseProfileStoreJson(raw);
+    if (!parsed.ok) {
+      return { state: emptySaveState(), recovered: true, error: parsed.error.message };
+    }
+    return { state: parsed.value, recovered: false };
   } catch (error) {
     return {
       state: emptySaveState(),
