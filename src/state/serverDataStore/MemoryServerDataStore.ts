@@ -1,6 +1,12 @@
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import { z } from 'zod';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { ProfileTokenHash } from '../../schemas/casinoSchemas/ProfileTokenHash';
+import { createIsoTimestamp } from '../../schemas/casinoSchemas/createIsoTimestamp';
+import { hexColourSchema } from '../../schemas/casinoSchemas/hexColourSchema';
 import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
+import { profileTokenHashSchema } from '../../schemas/casinoSchemas/profileTokenHashSchema';
 import { acceptHouseAdvance } from '../profiles/acceptHouseAdvance';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSaveState } from '../profiles/CasinoSaveState';
@@ -27,7 +33,7 @@ export class MemoryServerDataStore implements ServerDataStore {
   public readonly database: ServerDatabaseChoice = 'memory';
   private profileState: CasinoSaveState = emptySaveState();
   private session: CasinoSessionState | undefined;
-  private profileTokenHashes = new Map<string, string>();
+  private profileTokenHashes = new Map<ProfileId, ProfileTokenHash>();
 
   public snapshot(): ServerDataSnapshot {
     return { database: this.database, profileState: this.profileState, session: this.session };
@@ -38,12 +44,12 @@ export class MemoryServerDataStore implements ServerDataStore {
     return this.snapshot();
   }
 
-  public renameProfile(profileId: string, name: string): ServerDataSnapshot {
+  public renameProfile(profileId: ProfileId, name: string): ServerDataSnapshot {
     this.profileState = renameProfile(this.profileState, profileId, name);
     return this.snapshot();
   }
 
-  public deleteProfile(profileId: string): ServerDataSnapshot {
+  public deleteProfile(profileId: ProfileId): ServerDataSnapshot {
     this.profileState = deleteProfile(this.profileState, profileId);
     this.deleteProfileTokenHash(profileId);
     if (this.session?.profileId === profileId) {
@@ -70,16 +76,16 @@ export class MemoryServerDataStore implements ServerDataStore {
     return this.snapshot();
   }
 
-  public ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile {
+  public ensureProfile(profileId: ProfileId, profileName: string, bankroll: number): CasinoProfile {
     const existing = this.findProfile(profileId);
     if (existing) {
       return existing;
     }
-    const at = new Date().toISOString();
+    const at = createIsoTimestamp(new Date());
     const profile: CasinoProfile = {
       id: profileId,
       name: profileName.trim().replace(/\s+/g, ' ').slice(0, 32) || 'Player',
-      color: '#7dd3fc',
+      color: hexColourSchema.parse('#7dd3fc'),
       bankroll: MemoryServerDataStore.safeMoney(bankroll),
       houseAdvance: defaultHouseAdvanceState,
       stats: emptyStats(),
@@ -91,15 +97,15 @@ export class MemoryServerDataStore implements ServerDataStore {
     return profile;
   }
 
-  public profileTokenHash(profileId: string): string | undefined {
+  public profileTokenHash(profileId: ProfileId): ProfileTokenHash | undefined {
     return this.profileTokenHashes.get(profileId);
   }
 
-  public setProfileTokenHash(profileId: string, tokenHash: string): void {
+  public setProfileTokenHash(profileId: ProfileId, tokenHash: ProfileTokenHash): void {
     this.profileTokenHashes.set(profileId, tokenHash);
   }
 
-  public deleteProfileTokenHash(profileId: string): void {
+  public deleteProfileTokenHash(profileId: ProfileId): void {
     this.profileTokenHashes.delete(profileId);
   }
 
@@ -108,29 +114,27 @@ export class MemoryServerDataStore implements ServerDataStore {
   }
 
   protected loadProfileTokenHashesFromJson(profileAuthJson: string): void {
-    const parsed = z.record(z.string(), z.string()).safeParse(parseJsonText(profileAuthJson));
-    if (!parsed.success) {
-      this.profileTokenHashes.clear();
-      return;
-    }
-    this.profileTokenHashes = new Map(Object.entries(parsed.data));
+    const parsed = z.record(profileIdSchema, profileTokenHashSchema).parse(parseJsonText(profileAuthJson));
+    this.profileTokenHashes = new Map(
+      Object.entries(parsed).map(([profileId, profileTokenHash]) => [profileIdSchema.parse(profileId), profileTokenHash] as const),
+    );
   }
 
-  protected profileTokenHashEntries(): readonly (readonly [string, string])[] {
+  protected profileTokenHashEntries(): readonly (readonly [ProfileId, ProfileTokenHash])[] {
     return [...this.profileTokenHashes.entries()];
   }
 
-  public setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined {
+  public setProfileBankroll(profileId: ProfileId, bankroll: number): CasinoProfile | undefined {
     const profile = this.findProfile(profileId);
     if (!profile) {
       return undefined;
     }
-    const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(bankroll), updatedAt: new Date().toISOString() };
+    const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(bankroll), updatedAt: createIsoTimestamp(new Date()) };
     this.profileState = replaceProfile(this.profileState, updated);
     return updated;
   }
 
-  public acceptHouseAdvance(profileId: string): CasinoProfile | undefined {
+  public acceptHouseAdvance(profileId: ProfileId): CasinoProfile | undefined {
     const profile = this.findProfile(profileId);
     if (!profile) {
       return undefined;
@@ -144,7 +148,7 @@ export class MemoryServerDataStore implements ServerDataStore {
   }
 
   public applyGameplaySettlement(
-    profileId: string,
+    profileId: ProfileId,
     returned: number,
     profit: number,
     context: GameplaySettlementContext,
@@ -156,7 +160,7 @@ export class MemoryServerDataStore implements ServerDataStore {
     const grossReturned = MemoryServerDataStore.safeMoney(returned);
     const repayment = Math.min(grossReturned, houseAdvanceRepaymentForProfit(profile.houseAdvance, profit));
     if (repayment <= 0) {
-      const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(profile.bankroll + grossReturned), updatedAt: new Date().toISOString() };
+      const updated = { ...profile, bankroll: MemoryServerDataStore.safeMoney(profile.bankroll + grossReturned), updatedAt: createIsoTimestamp(new Date()) };
       this.profileState = replaceProfile(this.profileState, updated);
       return { profile: updated, houseAdvanceRepayment: 0 };
     }
@@ -190,7 +194,7 @@ export class MemoryServerDataStore implements ServerDataStore {
   }
 
   public recordTransaction(
-    profileId: string,
+    profileId: ProfileId,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
   ): CasinoProfile | undefined {
     const profile = this.findProfile(profileId);
@@ -202,7 +206,7 @@ export class MemoryServerDataStore implements ServerDataStore {
     return updated;
   }
 
-  private findProfile(profileId: string): CasinoProfile | undefined {
+  private findProfile(profileId: ProfileId): CasinoProfile | undefined {
     return this.profileState.profiles.find((profile) => profile.id === profileId);
   }
 

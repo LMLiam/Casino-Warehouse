@@ -2,7 +2,11 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { ProfileTokenHash } from '../../schemas/casinoSchemas/ProfileTokenHash';
 import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
+import { profileTokenHashSchema } from '../../schemas/casinoSchemas/profileTokenHashSchema';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
@@ -40,11 +44,11 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     return this.persist(super.createProfile(name, bankroll));
   }
 
-  public override renameProfile(profileId: string, name: string): ServerDataSnapshot {
+  public override renameProfile(profileId: ProfileId, name: string): ServerDataSnapshot {
     return this.persist(super.renameProfile(profileId, name));
   }
 
-  public override deleteProfile(profileId: string): ServerDataSnapshot {
+  public override deleteProfile(profileId: ProfileId): ServerDataSnapshot {
     const snapshot = super.deleteProfile(profileId);
     this.persistProfileAuth();
     return this.persist(snapshot);
@@ -60,12 +64,12 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     return this.persist(snapshot);
   }
 
-  public override setProfileTokenHash(profileId: string, tokenHash: string): void {
+  public override setProfileTokenHash(profileId: ProfileId, tokenHash: ProfileTokenHash): void {
     super.setProfileTokenHash(profileId, tokenHash);
     this.persistProfileAuth();
   }
 
-  public override deleteProfileTokenHash(profileId: string): void {
+  public override deleteProfileTokenHash(profileId: ProfileId): void {
     super.deleteProfileTokenHash(profileId);
     this.persistProfileAuth();
   }
@@ -75,26 +79,26 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     this.persistProfileAuth();
   }
 
-  public override ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile {
+  public override ensureProfile(profileId: ProfileId, profileName: string, bankroll: number): CasinoProfile {
     const profile = super.ensureProfile(profileId, profileName, bankroll);
     this.persist(this.snapshot());
     return profile;
   }
 
-  public override setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined {
+  public override setProfileBankroll(profileId: ProfileId, bankroll: number): CasinoProfile | undefined {
     const profile = super.setProfileBankroll(profileId, bankroll);
     this.persist(this.snapshot());
     return profile;
   }
 
-  public override acceptHouseAdvance(profileId: string): CasinoProfile | undefined {
+  public override acceptHouseAdvance(profileId: ProfileId): CasinoProfile | undefined {
     const profile = super.acceptHouseAdvance(profileId);
     this.persist(this.snapshot());
     return profile;
   }
 
   public override applyGameplaySettlement(
-    profileId: string,
+    profileId: ProfileId,
     returned: number,
     profit: number,
     context: GameplaySettlementContext,
@@ -105,7 +109,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   public override recordTransaction(
-    profileId: string,
+    profileId: ProfileId,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
   ): CasinoProfile | undefined {
     const profile = super.recordTransaction(profileId, transaction);
@@ -128,7 +132,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   private readStoredState(): Partial<Pick<ServerDataSnapshot, 'profileState' | 'session'> & { readonly profileAuth: Record<string, string> }> {
-    const rows = this.db.prepare('SELECT key, value FROM server_state').all() as Array<{ key: string; value: string }>;
+    const rows = z.array(z.object({ key: z.string(), value: z.string() }).strict()).parse(this.db.prepare('SELECT key, value FROM server_state').all());
     const stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] } = {};
     for (const row of rows) {
       try {
@@ -152,10 +156,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
       return;
     }
     if (storedKey === 'profileAuth') {
-      const profileAuth = z.record(z.string(), z.string()).safeParse(parseJsonText(value));
-      if (profileAuth.success) {
-        stored.profileAuth = profileAuth.data;
-      }
+      stored.profileAuth = z.record(profileIdSchema, profileTokenHashSchema).parse(parseJsonText(value));
       return;
     }
     if (storedKey === 'session') {

@@ -1,5 +1,7 @@
 import type { BankrollTransaction } from './BankrollTransaction';
 import type { CasinoProfile } from './CasinoProfile';
+import { createIsoTimestamp } from '../../schemas/casinoSchemas/createIsoTimestamp';
+import { transactionIdSchema } from '../../schemas/casinoSchemas/transactionIdSchema';
 import { createStateId } from './createStateId';
 import { defaultHouseAdvanceState } from './defaultHouseAdvanceState';
 import { favouriteGame } from './favouriteGame';
@@ -30,14 +32,15 @@ export const recordTransaction = (
     transaction.type === 'dealer_thanks' ||
     transaction.type === 'house_advance_credit' ||
     transaction.type === 'house_advance_repayment';
-  const previousGame = profile.stats.perGame[transaction.gameId] ?? emptyPerGameStats();
+  const casinoGameId = transaction.gameId === 'admin' || transaction.gameId === 'house-advance' ? undefined : transaction.gameId;
+  const previousGame = casinoGameId ? (profile.stats.perGame[casinoGameId] ?? emptyPerGameStats()) : emptyPerGameStats();
   const nextPerGame: PerGameStats = {
     gamesPlayed: previousGame.gamesPlayed + (!statsNeutral && countsAsWager ? 1 : 0),
     wagered: previousGame.wagered + (!statsNeutral && countsAsWager ? Math.abs(amount) : 0),
     won: previousGame.won + (!statsNeutral && countsAsWin ? amount : 0),
     netProfit: previousGame.netProfit + (statsNeutral ? 0 : amount),
   };
-  const perGame = statsNeutral ? profile.stats.perGame : { ...profile.stats.perGame, [transaction.gameId]: nextPerGame };
+  const perGame = statsNeutral || !casinoGameId ? profile.stats.perGame : { ...profile.stats.perGame, [casinoGameId]: nextPerGame };
   const nextStats: ProfileStats = {
     totalWagered: profile.stats.totalWagered + (!statsNeutral && countsAsWager ? Math.abs(amount) : 0),
     totalWon: profile.stats.totalWon + (!statsNeutral && countsAsWin ? amount : 0),
@@ -56,9 +59,9 @@ export const recordTransaction = (
     stats: nextStats,
     transactions: [
       {
-        id: idGenerator('tx', now),
+        id: transactionIdSchema.parse(idGenerator('tx', now)),
         profileId: profile.id,
-        at: now.toISOString(),
+        at: createIsoTimestamp(now),
         gameId: transaction.gameId,
         roomId: transaction.roomId,
         sessionId: transaction.sessionId,
@@ -71,6 +74,6 @@ export const recordTransaction = (
       },
       ...profile.transactions,
     ].slice(0, 200),
-    updatedAt: now.toISOString(),
+    updatedAt: createIsoTimestamp(now),
   };
 };

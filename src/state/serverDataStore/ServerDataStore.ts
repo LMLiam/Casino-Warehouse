@@ -1,3 +1,5 @@
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { ProfileTokenHash } from '../../schemas/casinoSchemas/ProfileTokenHash';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
@@ -10,20 +12,20 @@ export interface ServerDataStore {
   readonly database: ServerDatabaseChoice;
   snapshot(): ServerDataSnapshot;
   createProfile(name: string, bankroll?: number): ServerDataSnapshot;
-  renameProfile(profileId: string, name: string): ServerDataSnapshot;
-  deleteProfile(profileId: string): ServerDataSnapshot;
+  renameProfile(profileId: ProfileId, name: string): ServerDataSnapshot;
+  deleteProfile(profileId: ProfileId): ServerDataSnapshot;
   saveSession(session: CasinoSessionState): ServerDataSnapshot;
   clear(): ServerDataSnapshot;
-  ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile;
-  profileTokenHash(profileId: string): string | undefined;
-  setProfileTokenHash(profileId: string, tokenHash: string): void;
-  deleteProfileTokenHash(profileId: string): void;
+  ensureProfile(profileId: ProfileId, profileName: string, bankroll: number): CasinoProfile;
+  profileTokenHash(profileId: ProfileId): ProfileTokenHash | undefined;
+  setProfileTokenHash(profileId: ProfileId, tokenHash: ProfileTokenHash): void;
+  deleteProfileTokenHash(profileId: ProfileId): void;
   clearProfileTokenHashes(): void;
-  setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined;
-  acceptHouseAdvance(profileId: string): CasinoProfile | undefined;
-  applyGameplaySettlement(profileId: string, returned: number, profit: number, context: GameplaySettlementContext): GameplaySettlementResult | undefined;
+  setProfileBankroll(profileId: ProfileId, bankroll: number): CasinoProfile | undefined;
+  acceptHouseAdvance(profileId: ProfileId): CasinoProfile | undefined;
+  applyGameplaySettlement(profileId: ProfileId, returned: number, profit: number, context: GameplaySettlementContext): GameplaySettlementResult | undefined;
   recordTransaction(
-    profileId: string,
+    profileId: ProfileId,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
   ): CasinoProfile | undefined;
 }
