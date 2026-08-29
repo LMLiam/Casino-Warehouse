@@ -58,6 +58,51 @@ export default [
         { selector: 'TSObjectKeyword', message: 'Do not use the object type. Use a named domain type.' },
         { selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='unknown']", message: 'Do not use unknown-valued schemas.' },
         { selector: 'TSNonNullExpression', message: 'Do not use non-null assertion (!). Use a guard or fallback.' },
+        {
+          selector: "BinaryExpression[left.type='UnaryExpression'][left.operator='typeof'][right.value='object']",
+          message: "Do not use typeof x === 'object'. Use a Zod schema (e.g., cardSchema.safeParse) or a strict 'in' guard (e.g., 'bets' in snapshot) instead.",
+        },
+        {
+          selector: "TSPropertySignature[key.name='profileId'] TSTypeAnnotation > TSStringKeyword",
+          message:
+            "Use ProfileId (string & { __brand: 'profile' }) instead of string for profileId. Import ProfileId from 'src/schemas/casinoSchemas/profileIdSchema'.",
+        },
+        {
+          selector: "TSPropertySignature[key.name='roomId'] TSTypeAnnotation > TSStringKeyword",
+          message: "Use RoomId (string & { __brand: 'room' }) instead of string for roomId. Import RoomId from 'src/schemas/casinoSchemas/roomIdSchema'.",
+        },
+        {
+          selector: "TSPropertySignature[key.name='hostProfileId'] TSTypeAnnotation > TSStringKeyword",
+          message: 'Use ProfileId instead of string for hostProfileId.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/game/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'TSUnknownKeyword', message: 'Do not use the unknown type. Use a named domain type.' },
+        { selector: 'TSObjectKeyword', message: 'Do not use the object type. Use a named domain type.' },
+        { selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='unknown']", message: 'Do not use unknown-valued schemas.' },
+        { selector: 'TSNonNullExpression', message: 'Do not use non-null assertion (!). Use a guard or fallback.' },
+        {
+          selector: "BinaryExpression[left.type='UnaryExpression'][left.operator='typeof'][right.value='object']",
+          message: "Do not use typeof x === 'object'. Use a Zod schema (e.g., cardSchema.safeParse) or a strict 'in' guard (e.g., 'bets' in snapshot) instead.",
+        },
+        {
+          selector: "TSPropertySignature[key.name='profileId'] TSTypeAnnotation > TSStringKeyword",
+          message: 'Use ProfileId instead of string for profileId.',
+        },
+        {
+          selector: "TSPropertySignature[key.name='roomId'] TSTypeAnnotation > TSStringKeyword",
+          message: 'Use RoomId instead of string for roomId.',
+        },
+        {
+          selector: "MemberExpression[object.name='Math'][property.name='random']",
+          message: 'Do not use Math.random() in src/game/. Use src/game/rng.ts and inject deterministic RNG in tests.',
+        },
       ],
     },
   },

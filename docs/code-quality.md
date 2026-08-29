@@ -23,13 +23,19 @@ The app is organised by domain first. New modules should go into the narrowest f
 
 `npm run lint` now runs ESLint, TypeScript with `noUnusedLocals` and `noUnusedParameters`, and `npm run architecture:check`.
 
-`scripts/architecture-check.mjs` enforces:
+`eslint.config.js` enforces syntax-level bans with `no-restricted-syntax`:
+
+- No `unknown` or `object` types, no `z.unknown()`, no `as unknown` casts — use named domain types, runtime type guards, or schemas.
+- No non-null assertions (`!`) — use a guard or fallback.
+- No `typeof x === 'object'` — use a Zod schema (`cardSchema.safeParse`) or a strict `in` guard (`'bets' in snapshot`), see `src/multiplayer/roomAuthorityModel/timeoutWithUnrefSchema.ts:4`.
+- No `Math.random()` inside `src/game/` — use `src/game/rng.ts` and inject deterministic RNG in tests.
+
+`scripts/architecture-check.mjs` enforces domain and structural rules:
 
 - Game modules cannot import UI, app, or multiplayer modules.
 - Multiplayer and state modules cannot import UI or app modules.
 - UI modules cannot import the app shell.
 - No circular dependencies between source modules.
-- No direct `Math.random()` inside `src/game/`; use `src/game/rng.ts` and inject deterministic RNG in tests.
 - No direct bankroll property mutation outside `src/game/engine.ts`, `src/multiplayer/roomAuthority.ts`, and `src/state/profiles.ts`.
 - No obvious payout or settlement logic duplicated in `src/ui/`.
 - One module-scope top-level element per file.

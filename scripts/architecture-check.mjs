@@ -1,9 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { magicNumberErrors } from './magic-number-check.mjs';
-import { mathRandomErrors } from './math-random-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
@@ -11,7 +9,6 @@ const sourceRoot = join(workspaceRoot, 'src');
 const testRoot = join(workspaceRoot, 'tests');
 const scriptRoot = join(workspaceRoot, 'scripts');
 const maxSourceFileLines = 700;
-const trackedTypeScriptFiles = gitTrackedTypeScriptFiles();
 const sourceFiles = listFiles(sourceRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const scriptFiles = listFiles(scriptRoot).filter((file) => extname(file) === '.mjs');
@@ -28,16 +25,15 @@ function main() {
     const source = readFileSync(file, 'utf8');
 
     checkImportBoundaries(relativePath, source);
-    checkMathRandom(relativePath, source);
     checkBankrollMutation(relativePath, source);
     checkUiPayoutDuplication(relativePath, source);
     checkTopLevelElementCount(relativePath, source);
     checkFileSize(relativePath, source);
     checkVagueFilename(relativePath);
     checkAppFolderLayout(relativePath);
+    checkBrandedIds(relativePath, source);
   }
 
-  checkDirectUnknownCasts();
   checkTestFolderLayout();
   checkMagicNumbers();
   checkCycles();
@@ -79,10 +75,6 @@ function checkImportBoundaries(relativePath, source) {
       errors.push(`${relativePath} imports app shell module ${importedPath}. UI primitives should not depend on the application coordinator.`);
     }
   }
-}
-
-function checkMathRandom(relativePath, source) {
-  errors.push(...mathRandomErrors(relativePath, source));
 }
 
 function checkBankrollMutation(relativePath, source) {
@@ -144,28 +136,22 @@ function checkAppFolderLayout(relativePath) {
   }
 }
 
+function checkBrandedIds(relativePath, source) {
+  if (!relativePath.startsWith('src/multiplayer/protocol/') && !relativePath.startsWith('src/state/profiles/') && !relativePath.startsWith('src/state/session/')) {
+    return;
+  }
+  for (const match of source.matchAll(/\b(profileId|roomId|hostProfileId)\s*:\s*string\b/g)) {
+    const key = match[1];
+    const expected = key === 'roomId' ? 'RoomId' : 'ProfileId';
+    const line = source.slice(0, match.index).split('\n').length;
+    errors.push(`${relativePath}:${line} has ${key}: string. Use branded ${expected} (string & { __brand: '${key === 'roomId' ? 'room' : 'profile'}' }) from 'src/schemas/casinoSchemas/${expected === 'RoomId' ? 'roomIdSchema' : 'profileIdSchema'}' to prevent swaps.`);
+  }
+}
+
 function checkMagicNumbers() {
   for (const file of magicNumberFiles) {
     errors.push(...magicNumberErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
   }
-}
-
-function checkDirectUnknownCasts() {
-  for (const file of trackedTypeScriptFiles) {
-    const relativePath = toWorkspacePath(file);
-    const source = readFileSync(file, 'utf8');
-    for (const match of source.matchAll(/\bas\s+unknown\b/g)) {
-      const line = source.slice(0, match.index).split('\n').length;
-      errors.push(`${relativePath}:${line} uses a direct cast through unknown. Use validation, typed fakes, or a named escape-hatch helper instead.`);
-    }
-  }
-}
-
-function gitTrackedTypeScriptFiles() {
-  return execFileSync('git', ['ls-files', '*.ts', '*.tsx'], { cwd: workspaceRoot, encoding: 'utf8' })
-    .split('\n')
-    .filter((path) => path && !path.endsWith('.d.ts'))
-    .map((path) => resolve(workspaceRoot, path));
 }
 
 function checkTestFolderLayout() {
