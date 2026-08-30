@@ -1,12 +1,10 @@
 import { Container, Texture } from 'pixi.js';
 import { CasinoAudio } from '../../audio/casinoAudio/CasinoAudio';
-import { findGame } from '../../game/catalog/findGame';
 import type { CasinoGameId } from '../../game/ids';
 import type { BeatTheHouseChipTarget } from '../../game/types/BeatTheHouseChipTarget';
 import type { HandId } from '../../game/types/HandId';
 import type { ChipValue } from '../../ui/chips/ChipValue';
 import { PixiTable } from '../../ui/PixiTable/PixiTable';
-import type { PixiTableSettlementMetadata } from '../../ui/PixiTable/PixiTableSettlementMetadata';
 import { mountRadixChrome } from '../../ui/radixChrome';
 import { CardRenderer } from '../../ui/renderers/CardRenderer';
 import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
@@ -15,30 +13,11 @@ import { TagRenderer } from '../../ui/renderers/TagRenderer';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
 import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
 import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
-import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
 import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
-import type { SessionId } from '../../schemas/casinoSchemas/SessionId';
-import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
 import { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
 import type { RealtimeConnectionState } from '../../multiplayer/client/RealtimeConnectionState';
-import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
-import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
-import type { RoomSettlement } from '../../multiplayer/protocol/RoomSettlement';
-import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import type { RoomSummary } from '../../multiplayer/protocol/RoomSummary';
-import { normalizeRoomMaxPlayers } from '../../multiplayer/roomLimits/normalizeRoomMaxPlayers';
-import { AppEventBinder } from './AppEventBinder';
-import type { BeatAction } from './BeatAction';
-import type { AppElements } from '../dom/appElements/AppElements';
-import { collectElements } from '../dom/appElements/collectElements';
-import { renderTemplate } from '../dom/appTemplate';
-import { readCreditInput } from '../input/appInputs/readCreditInput';
-import { readPositiveCreditInput } from '../input/appInputs/readPositiveCreditInput';
-import { hitTestBetZone } from '../input/betZoneHitTest';
-import { defaultRoomMaxPlayers } from '../rooms/roomDefaults';
-import { isBeatSnapshot } from '../state/appSnapshots/isBeatSnapshot';
 import type { CasinoPlayer } from '../state/casinoPlayer/CasinoPlayer';
-import { createPlayerFromProfile } from '../state/casinoPlayer/createPlayerFromProfile';
 import { AudioControls } from '../views/AudioControls';
 import { BeatControlsView } from '../views/BeatControlsView';
 import { BeatSeatStatusView } from '../views/BeatSeatStatusView';
@@ -51,19 +30,24 @@ import { RoomSeatsView } from '../views/RoomSeatsView';
 import { RulesMenuView } from '../views/RulesMenuView';
 import { SlotsView } from '../views/SlotsView';
 import { WalletView } from '../views/WalletView';
+import { AppEventBinder } from './AppEventBinder';
+import type { AppElements } from '../dom/appElements/AppElements';
+import { collectElements } from '../dom/appElements/collectElements';
+import { renderTemplate } from '../dom/appTemplate';
+import { readCreditInput } from '../input/appInputs/readCreditInput';
 import { BeatChipSelection } from './BeatChipSelection';
 import { BeatSettlementMetadataCache } from './BeatSettlementMetadataCache';
-import { GameAppSession } from './GameAppSession';
+import { GameAppProfileActions } from './GameAppProfileActions';
 
-export class GameApp extends GameAppSession {
+export class GameApp extends GameAppProfileActions {
   protected readonly table: PixiTable;
   protected readonly elements: AppElements;
-  private readonly beatChipSelection: BeatChipSelection;
+  protected readonly beatChipSelection: BeatChipSelection;
   protected activeGame: CasinoGameId = 'beat-the-house';
   protected showingGameLobby = true;
   protected sessionWagerLimit = 0;
   protected sessionWagered = 0;
-  private readonly audio = new CasinoAudio();
+  protected readonly audio = new CasinoAudio();
   protected readonly audioControls: AudioControls;
   protected readonly beatControlsView: BeatControlsView;
   protected readonly beatSeatStatusView: BeatSeatStatusView;
@@ -78,7 +62,7 @@ export class GameApp extends GameAppSession {
   protected readonly walletView: WalletView;
   protected readonly multiplayer: MultiplayerClient;
   protected player: CasinoPlayer | undefined;
-  private readonly beatSettlementMetadata = new BeatSettlementMetadataCache();
+  protected readonly beatSettlementMetadata = new BeatSettlementMetadataCache();
   protected profileState: CasinoSaveState = { profiles: [] };
   protected readonly ownedProfileIds = new Set<ProfileId>();
   protected profileAccessReceived = false;
@@ -93,6 +77,7 @@ export class GameApp extends GameAppSession {
   protected returnHomeOnServerResync = false;
   protected restoringRoomAfterReconnect = false;
   protected pendingRoomRestore: CasinoSessionRoomState | undefined;
+
   public constructor(root: HTMLElement) {
     super();
     root.innerHTML = renderTemplate();
@@ -208,8 +193,8 @@ export class GameApp extends GameAppSession {
         this.table.resize();
         this.renderCasino();
       })
-      .catch((error) => {
-        console.warn('Beat the House table renderer failed to initialize.', error);
+      .catch(() => {
+        console.warn('Beat the House table renderer failed to initialize.');
       });
   }
 
@@ -256,438 +241,5 @@ export class GameApp extends GameAppSession {
       this.table.resize();
       this.beatSeatStatusView.layout();
     });
-  }
-
-  private runBeatAction(action: BeatAction): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (this.activeRoomForGame()) {
-      if (action === 'start-round' && this.beatControlsView.shouldQueueStartRound(this.activeRoomForGame())) {
-        this.beatControlsView.queueStartRound();
-        return;
-      }
-      this.multiplayer.send(typeof action === 'string' ? { type: action } : { type: action.type, action: action.action });
-      return;
-    }
-    this.showRoomRequiredMessage();
-  }
-
-  private selectChip(button: HTMLButtonElement): void {
-    this.beatChipSelection.select(button);
-  }
-
-  private dropChipOnTable(event: DragEvent): void {
-    event.preventDefault();
-    const amount = Math.floor(Number(event.dataTransfer?.getData('text/plain') || 0));
-    const target = hitTestBetZone(this.elements.tableHost, event.clientX, event.clientY);
-    if (!target || amount <= 0 || !this.currentPlayer) {
-      return;
-    }
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (!this.beatChipSelection.ensureAmountAffordable(amount)) {
-      return;
-    }
-    const activeRoom = this.activeRoomForGame();
-    if ('betType' in target && target.betType !== 'main' && activeRoom && isBeatSnapshot(activeRoom.game) && activeRoom.game.bets[target.handId].main <= 0) {
-      return;
-    }
-    if (activeRoom) {
-      if ('dealerTip' in target) {
-        this.multiplayer.send({ type: 'place-tip', seatId: target.handId, amount });
-        this.beatControlsView.markPendingBet('dealerTip');
-      } else {
-        this.multiplayer.send({ type: 'place-chip', seatId: target.handId, betType: target.betType, amount });
-        this.beatControlsView.markPendingBet(target.betType);
-      }
-    }
-    this.audio.play('chip');
-  }
-
-  private showRoomRequiredMessage(): void {
-    this.elements.roomStatus.textContent = 'Choose or create a multiplayer room before playing.';
-  }
-
-  private hostMultiplayerRoom(): void {
-    const profile = this.currentProfile();
-    if (!profile) {
-      this.elements.roomStatus.textContent = 'Start a profile session before hosting a room.';
-      return;
-    }
-    if (!this.canUseServer()) {
-      return;
-    }
-    const gameId = this.activeGame;
-    const roomName = this.elements.roomNameInput.value.trim() || `${findGame(gameId).title} Room`;
-    const maxPlayers = normalizeRoomMaxPlayers(gameId, readCreditInput(this.elements.roomMaxPlayersInput, defaultRoomMaxPlayers(gameId)));
-    this.elements.roomMaxPlayersInput.value = String(maxPlayers);
-    this.ensureRealtimeConnected();
-    this.multiplayer.createRoom(gameId, roomName, maxPlayers, profile.id, profile.name, profile.bankroll);
-  }
-
-  protected joinMultiplayerRoom(roomId: RoomId, role: RoomRole = 'player'): void {
-    const profile = this.currentProfile();
-    if (!profile || !roomId) {
-      this.elements.roomStatus.textContent = 'Select a profile and choose a room first.';
-      return;
-    }
-    if (!this.canUseServer()) {
-      return;
-    }
-    const gameId = this.activeGame;
-    this.ensureRealtimeConnected();
-    this.multiplayer.joinRoom(gameId, roomId, role, profile.id, profile.name, profile.bankroll);
-  }
-
-  protected claimRoomSeat(seatId: RoomSeatId): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (!this.activeRoomForGame()) {
-      this.elements.roomStatus.textContent = 'Join a room before choosing a seat.';
-      return;
-    }
-    this.multiplayer.send({ type: 'assign-seat', seatId });
-  }
-
-  private leaveMultiplayerRoom(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    this.multiplayer.leaveRoom();
-    this.elements.roomStatus.textContent = 'Left room. No active game room is connected.';
-    this.roomSeatsView.clear();
-    this.beatControlsView.clearPending();
-    this.beatSeatStatusView.clear();
-    this.refreshMultiplayerRooms();
-    this.saveSession();
-    this.renderCasino();
-  }
-
-  private goHome(): void {
-    if (this.activeRoomForGame() && this.multiplayer.connected) {
-      this.multiplayer.leaveRoom();
-      this.roomSeatsView.clear();
-      this.beatControlsView.clearPending();
-      this.beatSeatStatusView.clear();
-    }
-    this.showingGameLobby = true;
-    this.elements.roomStatus.textContent = 'Choose a game to browse live rooms.';
-    this.saveSession();
-    this.renderCasino();
-  }
-
-  private switchProfiles(): void {
-    if (this.multiplayer.room && this.multiplayer.connected) {
-      this.multiplayer.leaveRoom();
-    }
-    this.player = undefined;
-    this.activeGame = 'beat-the-house';
-    this.showingGameLobby = true;
-    this.sessionWagered = 0;
-    this.sessionWagerLimit = 0;
-    this.pendingRoomRestore = undefined;
-    this.returnHomeOnServerResync = false;
-    this.restoringRoomAfterReconnect = false;
-    this.multiplayerRooms = [];
-    this.clearClientSession();
-    this.profileSetupView.clearSelection();
-    this.roomSeatsView.clear();
-    this.beatControlsView.clearPending();
-    this.beatSeatStatusView.clear();
-    this.multiplayer.clearRoomState();
-    this.elements.shell.classList.add('hidden');
-    this.elements.setup.classList.remove('hidden');
-    this.renderProfileSetup();
-  }
-
-  protected refreshMultiplayerRooms(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    this.ensureRealtimeConnected();
-    this.multiplayer.listRooms(this.activeGame);
-  }
-
-  private ensureRealtimeConnected(): void {
-    if (this.multiplayer.connected || this.connectionState === 'connecting' || this.connectionState === 'reconnecting') {
-      return;
-    }
-    if (this.realtimeUrlError) {
-      this.connectionState = 'disconnected';
-      this.elements.roomStatus.textContent = this.realtimeUrlError;
-      this.renderConnectionState();
-      return;
-    }
-    this.multiplayer.connect(this.realtimeUrl || defaultRealtimeUrl());
-  }
-
-  protected openRoomLobby(gameId: CasinoGameId): void {
-    this.activeGame = gameId;
-    this.showingGameLobby = false;
-    this.multiplayerRooms = [];
-    this.elements.roomStatus.textContent = `Browsing ${findGame(gameId).title} rooms.`;
-    this.saveSession();
-    this.renderCasino();
-    this.refreshMultiplayerRooms();
-  }
-
-  protected beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: ProfileId | undefined): readonly PixiTableSettlementMetadata[] {
-    return this.beatSettlementMetadata.get(room, profileId);
-  }
-
-  private applyRoomSettlements(settlements: readonly RoomSettlement[], roomId: RoomId, sessionId: SessionId): void {
-    const profileId = this.currentPlayer?.profileId;
-    if (!profileId) {
-      return;
-    }
-    const profileSettlements = settlements.filter((settlement) => settlement.profileId === profileId);
-    if (this.activeRoomForGame()?.gameId === 'beat-the-house' && profileSettlements.length > 0) {
-      this.beatSettlementMetadata.set(roomId, sessionId, profileId, profileSettlements);
-    }
-    profileSettlements.forEach((settlement) => {
-      if (settlement.wagered > 0) {
-        this.recordSessionWager(settlement.wagered);
-      }
-    });
-    this.renderCasino();
-  }
-
-  private createProfileFromInput(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    this.multiplayer.createProfile(this.elements.profileNameInput.value);
-    this.elements.profileNameInput.value = '';
-  }
-
-  private startSelectedProfiles(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-
-    const selectedId = profileIdSchema.safeParse(this.elements.profileList.querySelector<HTMLInputElement>('[data-profile-select]:checked')?.value ?? '');
-    const ownedIds = this.profileState.profiles.filter((profile) => this.ownedProfileIds.has(profile.id)).map((profile) => profile.id);
-    const profileId = selectedId.success && this.ownedProfileIds.has(selectedId.data) ? selectedId.data : ownedIds[0];
-    const profile = profileId ? this.profileState.profiles.find((candidate) => candidate.id === profileId) : undefined;
-    if (!profile) {
-      this.lastSaveError = 'Create or unlock a profile in this browser before starting a session.';
-      this.renderProfileSetup();
-      return;
-    }
-
-    this.player = createPlayerFromProfile(profile);
-    this.activeGame = 'beat-the-house';
-    this.showingGameLobby = true;
-    this.sessionWagered = 0;
-    this.sessionWagerLimit = readCreditInput(this.elements.sessionLimitInput);
-    this.walletView.resetPreviousBankroll();
-    this.elements.setup.classList.add('hidden');
-    this.elements.shell.classList.remove('hidden');
-    this.table.resize();
-    this.renderPlayerProfile();
-    this.renderGameLobby();
-    this.saveSession();
-    this.renderCasino();
-    this.maybeAutoJoinInvite();
-  }
-
-  private dealBlackjack(): void {
-    const player = this.currentPlayer;
-    if (!player) {
-      return;
-    }
-    if (!this.canUseServer()) {
-      return;
-    }
-
-    const wager = readPositiveCreditInput(this.elements.blackjackWager);
-    if (this.activeRoomForGame()?.gameId === 'blackjack') {
-      this.multiplayer.send({ type: 'blackjack-deal', wager });
-      this.audio.play('deal');
-      return;
-    }
-    this.showRoomRequiredMessage();
-  }
-
-  private sendBlackjackAction(action: 'hit' | 'stand' | 'double' | 'split' | 'insurance' | 'new-hand'): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (this.activeRoomForGame()?.gameId === 'blackjack') {
-      this.multiplayer.send({ type: 'blackjack-action', action });
-      return;
-    }
-    this.showRoomRequiredMessage();
-  }
-
-  private spinSlots(): void {
-    const player = this.currentPlayer;
-    if (!player) {
-      return;
-    }
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (this.activeRoomForGame()?.gameId === this.activeGame) {
-      this.slotsView.playSpinAnimation();
-      this.multiplayer.send({ type: 'slots-spin' });
-      this.audio.play('spin');
-      return;
-    }
-    this.showRoomRequiredMessage();
-  }
-
-  private setMultiplayerSlotsWager(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (this.activeRoomForGame()?.gameId !== this.activeGame) {
-      return;
-    }
-    const wager = readPositiveCreditInput(this.elements.slotsWager);
-    this.multiplayer.send({ type: 'slots-wager', wager });
-  }
-
-  private readyMultiplayerSlots(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (this.activeRoomForGame()?.gameId !== this.activeGame) {
-      return;
-    }
-    this.multiplayer.send({ type: 'slots-ready', ready: true });
-  }
-
-  private pickSlotsBonus(): void {
-    if (!this.canUseServer()) {
-      return;
-    }
-    if (this.activeRoomForGame()?.gameId === this.activeGame) {
-      this.multiplayer.send({ type: 'slots-pick-bonus' });
-      return;
-    }
-    this.showRoomRequiredMessage();
-  }
-
-  protected activeRoomForGame(): RoomSnapshot | undefined {
-    return this.multiplayer.room?.gameId === this.activeGame ? this.multiplayer.room : undefined;
-  }
-
-  protected canUseServer(): boolean {
-    if (this.multiplayer.connected) {
-      return true;
-    }
-    this.connectionState = 'reconnecting';
-    this.renderConnectionState();
-    this.elements.roomStatus.textContent = 'Reconnecting to the server. Actions are paused.';
-    return false;
-  }
-
-  private adjustCurrentBankroll(action: 'add' | 'subtract' | 'reset'): void {
-    const profile = this.currentProfile();
-    if (!profile || !this.canUseServer()) {
-      return;
-    }
-    if (action === 'reset' && !window.confirm('Reset this profile bankroll to £1,000?')) {
-      return;
-    }
-    this.multiplayer.adjustBankroll(profile.id, action, readPositiveCreditInput(this.elements.moneyInput));
-  }
-
-  private acceptHouseAdvance(): void {
-    const profile = this.currentProfile();
-    if (!profile || !this.canUseServer()) {
-      return;
-    }
-    this.elements.houseAdvanceButton.disabled = true;
-    this.multiplayer.acceptHouseAdvance(profile.id);
-  }
-
-  private authorizeAdmin(): void {
-    this.multiplayer.authorizeAdmin(this.elements.adminTokenInput.value);
-  }
-
-  private resetAllBankrolls(): void {
-    if (!this.canUseServer() || !window.confirm('Reset every server profile bankroll to £1,000?')) {
-      return;
-    }
-    this.multiplayer.resetAllBankrolls();
-  }
-
-  private clearServerData(): void {
-    if (!this.canUseServer() || !window.confirm('Clear all saved profiles and session data?')) {
-      return;
-    }
-    this.player = undefined;
-    this.profileState = { profiles: [] };
-    this.pendingRoomRestore = undefined;
-    this.clearClientSession();
-    this.profileSetupView.clearSelection();
-    this.multiplayer.clearServerData();
-    this.elements.shell.classList.add('hidden');
-    this.elements.setup.classList.remove('hidden');
-    this.renderProfileSetup();
-  }
-
-  private applyProfileAccess(ownedProfileIds: readonly ProfileId[]): void {
-    this.profileAccessReceived = true;
-    this.ownedProfileIds.clear();
-    ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));
-    if (this.player && !this.ownedProfileIds.has(this.player.profileId)) {
-      this.player = undefined;
-    }
-    if (!this.player) {
-      const clientSession = this.loadClientSession();
-      if (clientSession && this.ownedProfileIds.has(clientSession.profileId)) {
-        this.restoreSavedSession(clientSession);
-      }
-    }
-    this.renderProfileSetup();
-    if (this.player) {
-      this.elements.setup.classList.add('hidden');
-      this.elements.shell.classList.remove('hidden');
-      this.renderPlayerProfile();
-      this.renderGameLobby();
-      this.renderCasino();
-    }
-  }
-
-  private applyAdminAccess(authorized: boolean): void {
-    if (authorized) {
-      this.elements.adminTokenInput.value = '';
-      this.elements.roomStatus.textContent = 'Admin controls unlocked.';
-    } else {
-      this.elements.roomStatus.textContent = 'Admin token was not accepted.';
-    }
-    this.renderAdminControls();
-  }
-
-  private renderAdminControls(): void {
-    const adminButtons = [
-      this.elements.addMoneyButton,
-      this.elements.subtractMoneyButton,
-      this.elements.resetMoneyButton,
-      this.elements.resetAllButton,
-      this.elements.clearSavesButton,
-    ];
-    adminButtons.forEach((button) => {
-      button.disabled = !this.multiplayer.hasAdminAccess;
-    });
-    this.elements.authorizeAdminButton.textContent = this.multiplayer.hasAdminAccess ? 'Admin Unlocked' : 'Unlock Admin';
-    this.elements.authorizeAdminButton.disabled = this.multiplayer.hasAdminAccess;
-    this.elements.adminTokenInput.disabled = this.multiplayer.hasAdminAccess;
-  }
-
-  private canWager(amount: number): boolean {
-    return amount > 0 && (this.sessionWagerLimit <= 0 || this.sessionWagered + amount <= this.sessionWagerLimit);
-  }
-
-  private recordSessionWager(amount: number): void {
-    this.sessionWagered += Math.max(0, Math.floor(amount));
-    this.saveSession();
-    this.renderSessionLimit();
   }
 }

@@ -56,7 +56,7 @@ export abstract class GameAppRendering {
   protected abstract sessionWagered: number;
   protected abstract multiplayerRooms: readonly RoomSummary[];
   protected abstract connectionState: RealtimeConnectionState;
-  protected abstract readonly ownedProfileIds: ReadonlySet<ProfileId>;
+  protected abstract readonly ownedProfileIds: Set<ProfileId>;
   protected abstract profileAccessReceived: boolean;
   protected abstract get currentPlayer(): CasinoPlayer | undefined;
 
