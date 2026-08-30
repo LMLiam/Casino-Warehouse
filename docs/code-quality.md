@@ -41,7 +41,7 @@ The app is organised by domain first. New modules should go into the narrowest f
 - No obvious payout or settlement logic duplicated in `src/ui/`.
 - One module-scope top-level element per file.
 - No vague `utils`, `helpers`, `misc`, or `manager` filenames.
-- Files over 700 lines must either be split or listed with a documented exception.
+- Files over 400 lines must either be split or listed with a documented exception.
 - App modules must live in an approved `src/app/<role>/` folder instead of directly under `src/app/`.
 - Tests must live under `tests/unit/<domain>/` or `tests/e2e/`.
 - No unexplained magic numbers in checked TypeScript, TSX, or repository tooling scripts.

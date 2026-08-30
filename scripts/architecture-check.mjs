@@ -11,7 +11,7 @@ const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
 const sourceRoot = join(workspaceRoot, 'src');
 const testRoot = join(workspaceRoot, 'tests');
 const scriptRoot = join(workspaceRoot, 'scripts');
-const maxSourceFileLines = 700;
+const maxSourceFileLines = 400;
 const sourceFiles = listFiles(sourceRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const scriptFiles = listFiles(scriptRoot).filter((file) => extname(file) === '.mjs');
@@ -86,7 +86,7 @@ function checkImportBoundaries(relativePath, source) {
 }
 
 function checkBankrollMutation(relativePath, source) {
-  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/multiplayer/roomAuthority.ts']);
+  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/game/engine/BeatTheHouseState.ts', 'src/multiplayer/roomAuthority.ts']);
   const mutatesBankroll = /\bthis\.bankroll\s*(?:[+\-*/]?=|\+\+|--)|\.bankroll\s*(?:[+\-*/]?=|\+\+|--)/.test(source);
   if (mutatesBankroll && !allowed.has(relativePath)) {
     errors.push(`${relativePath} mutates bankroll directly. Route changes through the authorised game/room/profile ledger modules.`);
