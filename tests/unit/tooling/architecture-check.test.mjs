@@ -7,6 +7,7 @@ import requireZodRecordKeyValue from '../../../scripts/require-zod-record-key-va
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
 import { stateLoaderErrors } from '../../../scripts/state-loader-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
+import { checkVagueFilename } from '../../../scripts/vagueFilenameCheck.mjs';
 import { zodObjectErrors } from '../../../scripts/zod-object-check.mjs';
 
 describe('topLevelElementErrors', () => {
@@ -123,6 +124,18 @@ describe('stateLoaderErrors', () => {
   it('allows result-based recovery and non-loader writes', () => {
     expect(stateLoaderErrors('src/state/session/loadSessionState.ts', 'export const loadSessionState = () => ({ recovered: true });')).toEqual([]);
     expect(stateLoaderErrors('src/state/session/saveSessionState.ts', 'export const saveSessionState = () => { throw new Error("bad"); };')).toEqual([]);
+  });
+});
+
+describe('checkVagueFilename', () => {
+  it('rejects utility-style filenames, including compound names', () => {
+    expect(checkVagueFilename('src/game/utils.ts')).toContain('vague filename');
+    expect(checkVagueFilename('src/state/storageUtils.ts')).toContain('vague filename');
+    expect(checkVagueFilename('src/state/profile-utils.ts')).toContain('vague filename');
+  });
+
+  it('accepts domain-specific filenames', () => {
+    expect(checkVagueFilename('src/state/profileStore.ts')).toBeUndefined();
   });
 });
 
