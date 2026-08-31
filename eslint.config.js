@@ -1,5 +1,8 @@
+import { fixupPluginRules } from '@eslint/compat';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import eslintPluginStrictDependencies from 'eslint-plugin-strict-dependencies';
+import eslintPluginZod from 'eslint-plugin-zod';
 import requireZodRecordKeyValue from './scripts/require-zod-record-key-value.mjs';
 
 const globals = {
@@ -59,11 +62,35 @@ export default [
           'require-zod-record-key-value': requireZodRecordKeyValue,
         },
       },
+      'strict-dependencies': fixupPluginRules(eslintPluginStrictDependencies),
+      zod: eslintPluginZod,
     },
     rules: {
       'local/require-zod-record-key-value': 'error',
       'no-throw-literal': 'error',
       'no-undef': 'off',
+      // Use semantic Zod rules without forcing an import or formatting migration.
+      'zod/no-any-schema': 'error',
+      'zod/no-coerce-boolean': 'error',
+      'zod/no-conflicting-checks': 'error',
+      'zod/no-duplicate-schema-methods': 'error',
+      'zod/no-empty-custom-schema': 'error',
+      'zod/no-native-enum': 'error',
+      'zod/no-number-schema-with-finite': 'error',
+      'zod/no-number-schema-with-int': 'error',
+      'zod/no-number-schema-with-is-finite': 'error',
+      'zod/no-number-schema-with-is-int': 'error',
+      'zod/no-number-schema-with-safe': 'error',
+      'zod/no-number-schema-with-step': 'error',
+      'zod/no-optional-and-default-together': 'error',
+      'zod/no-promise-schema': 'error',
+      'zod/no-schema-with-is-nullable': 'error',
+      'zod/no-schema-with-is-optional': 'error',
+      'zod/no-string-schema-with-uuid': 'error',
+      'zod/no-throw-in-refine': 'error',
+      'zod/no-transform-in-record-key': 'error',
+      'zod/no-unnecessary-readonly': 'error',
+      'zod/require-brand-type-parameter': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
@@ -97,6 +124,7 @@ export default [
   {
     files: ['src/game/**/*.{ts,tsx}'],
     rules: {
+      'strict-dependencies/strict-dependencies': ['error', [{ module: 'src/ui/', allowReferenceFrom: [] }], { resolveRelativeImport: true }],
       'no-restricted-syntax': [
         'error',
         { selector: 'TSUnknownKeyword', message: 'Do not use the unknown type. Use a named domain type.' },

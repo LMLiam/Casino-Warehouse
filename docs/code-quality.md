@@ -21,7 +21,7 @@ The app is organised by domain first. New modules should go into the narrowest f
 
 ## Static Checks
 
-`npm run lint` now runs ESLint, TypeScript with `noUnusedLocals` and `noUnusedParameters`, and `npm run architecture:check`. The architecture check also runs Knip for unused files, exports, types, and dependencies, then runs depcheck for unused npm dependencies.
+`npm run lint` runs static ESLint and TypeScript checks, the architecture check, and supply-chain checks. The architecture check also runs Knip for unused files, exports, types, and dependencies, then runs depcheck for unused npm dependencies.
 
 `eslint.config.js` enforces syntax-level bans with `no-restricted-syntax`:
 
@@ -30,6 +30,8 @@ The app is organised by domain first. New modules should go into the narrowest f
 - No `typeof x === 'object'` — use a Zod schema (`cardSchema.safeParse`) or a strict `in` guard (`'bets' in snapshot`), see `src/multiplayer/roomAuthorityModel/timeoutWithUnrefSchema.ts:4`.
 - No `Math.random()` inside `src/game/` — use `src/game/rng.ts` and inject deterministic RNG in tests.
 - No literal throws. State loader modules under `src/state/**/load*.ts` must return recovery results instead of throwing on invalid saved data.
+- Zod schemas must avoid unsafe or deprecated patterns, including `z.any()`, `z.coerce.boolean()`, deprecated number checks, duplicate checks, and throwing from refinement callbacks.
+- `src/game/` cannot import `src/ui/`; the ESLint strict-dependencies rule checks relative and root-based imports.
 
 `scripts/architecture-check.mjs` enforces domain and structural rules:
 

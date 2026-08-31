@@ -3,7 +3,7 @@ import { volumeSchema } from './volumeSchema';
 
 export const audioSettingsSchema = z
   .object({
-    muted: z.coerce.boolean().default(false),
+    muted: z.boolean().default(false),
     masterVolume: volumeSchema.default(0.55),
     musicVolume: volumeSchema.default(0.22),
     effectsVolume: volumeSchema.default(0.7),

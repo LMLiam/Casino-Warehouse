@@ -9,17 +9,17 @@ export const slotThemeSchema = z
     id: slotThemeIdSchema,
     title: z.string().min(1),
     accent: hexColourSchema,
-    columns: z.number().int().min(3).max(3),
-    rows: z.number().int().min(5).max(5),
+    columns: z.int().min(3).max(3),
+    rows: z.int().min(5).max(5),
     wildSymbol: slotSymbolSchema.optional(),
     reelStrip: z.array(slotSymbolSchema).min(3, 'Slot reel strips need at least three symbols.'),
-    payouts: z.partialRecord(slotSymbolSchema, z.number().int().positive()),
+    payouts: z.partialRecord(slotSymbolSchema, z.int().positive()),
     jackpots: z.partialRecord(
       jackpotTierSchema,
       z
         .object({
           symbol: slotSymbolSchema,
-          multiplier: z.number().int().positive(),
+          multiplier: z.int().positive(),
           label: z.string().min(1),
         })
         .strict(),
@@ -27,9 +27,9 @@ export const slotThemeSchema = z
     bonus: z
       .object({
         triggerSymbol: slotSymbolSchema,
-        picks: z.number().int().positive(),
-        freeSpinsOnTwoBonus: z.number().int().nonnegative(),
-        multipliers: z.array(z.number().int().positive()).min(1),
+        picks: z.int().positive(),
+        freeSpinsOnTwoBonus: z.int().nonnegative(),
+        multipliers: z.array(z.int().positive()).min(1),
       })
       .strict(),
   })
