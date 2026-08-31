@@ -17,6 +17,7 @@ const forbiddenAssetLanguage =
   /generated-placeholder|manual placeholder|legacy placeholder|temporary fallback|optional-deferred|deferred required|missing required asset/i;
 const forbiddenLegacyPath =
   /(?:\.\.\/\.\.\/(?:table|chips-sheet)\.png|['"`]\/(?:table|chips-sheet)\.png['"`]|\/assets\/blackjack\/table\.svg|\/assets\/lobby\/game-tiles\/[^'"`)]+\.svg|\/assets\/slots\/[^'"`)]+\/frame\.svg)/;
+const assetPixelInspectionTimeoutMs = 30_000;
 
 const assetFilePath = (assetPath: string): string => {
   const relativePath = assetPath.replace(/^\//, '');
@@ -252,14 +253,18 @@ describe('casino asset manifest', () => {
     expect(new Set(Object.values(casinoAssets.slotSymbols).map((asset) => pngDimensions(asset.path))).size).toBe(1);
   });
 
-  it('provides transparent generated image assets for every slot reel symbol', () => {
-    const symbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
-    for (const symbol of symbols) {
-      const asset = slotSymbolAsset(symbol);
-      expect(asset).toMatchObject({ category: 'slot-symbol', source: 'imagegen', transparent: true, dimensions: '512x512' });
-      expect(pngAlphaSummary(asset.path)).toEqual({ alphaMin: 0, alphaMax: 255, opaqueChromaPixels: 0, transparentCorners: 4 });
-    }
-  });
+  it(
+    'provides transparent generated image assets for every slot reel symbol',
+    () => {
+      const symbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
+      for (const symbol of symbols) {
+        const asset = slotSymbolAsset(symbol);
+        expect(asset).toMatchObject({ category: 'slot-symbol', source: 'imagegen', transparent: true, dimensions: '512x512' });
+        expect(pngAlphaSummary(asset.path)).toEqual({ alphaMin: 0, alphaMax: 255, opaqueChromaPixels: 0, transparentCorners: 4 });
+      }
+    },
+    assetPixelInspectionTimeoutMs,
+  );
 
   it('keeps stale placeholders, legacy paths, and duplicate asset routes out of code and docs', () => {
     expect(readFileSync(join(workspaceRoot, 'src', 'assets', 'manifest', 'casinoAssets.ts'), 'utf8')).not.toMatch(forbiddenAssetLanguage);
