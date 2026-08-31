@@ -415,6 +415,9 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.createRoom('beat-the-house', 'Blocked Room', 3, profileA, 'Alice', 1000);
     client.acceptHouseAdvance(profileA);
     client.adjustBankroll(profileA, 'add', 100);
+    const sentBeforeLockedClear = socket.sent.length;
+    client.clearServerData();
+    expect(socket.sent).toHaveLength(sentBeforeLockedClear);
     expect(events.onError).toHaveBeenCalledWith('This browser does not own that server profile.');
     expect(events.onError).toHaveBeenCalledWith('Admin controls are locked for this browser.');
 
@@ -440,6 +443,8 @@ describe('multiplayer realtime client reconnect reloads', () => {
     socket.serverMessage({ type: 'admin-access', authorized: true });
     client.adjustBankroll(profileA, 'add', 100);
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'admin-bankroll', profileId: 'profile-a' });
+    client.clearServerData();
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'clear-server-data' });
   });
 
   it('covers client-side ownership, admin token, stale socket, and heartbeat edge cases', () => {

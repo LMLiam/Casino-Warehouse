@@ -623,6 +623,37 @@ describe('multiplayer WebSocket server', () => {
     expect(updated.type === 'data-state' ? updated.profileState.profiles.find((profile) => profile.id === aliceProfile.id)?.bankroll : 0).toBe(1075);
   });
 
+  it('uses the rotated CASINO_ADMIN_TOKEN for a newly created server', async () => {
+    const originalAdminToken = process.env.CASINO_ADMIN_TOKEN;
+    const firstAdminToken = 'first-server-admin-secret';
+    const rotatedAdminToken = 'rotated-server-admin-secret';
+
+    try {
+      process.env.CASINO_ADMIN_TOKEN = firstAdminToken;
+      const firstServer = await startServer();
+      const firstAdmin = await connect(firstServer.ws);
+      await authorizeAdmin(firstAdmin, firstAdminToken);
+
+      await closeCurrentServer();
+      process.env.CASINO_ADMIN_TOKEN = rotatedAdminToken;
+      const rotatedServer = await startServer();
+      const rotatedAdmin = await connect(rotatedServer.ws);
+
+      rotatedAdmin.send({ type: 'authorize-admin', adminToken: firstAdminToken });
+      await expect(rotatedAdmin.waitFor((message) => message.type === 'admin-access')).resolves.toMatchObject({ authorized: false });
+      rotatedAdmin.send({ type: 'clear-server-data' });
+      await expect(rotatedAdmin.waitFor(adminLockedError)).resolves.toMatchObject({ type: 'error', code: 'rejected' });
+
+      await authorizeAdmin(rotatedAdmin, rotatedAdminToken);
+    } finally {
+      if (originalAdminToken === undefined) {
+        delete process.env.CASINO_ADMIN_TOKEN;
+      } else {
+        process.env.CASINO_ADMIN_TOKEN = originalAdminToken;
+      }
+    }
+  });
+
   it('authorizes House Advance at zero balance, prevents duplicate accepts, and reconciles active rooms before data-state', async () => {
     const baseUrl = await startServer('.', undefined, { adminToken: 'server-admin-secret' });
     const alice = await connect(baseUrl.ws);
