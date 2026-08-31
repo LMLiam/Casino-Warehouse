@@ -72,6 +72,12 @@ For visual or browser workflow changes, also run:
 npm run visual
 ```
 
+For any change under `src/ui/`, also run:
+
+```bash
+npm run visual:serial
+```
+
 Playwright defaults to two workers so browser tests catch shared-state
 collisions quickly without overloading local laptops. The
 `Project Checks` workflow runs the same
@@ -98,7 +104,8 @@ PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --pr
 
 `NGROK_SMOKE_URL` remains an ngrok-specific alias for existing workflows.
 
-Serial execution is reserved for debugging with `npm run visual:serial`.
+The `Project Checks` workflow selects `npm run visual:serial` when a change
+includes `src/ui/` files. It uses `npm run visual` for other changes.
 `tests/e2e/multiplayer-flow.spec.ts` opts into Playwright's parallel test mode
 because every scenario owns an ephemeral realtime server and fresh browser
 contexts. The `Project Checks` e2e matrix is generated from
@@ -113,7 +120,7 @@ node scripts/ci-e2e-matrix.mjs --report-balance   # shard balance per lane
 npm run visual -- --workers=1 --project=laptop --shard=1/2 tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 ```
 
-For debugging a flaky browser test serially, use:
+For a change under `src/ui/`, or to debug a flaky browser test serially, use:
 
 ```bash
 npm run visual:serial

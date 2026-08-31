@@ -80,6 +80,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -101,8 +103,25 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
+      - name: Detect UI changes
+        id: ui-path
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- 'src/ui/**'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Playwright e2e and visual tests
-        run: npm run visual -- ${{ matrix.playwrightArgs }}
+        run: |
+          if [ "${{ steps.ui-path.outputs.changed }}" = "true" ]; then
+            npm run visual:serial -- ${{ matrix.playwrightArgs }}
+          else
+            npm run visual -- ${{ matrix.playwrightArgs }}
+          fi
 
       - name: Upload Playwright artifacts
         if: failure()
