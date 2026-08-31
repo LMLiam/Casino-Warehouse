@@ -51,6 +51,8 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "@eslint/js": "^10.0.1",
     "@ngrok/ngrok": "^1.7.0",
     "@playwright/test": "^1.60.0",
@@ -78,6 +80,7 @@
     }
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged"
+    "pre-commit": "npx lint-staged",
+    "commit-msg": "npx commitlint --edit \"$1\" && node scripts/validate-pr-standards.mjs --commit-message \"$1\""
   }
 }

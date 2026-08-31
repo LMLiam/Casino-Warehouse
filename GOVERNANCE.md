@@ -35,6 +35,8 @@ Maintainers may reorder work when a dependency, security concern, or contributor
 
 Pull requests must follow the template, use a conventional title, include the required labels, and keep generated build output out of commits. Maintainers review pull requests after the relevant local checks and required GitHub checks pass.
 
+Commit messages and pull request titles use `type(scope): summary`. Supported types are `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`, `security`, and `deps`. Use lower-case letters, numbers, and hyphens in the scope. Keep the summary at least five characters long.
+
 Maintainer review focuses on correctness, security, maintainability, accessibility, test coverage, fit with the current milestone, and consistency with the noncommercial/source-available project scope. Pull requests may be held, requested for changes, or closed when they do not meet those expectations.
 
 The `main` branch is protected. Direct commits are blocked, required checks must pass, and maintainers merge accepted pull requests with squash commits. Maintainers may edit the squash title or body to match repository history.
