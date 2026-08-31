@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BlackjackGame } from '../../../src/game/blackjack/BlackjackGame';
 import { slotThemes } from '../../../src/game/catalog/slotThemes';
 import type { Card } from '../../../src/game/cards/Card';
@@ -25,6 +25,14 @@ class MemoryStorage implements StorageLike {
 
   public setItem(key: string, value: string): void {
     this.values.set(key, value);
+  }
+
+  public removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  public clear(): void {
+    this.values.clear();
   }
 }
 
@@ -141,6 +149,34 @@ describe('session store', () => {
     expect(loaded.session).toBeUndefined();
     expect(loaded.recovered).toBe(true);
     expect(loaded.error).toBeTruthy();
+    expect(storage.getItem('casino_warehouse_session')).toBeNull();
+  });
+
+  it('keeps the recovery result when corrupt session storage cannot be removed', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('casino_warehouse_session', '{ broken');
+    vi.spyOn(storage, 'removeItem').mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+
+    const loaded = loadSessionState(storage);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.session).toBeUndefined();
+  });
+
+  it('recovers when session storage access throws', () => {
+    const storage: StorageLike = {
+      getItem: () => {
+        throw Symbol('storage unavailable');
+      },
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    };
+
+    expect(loadSessionState(storage)).toMatchObject({ recovered: true, error: 'Unknown session-data error.' });
+    expect(storage.removeItem).toHaveBeenCalledWith('casino_warehouse_session');
   });
 
   it('rejects invalid session fields and malformed nested snapshots', () => {

@@ -28,6 +28,14 @@ class MemoryStorage implements StorageLike {
   public setItem(key: string, value: string): void {
     this.values.set(key, value);
   }
+
+  public removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  public clear(): void {
+    this.values.clear();
+  }
 }
 
 describe('Zod-backed runtime validation', () => {
@@ -117,6 +125,7 @@ describe('Zod-backed runtime validation', () => {
     const loaded = loadProfileStore(storage);
     expect(loaded.recovered).toBe(true);
     expect(loaded.error).toContain('Profile id is required');
+    expect(storage.getItem('casino_warehouse_profiles')).toBeNull();
 
     expect(parseProfileStoreJson('{"version":2,"profiles":[]}')).toMatchObject({
       ok: false,

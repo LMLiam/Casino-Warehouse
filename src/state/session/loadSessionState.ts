@@ -5,6 +5,15 @@ import type { SessionLoadResult } from './SessionLoadResult';
 import { sessionStorageKey } from './sessionStorageKey';
 
 export const loadSessionState = (storage: StorageLike, key = sessionStorageKey): SessionLoadResult => {
+  const recover = (message: string): SessionLoadResult => {
+    try {
+      storage.removeItem(key);
+    } catch {
+      // Preserve recovery when storage cleanup is unavailable.
+    }
+    return { recovered: true, error: message };
+  };
+
   try {
     const raw = storage.getItem(key);
     if (!raw) {
@@ -13,13 +22,10 @@ export const loadSessionState = (storage: StorageLike, key = sessionStorageKey):
 
     const parsed = parseSessionState(parseJsonText(raw));
     if (!parsed.ok) {
-      return { recovered: true, error: parsed.error.message };
+      return recover(parsed.error.message);
     }
     return { session: parsed.value, recovered: false };
   } catch (error) {
-    return {
-      recovered: true,
-      error: error instanceof Error ? error.message : 'Unknown session-data error.',
-    };
+    return recover(error instanceof Error ? error.message : 'Unknown session-data error.');
   }
 };

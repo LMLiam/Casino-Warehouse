@@ -5,6 +5,15 @@ import type { ProfileStoreResult } from './ProfileStoreResult';
 import type { StorageLike } from './StorageLike';
 
 export const loadProfileStore = (storage: StorageLike, key = profileStorageKey): ProfileStoreResult => {
+  const recover = (message: string): ProfileStoreResult => {
+    try {
+      storage.removeItem(key);
+    } catch {
+      // Preserve recovery when storage cleanup is unavailable.
+    }
+    return { state: emptySaveState(), recovered: true, error: message };
+  };
+
   try {
     const raw = storage.getItem(key);
     if (!raw) {
@@ -13,14 +22,10 @@ export const loadProfileStore = (storage: StorageLike, key = profileStorageKey):
 
     const parsed = parseProfileStoreJson(raw);
     if (!parsed.ok) {
-      return { state: emptySaveState(), recovered: true, error: parsed.error.message };
+      return recover(parsed.error.message);
     }
     return { state: parsed.value, recovered: false };
   } catch (error) {
-    return {
-      state: emptySaveState(),
-      recovered: true,
-      error: error instanceof Error ? error.message : 'Unknown save-data error.',
-    };
+    return recover(error instanceof Error ? error.message : 'Unknown save-data error.');
   }
 };

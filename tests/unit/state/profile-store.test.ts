@@ -39,6 +39,14 @@ class MemoryStorage implements StorageLike {
   public setItem(key: string, value: string): void {
     this.values.set(key, value);
   }
+
+  public removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  public clear(): void {
+    this.values.clear();
+  }
 }
 
 describe('profile store', () => {
@@ -307,6 +315,34 @@ describe('profile store', () => {
     expect(loaded.recovered).toBe(true);
     expect(loaded.state.profiles).toEqual([]);
     expect(loaded.error).toBeTruthy();
+    expect(storage.getItem('casino_warehouse_profiles')).toBeNull();
+  });
+
+  it('keeps the recovery result when corrupted storage cannot be removed', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('casino_warehouse_profiles', '{ broken');
+    vi.spyOn(storage, 'removeItem').mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+
+    const loaded = loadProfileStore(storage);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.state.profiles).toEqual([]);
+  });
+
+  it('recovers when profile storage access throws', () => {
+    const storage: StorageLike = {
+      getItem: () => {
+        throw Symbol('storage unavailable');
+      },
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    };
+
+    expect(loadProfileStore(storage)).toMatchObject({ recovered: true, error: 'Unknown save-data error.' });
+    expect(storage.removeItem).toHaveBeenCalledWith('casino_warehouse_profiles');
   });
 
   it('keeps save failures visible to the caller', () => {
@@ -315,6 +351,8 @@ describe('profile store', () => {
       setItem: vi.fn(() => {
         throw new Error('quota exceeded');
       }),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
     };
 
     expect(() => saveProfileStore(storage, { profiles: [] })).toThrow('quota exceeded');
