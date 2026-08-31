@@ -47,7 +47,7 @@ Supply-chain controls are documented in [docs/supply-chain-security.md](docs/sup
 
 Keep new `src/` modules focused on one module-scope top-level element. Classes, React components, functions, constants, variables, interfaces, types, enums, and schemas all count as top-level elements whether or not they are exported. File-local implementation details must be nested inside the element they support or extracted into focused module files.
 
-`npm run architecture:check` enforces this convention. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
+`npm run architecture:check` enforces this convention and checks for unused files, exports, types, and npm dependencies with Knip and depcheck. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
 
 The architecture check also rejects unexplained magic numbers in source, TypeScript tests, and repository tooling scripts. Name game rules, payout multipliers, layout values, protocol bytes, thresholds, and reusable test-helper values in the narrowest owner, or use the documented inline exception marker only when an inline number is intentionally clearer.
 

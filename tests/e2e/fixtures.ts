@@ -59,9 +59,6 @@ export const resetBrowserStorage = async (page: Page, realtimeUrl: string): Prom
   );
 };
 
-export const currentRealtimeUrl = async (page: Page): Promise<string> =>
-  page.evaluate(() => localStorage.getItem('casino_realtime_url') ?? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
-
 const closeServer = async (server: CasinoServer): Promise<void> => {
   server.closePeers();
   server.closeAllConnections();

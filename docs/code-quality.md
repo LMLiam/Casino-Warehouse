@@ -21,7 +21,7 @@ The app is organised by domain first. New modules should go into the narrowest f
 
 ## Static Checks
 
-`npm run lint` now runs ESLint, TypeScript with `noUnusedLocals` and `noUnusedParameters`, and `npm run architecture:check`.
+`npm run lint` now runs ESLint, TypeScript with `noUnusedLocals` and `noUnusedParameters`, and `npm run architecture:check`. The architecture check also runs Knip for unused files, exports, types, and dependencies, then runs depcheck for unused npm dependencies.
 
 `eslint.config.js` enforces syntax-level bans with `no-restricted-syntax`:
 
@@ -45,6 +45,7 @@ The app is organised by domain first. New modules should go into the narrowest f
 - App modules must live in an approved `src/app/<role>/` folder instead of directly under `src/app/`.
 - Tests must live under `tests/unit/<domain>/` or `tests/e2e/`.
 - No unexplained magic numbers in checked TypeScript, TSX, or repository tooling scripts.
+- Knip and depcheck must report no unused source declarations or npm dependencies. The depcheck command ignores packages used through npm hook configuration or Tailwind configuration where static dependency detection cannot see the usage.
 
 ## Magic Numbers
 

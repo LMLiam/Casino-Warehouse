@@ -48,6 +48,6 @@ Important additions should include focused Vitest coverage for schema failures a
 
 ## Architecture Enforcement
 
-The architectural rules are enforced by `npm run architecture:check`, which is included in `npm run lint` and therefore in `npm run check`. The checker validates import boundaries, circular dependencies, direct game RNG usage, direct bankroll mutation, UI payout duplication, broad file-size exceptions, vague filenames, and one module-scope top-level element per file.
+The architectural rules are enforced by `npm run architecture:check`, which is included in `npm run lint` and therefore in `npm run check`. The checker validates import boundaries, circular dependencies, direct game RNG usage, direct bankroll mutation, UI payout duplication, broad file-size exceptions, vague filenames, one module-scope top-level element per file, and unused source or npm dependency declarations.
 
 See [code-quality.md](code-quality.md) for the current domain map, static-analysis rules, and documented exceptions.
