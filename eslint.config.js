@@ -41,6 +41,12 @@ export default [
     ignores: ['coverage/**', 'dist/**', 'dist-server/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
   },
   js.configs.recommended,
+  {
+    rules: {
+      'no-eval': 'error',
+      'no-new-func': 'error',
+    },
+  },
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx,mjs}'],
