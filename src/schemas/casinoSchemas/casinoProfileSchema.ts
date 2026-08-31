@@ -1,26 +1,24 @@
 import { z } from 'zod';
+import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import { bankrollTransactionSchema } from './bankrollTransactionSchema';
 import { creditSchema } from './creditSchema';
 import { houseAdvanceStateSchema } from './houseAdvanceStateSchema';
+import { hexColourSchema } from './hexColourSchema';
+import { isoTimestampSchema } from './isoTimestampSchema';
+import { profileIdSchema } from './profileIdSchema';
 import { profileNameSchema } from './profileNameSchema';
 import { profileStatsSchema } from './profileStatsSchema';
 
-export const casinoProfileSchema = z.object({
-  id: z.string().min(1, 'Profile id is required.'),
-  name: profileNameSchema,
-  color: z.string().optional(),
-  bankroll: creditSchema.default(0),
-  houseAdvance: houseAdvanceStateSchema.default({ outstandingBalance: 0, activeCount: 0 }),
-  stats: profileStatsSchema.default({
-    totalWagered: 0,
-    totalWon: 0,
-    netProfit: 0,
-    biggestWin: 0,
-    biggestWager: 0,
-    gamesPlayed: 0,
-    perGame: {},
-  }),
-  transactions: z.array(bankrollTransactionSchema).default([]),
-  createdAt: z.string().default(() => new Date().toISOString()),
-  updatedAt: z.string().default(() => new Date().toISOString()),
-});
+export const casinoProfileSchema = z
+  .object({
+    id: profileIdSchema,
+    name: profileNameSchema,
+    color: hexColourSchema,
+    bankroll: creditSchema,
+    houseAdvance: houseAdvanceStateSchema,
+    stats: profileStatsSchema,
+    transactions: z.array(bankrollTransactionSchema),
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
+  })
+  .strict() satisfies z.ZodType<CasinoProfile>;

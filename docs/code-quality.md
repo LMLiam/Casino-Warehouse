@@ -21,23 +21,33 @@ The app is organised by domain first. New modules should go into the narrowest f
 
 ## Static Checks
 
-`npm run lint` now runs ESLint, TypeScript with `noUnusedLocals` and `noUnusedParameters`, and `npm run architecture:check`.
+`npm run lint` runs static ESLint and TypeScript checks, the architecture check, and supply-chain checks. The architecture check also runs Knip for unused files, exports, types, and dependencies, then runs depcheck for unused npm dependencies.
 
-`scripts/architecture-check.mjs` enforces:
+`eslint.config.js` enforces syntax-level bans with `no-restricted-syntax`:
+
+- No `unknown` or `object` types, no `z.unknown()`, no `as unknown` casts — use named domain types, runtime type guards, or schemas.
+- No non-null assertions (`!`) — use a guard or fallback.
+- No `typeof x === 'object'` — use a Zod schema (`cardSchema.safeParse`) or a strict `in` guard (`'bets' in snapshot`), see `src/multiplayer/roomAuthorityModel/timeoutWithUnrefSchema.ts:4`.
+- No `Math.random()` inside `src/game/` — use `src/game/rng.ts` and inject deterministic RNG in tests.
+- No literal throws. State loader modules under `src/state/**/load*.ts` must return recovery results instead of throwing on invalid saved data.
+- Zod schemas must avoid unsafe or deprecated patterns, including `z.any()`, `z.coerce.boolean()`, deprecated number checks, duplicate checks, and throwing from refinement callbacks.
+- `src/game/` cannot import `src/ui/`; the ESLint strict-dependencies rule checks relative and root-based imports.
+
+`scripts/architecture-check.mjs` enforces domain and structural rules:
 
 - Game modules cannot import UI, app, or multiplayer modules.
 - Multiplayer and state modules cannot import UI or app modules.
 - UI modules cannot import the app shell.
 - No circular dependencies between source modules.
-- No direct `Math.random()` inside `src/game/`; use `src/game/rng.ts` and inject deterministic RNG in tests.
 - No direct bankroll property mutation outside `src/game/engine.ts`, `src/multiplayer/roomAuthority.ts`, and `src/state/profiles.ts`.
 - No obvious payout or settlement logic duplicated in `src/ui/`.
 - One module-scope top-level element per file.
 - No vague `utils`, `helpers`, `misc`, or `manager` filenames.
-- Files over 700 lines must either be split or listed with a documented exception.
+- Files over 400 lines must either be split or listed with a documented exception.
 - App modules must live in an approved `src/app/<role>/` folder instead of directly under `src/app/`.
 - Tests must live under `tests/unit/<domain>/` or `tests/e2e/`.
 - No unexplained magic numbers in checked TypeScript, TSX, or repository tooling scripts.
+- Knip and depcheck must report no unused source declarations or npm dependencies. The depcheck command ignores packages used through npm hook configuration or Tailwind configuration where static dependency detection cannot see the usage.
 
 ## Magic Numbers
 

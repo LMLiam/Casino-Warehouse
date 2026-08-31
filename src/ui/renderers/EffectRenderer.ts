@@ -71,7 +71,12 @@ export class EffectRenderer {
     }
 
     for (let index = 0; index < EffectRenderer.confettiPieceCount; index += 1) {
-      const bit = new Graphics().rect(-4, -3, 8, 6).fill({ color: [COLORS.gold, 0xfff5d6, 0xd23b32, 0x2d72ff][index % 4] });
+      const palette = [COLORS.gold, 0xfff5d6, 0xd23b32, 0x2d72ff] as const;
+      const paletteColor = palette[index % palette.length];
+      if (paletteColor === undefined) {
+        continue;
+      }
+      const bit = new Graphics().rect(-4, -3, 8, 6).fill({ color: paletteColor });
       bit.position.set(Math.random() * tableSize.width, EffectRenderer.confettiSpawnY - Math.random() * EffectRenderer.confettiSpawnYRange);
       this.layer.addChild(bit);
       gsap.to(bit, {

@@ -5,6 +5,11 @@ import type { HandId } from '../../../src/game/types/HandId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import { BeatControlsView } from '../../../src/app/views/BeatControlsView';
 import { chipValues } from '../../../src/ui/chips/chipValues';
+import { testConnectionId, testProfileId, testRoomId, testSessionId } from '../schemas/testIds';
+
+const aliceId = testProfileId('alice');
+const bobId = testProfileId('bob');
+const coryId = testProfileId('cory');
 
 class FakeClassList {
   private readonly classes = new Set<string>();
@@ -89,25 +94,25 @@ const createRoom = (
     readonly rebetSeatIds?: readonly HandId[];
   } = {},
 ): RoomSnapshot => ({
-  roomId: 'ROOM42',
+  roomId: testRoomId('ROOM42'),
   roomName: 'Beat Room',
-  hostProfileId: 'alice',
+  hostProfileId: aliceId,
   gameId: 'beat-the-house',
   gameTitle: 'Beat the House',
   status: 'betting',
   phase: 'betting',
-  sessionId: 'session-1',
+  sessionId: testSessionId('session-1'),
   revision: 1,
   maxPlayers: 3,
   allowSpectators: true,
   createdAt: 1,
   updatedAt: 1,
   players: options.players ?? [
-    { connectionId: 'a', profileId: 'alice', profileName: 'Alice', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
-    { connectionId: 'b', profileId: 'bob', profileName: 'Bob', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
+    { connectionId: testConnectionId('a'), profileId: aliceId, profileName: 'Alice', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
+    { connectionId: testConnectionId('b'), profileId: bobId, profileName: 'Bob', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
   ],
   spectators: [],
-  seats: options.seats ?? [{ seatId: 'left', profileId: 'alice' }, { seatId: 'right', profileId: 'bob' }, { seatId: 'centre' }],
+  seats: options.seats ?? [{ seatId: 'left', profileId: aliceId }, { seatId: 'right', profileId: bobId }, { seatId: 'centre' }],
   game,
   beat: { rebetSeatIds: options.rebetSeatIds ?? ['left'], readyProfileIds: [], readyCount: 0, playerCount: options.players?.length ?? 2 },
 });
@@ -184,11 +189,11 @@ describe('BeatControlsView', () => {
     };
     const room = {
       ...createRoom(snapshot),
-      beat: { rebetSeatIds: ['left' as const], readyProfileIds: ['alice'], readyCount: 1, playerCount: 2, readyPhase: 'betting' as const },
+      beat: { rebetSeatIds: ['left' as const], readyProfileIds: [aliceId], readyCount: 1, playerCount: 2, readyPhase: 'betting' as const },
     };
     const elements = createElements();
 
-    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
+    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, aliceId, 100);
 
     expect(elements.dealButton.textContent).toBe('Waiting to Deal');
     expect(elements.dealButton.disabled).toBe(true);
@@ -202,7 +207,7 @@ describe('BeatControlsView', () => {
       phase: 'settled' as const,
       beat: {
         rebetSeatIds: ['left' as const],
-        readyProfileIds: ['bob'],
+        readyProfileIds: [bobId],
         readyCount: 1,
         playerCount: 2,
         readyPhase: 'roundOver' as const,
@@ -212,7 +217,7 @@ describe('BeatControlsView', () => {
     };
     const elements = createElements();
 
-    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
+    new BeatControlsView(elements).render(snapshot, true, () => undefined, true, room, aliceId, 100);
 
     expect(elements.nextButton.textContent).toBe('Ready for Next');
     expect(elements.nextButton.disabled).toBe(false);
@@ -233,8 +238,8 @@ describe('BeatControlsView', () => {
     const aliceElements = createElements();
     const bobElements = createElements();
 
-    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
-    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, 'bob', 100);
+    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, aliceId, 100);
+    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, bobId, 100);
 
     expect(aliceElements.rebetButton.disabled).toBe(false);
     expect(aliceElements.clearButton.disabled).toBe(true);
@@ -258,8 +263,8 @@ describe('BeatControlsView', () => {
     const bobElements = createElements();
     const localElements = createElements();
 
-    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
-    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, 'bob', 100);
+    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, aliceId, 100);
+    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, bobId, 100);
     new BeatControlsView(localElements).render(snapshot, true, () => undefined, true, undefined, undefined, 100);
 
     expect(aliceElements.actionDock.dataset.beatSeat).toBe('left');
@@ -281,7 +286,7 @@ describe('BeatControlsView', () => {
     const room = createRoom(snapshot, { rebetSeatIds: ['right'] });
     const bobElements = createElements();
 
-    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, 'bob', 100);
+    new BeatControlsView(bobElements).render(snapshot, true, () => undefined, true, room, bobId, 100);
 
     expect(bobElements.clearButton.disabled).toBe(false);
     expect(bobElements.rebetButton.disabled).toBe(true);
@@ -296,19 +301,19 @@ describe('BeatControlsView', () => {
     };
     const room = createRoom(snapshot, {
       players: [
-        { connectionId: 'a', profileId: 'alice', profileName: 'Alice', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
-        { connectionId: 'c', profileId: 'cory', profileName: 'Cory', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
+        { connectionId: testConnectionId('a'), profileId: aliceId, profileName: 'Alice', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
+        { connectionId: testConnectionId('c'), profileId: coryId, profileName: 'Cory', bankroll: 100, sessionStartBankroll: 100, role: 'player' },
       ],
-      seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'right', profileId: 'cory' }, { seatId: 'centre' }],
+      seats: [{ seatId: 'left', profileId: aliceId }, { seatId: 'right', profileId: coryId }, { seatId: 'centre' }],
       rebetSeatIds: ['left'],
     });
     const aliceElements = createElements();
     const coryElements = createElements();
     const missingEligibilityElements = createElements();
 
-    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, 'alice', 100);
-    new BeatControlsView(coryElements).render(snapshot, true, () => undefined, true, room, 'cory', 100);
-    new BeatControlsView(missingEligibilityElements).render(snapshot, true, () => undefined, true, { ...room, beat: undefined }, 'alice', 100);
+    new BeatControlsView(aliceElements).render(snapshot, true, () => undefined, true, room, aliceId, 100);
+    new BeatControlsView(coryElements).render(snapshot, true, () => undefined, true, room, coryId, 100);
+    new BeatControlsView(missingEligibilityElements).render(snapshot, true, () => undefined, true, { ...room, beat: undefined }, aliceId, 100);
 
     expect(aliceElements.rebetButton.disabled).toBe(false);
     expect(coryElements.rebetButton.disabled).toBe(true);

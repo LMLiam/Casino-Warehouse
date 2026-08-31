@@ -16,13 +16,13 @@ export class SlotsGame {
 
   private static readonly slotSymbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
 
-  private readonly rng?: Rng;
+  private readonly rng?: Rng | undefined;
   private readonly theme: SlotTheme;
   private phase: SlotPhase = 'idle';
   private wager = 0;
   private reels: SlotSymbol[];
   private lineWin = 0;
-  private jackpotWin?: JackpotWin;
+  private jackpotWin?: JackpotWin | undefined;
   private bonusPicksRemaining = 0;
   private freeSpinsRemaining = 0;
   private bonusBank = 0;
@@ -116,7 +116,11 @@ export class SlotsGame {
       return this.snapshot();
     }
 
-    const multiplier = forcedMultiplier ?? this.theme.bonus.multipliers[this.randomIndex(this.theme.bonus.multipliers.length)];
+    const multiplierValue = this.theme.bonus.multipliers[this.randomIndex(this.theme.bonus.multipliers.length)];
+    if (multiplierValue === undefined) {
+      throw new Error('Slot bonus multiplier is invalid.');
+    }
+    const multiplier = forcedMultiplier ?? multiplierValue;
     const prize = this.wager * multiplier;
     this.bonusBank += prize;
     this.bonusPicksRemaining -= 1;
@@ -133,11 +137,21 @@ export class SlotsGame {
   }
 
   private randomSymbol(): SlotSymbol {
-    return this.theme.reelStrip[this.randomIndex(this.theme.reelStrip.length)];
+    const symbol = this.theme.reelStrip[this.randomIndex(this.theme.reelStrip.length)];
+    if (!symbol) {
+      throw new Error('Slot reel strip is invalid.');
+    }
+    return symbol;
   }
 
   private initialGrid(): SlotSymbol[] {
-    return Array.from({ length: SlotsGame.gridSize(this.theme) }, (_, index) => this.theme.reelStrip[index % this.theme.reelStrip.length]);
+    return Array.from({ length: SlotsGame.gridSize(this.theme) }, (_, index) => {
+      const symbol = this.theme.reelStrip[index % this.theme.reelStrip.length];
+      if (!symbol) {
+        throw new Error('Slot reel strip is invalid.');
+      }
+      return symbol;
+    });
   }
 
   private randomIndex(length: number): number {
@@ -156,6 +170,9 @@ export class SlotsGame {
     }
 
     const [first, second, third] = row;
+    if (first === undefined || second === undefined || third === undefined) {
+      return 0;
+    }
     if (first === second && second === third && first !== theme.bonus.triggerSymbol) {
       return wager * (theme.payouts[first] ?? 0);
     }
@@ -171,6 +188,9 @@ export class SlotsGame {
 
     const firstPayingSymbol = row.find((symbol) => symbol !== wildSymbol && symbol !== theme.bonus.triggerSymbol);
     const lineSymbol = row[0] === wildSymbol ? (firstPayingSymbol ?? wildSymbol) : row[0];
+    if (lineSymbol === undefined) {
+      return 0;
+    }
     if (lineSymbol === theme.bonus.triggerSymbol) {
       return 0;
     }

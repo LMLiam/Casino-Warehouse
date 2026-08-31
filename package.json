@@ -21,35 +21,38 @@
     "dev:cloudflared": "npm run dev:cloudflare",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . && npm run typecheck && npm run architecture:check && npm run supply-chain:check",
-    "architecture:check": "node scripts/architecture-check.mjs",
+    "lint": "npm run lint:static && npm run architecture:check && npm run supply-chain:check",
+    "lint:static": "eslint . && npm run typecheck",
+    "architecture:check": "node scripts/architecture-check.mjs && knip --no-progress --include files,dependencies,exports,types,nsExports,nsTypes && depcheck --skip-missing --ignores=\"@commitlint/cli,@commitlint/config-conventional,lint-staged,tailwindcss\" --quiet",
     "supply-chain:check": "node scripts/supply-chain-check.mjs",
     "editorconfig:check": "node scripts/check-editorconfig.mjs",
-    "format": "npm run editorconfig:check && prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/dev-cloudflare.mjs\" \"scripts/dev-localtunnel.mjs\" \"scripts/magic-number-check.mjs\" \"scripts/math-random-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \"scripts/ci-e2e-matrix.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\"",
-    "format:write": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/dev-cloudflare.mjs\" \"scripts/dev-localtunnel.mjs\" \"scripts/magic-number-check.mjs\" \"scripts/math-random-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \"scripts/ci-e2e-matrix.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\" && npm run editorconfig:check",
+    "format": "npm run editorconfig:check && prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/dev-cloudflare.mjs\" \"scripts/dev-localtunnel.mjs\" \"scripts/finite-number-check.mjs\" \"scripts/magic-number-check.mjs\" \"scripts/math-random-check.mjs\" \"scripts/require-zod-record-key-value.mjs\" \"scripts/state-loader-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \"scripts/zod-object-check.mjs\" \"scripts/ci-e2e-matrix.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\"",
+    "format:write": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,mjs}\" \"scripts/validate-pr-standards.mjs\" \"scripts/validate-issue-standards.mjs\" \"scripts/check-editorconfig.mjs\" \"scripts/codeql-autofix-prs.mjs\" \"scripts/dev-cloudflare.mjs\" \"scripts/dev-localtunnel.mjs\" \"scripts/finite-number-check.mjs\" \"scripts/magic-number-check.mjs\" \"scripts/math-random-check.mjs\" \"scripts/require-zod-record-key-value.mjs\" \"scripts/state-loader-check.mjs\" \"scripts/supply-chain-check.mjs\" \"scripts/top-level-elements-check.mjs\" \"scripts/zod-object-check.mjs\" \"scripts/ci-e2e-matrix.mjs\" \".github/**/*.{md,yml,yaml}\" \"*.ts\" \"*.js\" \"*.json\" \".prettierrc\" \"README.md\" \"CONTRIBUTING.md\" \"GOVERNANCE.md\" \"AGENTS.md\" \"docs/**/*.md\" && npm run editorconfig:check",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --coverage.thresholds.statements=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 --coverage.thresholds.lines=90",
+    "test:coverage": "vitest run --coverage",
     "check": "npm run lint && npm run format && npm run test:coverage && npm run build:server && npm run visual",
     "preview": "vite preview",
+    "prepare": "simple-git-hooks",
     "visual": "npm run build && playwright test",
     "visual:serial": "npm run build && playwright test --workers=1"
   },
   "dependencies": {
-    "@pixi/sound": "^6.0.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-tooltip": "^1.2.8",
     "gsap": "^3.13.0",
     "helmet": "^8.2.0",
     "pixi.js": "8.20.0",
-    "radix-ui": "^1.5.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "ws": "^8.21.0",
+    "ws": "8.21.0",
     "xstate": "^5.31.1",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@eslint/compat": "^2.1.0",
     "@eslint/js": "^10.0.1",
     "@ngrok/ngrok": "^1.7.0",
     "@playwright/test": "^1.60.0",
@@ -59,9 +62,16 @@
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^4.1.8",
+    "depcheck": "^1.4.7",
     "eslint": "^10.4.1",
+    "eslint-plugin-strict-dependencies": "^1.3.36",
+    "eslint-plugin-zod": "^4.12.0",
+    "fast-check": "^4.9.0",
+    "knip": "^6.33.0",
+    "lint-staged": "^17.4.1",
     "localtunnel": "^2.0.2",
     "prettier": "^3.8.3",
+    "simple-git-hooks": "^2.14.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.3",
@@ -72,5 +82,9 @@
     "localtunnel": {
       "axios": "^1.16.1"
     }
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged",
+    "commit-msg": "npx commitlint --edit \"$1\" && node scripts/validate-pr-standards.mjs --commit-message \"$1\""
   }
 }

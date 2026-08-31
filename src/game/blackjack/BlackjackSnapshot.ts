@@ -10,7 +10,7 @@ export interface BlackjackSnapshot {
   readonly dealerHoleHidden: boolean;
   readonly insuranceWager: number;
   readonly splitHands: readonly (readonly Card[])[];
-  readonly result?: BlackjackResult;
+  readonly result?: BlackjackResult | undefined;
   readonly returned: number;
   readonly status: string;
 }

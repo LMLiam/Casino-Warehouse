@@ -1,9 +1,10 @@
 import type { CasinoGameId } from '../../game/ids';
-import type { SessionRoomSeatId } from './SessionRoomSeatId';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
 
 export interface CasinoSessionRoomState {
-  readonly roomId: string;
+  readonly roomId: RoomId;
   readonly gameId: CasinoGameId;
   readonly role: 'player' | 'spectator';
-  readonly seatId?: SessionRoomSeatId;
+  readonly seatId?: RoomSeatId | undefined;
 }

@@ -1,21 +1,24 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { finiteNumberErrors } from './finite-number-check.mjs';
 import { magicNumberErrors } from './magic-number-check.mjs';
-import { mathRandomErrors } from './math-random-check.mjs';
+import { stateLoaderErrors } from './state-loader-check.mjs';
 import { topLevelElementErrors } from './top-level-elements-check.mjs';
+import { checkVagueFilename } from './vagueFilenameCheck.mjs';
+import { zodObjectErrors } from './zod-object-check.mjs';
 
 const workspaceRoot = resolve(new URL('..', import.meta.url).pathname);
 const sourceRoot = join(workspaceRoot, 'src');
 const testRoot = join(workspaceRoot, 'tests');
 const scriptRoot = join(workspaceRoot, 'scripts');
-const maxSourceFileLines = 700;
-const trackedTypeScriptFiles = gitTrackedTypeScriptFiles();
+const maxSourceFileLines = 400;
 const sourceFiles = listFiles(sourceRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const testFiles = listFiles(testRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)) && !file.endsWith('.d.ts'));
 const scriptFiles = listFiles(scriptRoot).filter((file) => extname(file) === '.mjs');
 const magicNumberFiles = [...sourceFiles, ...testFiles, ...scriptFiles];
+const zodObjectFiles = [...sourceFiles, ...testFiles];
+const finiteNumberFiles = [...sourceFiles, ...testFiles];
 const relativeSourceFiles = new Set(sourceFiles.map(toWorkspacePath));
 const errors = [];
 const appModuleFolders = new Set(['actions', 'dom', 'format', 'input', 'rooms', 'shell', 'state', 'views']);
@@ -28,18 +31,23 @@ function main() {
     const source = readFileSync(file, 'utf8');
 
     checkImportBoundaries(relativePath, source);
-    checkMathRandom(relativePath, source);
     checkBankrollMutation(relativePath, source);
     checkUiPayoutDuplication(relativePath, source);
     checkTopLevelElementCount(relativePath, source);
     checkFileSize(relativePath, source);
-    checkVagueFilename(relativePath);
+    const vagueFilenameError = checkVagueFilename(relativePath);
+    if (vagueFilenameError) {
+      errors.push(vagueFilenameError);
+    }
     checkAppFolderLayout(relativePath);
+    checkBrandedIds(relativePath, source);
+    errors.push(...stateLoaderErrors(relativePath, source));
   }
 
-  checkDirectUnknownCasts();
   checkTestFolderLayout();
   checkMagicNumbers();
+  checkZodObjects();
+  checkFiniteNumbers();
   checkCycles();
 
   if (errors.length > 0) {
@@ -81,12 +89,8 @@ function checkImportBoundaries(relativePath, source) {
   }
 }
 
-function checkMathRandom(relativePath, source) {
-  errors.push(...mathRandomErrors(relativePath, source));
-}
-
 function checkBankrollMutation(relativePath, source) {
-  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/multiplayer/roomAuthority.ts']);
+  const allowed = new Set(['src/game/engine/BeatTheHouseGame.ts', 'src/game/engine/BeatTheHouseState.ts', 'src/multiplayer/roomAuthority.ts']);
   const mutatesBankroll = /\bthis\.bankroll\s*(?:[+\-*/]?=|\+\+|--)|\.bankroll\s*(?:[+\-*/]?=|\+\+|--)/.test(source);
   if (mutatesBankroll && !allowed.has(relativePath)) {
     errors.push(`${relativePath} mutates bankroll directly. Route changes through the authorised game/room/profile ledger modules.`);
@@ -124,12 +128,6 @@ function checkFileSize(relativePath, source) {
   errors.push(`${relativePath} has ${lines} lines. Split files above ${maxSourceFileLines} lines.`);
 }
 
-function checkVagueFilename(relativePath) {
-  if (/(^|\/)(utils?|helpers?|misc|manager)\.(ts|tsx)$/.test(relativePath)) {
-    errors.push(`${relativePath} has a vague filename. Use a domain-specific module name.`);
-  }
-}
-
 function checkAppFolderLayout(relativePath) {
   if (!relativePath.startsWith('src/app/')) {
     return;
@@ -144,28 +142,34 @@ function checkAppFolderLayout(relativePath) {
   }
 }
 
+function checkBrandedIds(relativePath, source) {
+  if (!relativePath.startsWith('src/multiplayer/protocol/') && !relativePath.startsWith('src/state/profiles/') && !relativePath.startsWith('src/state/session/')) {
+    return;
+  }
+  for (const match of source.matchAll(/\b(profileId|roomId|hostProfileId)\s*:\s*string\b/g)) {
+    const key = match[1];
+    const expected = key === 'roomId' ? 'RoomId' : 'ProfileId';
+    const line = source.slice(0, match.index).split('\n').length;
+    errors.push(`${relativePath}:${line} has ${key}: string. Use branded ${expected} (string & { __brand: '${key === 'roomId' ? 'room' : 'profile'}' }) from 'src/schemas/casinoSchemas/${expected === 'RoomId' ? 'roomIdSchema' : 'profileIdSchema'}' to prevent swaps.`);
+  }
+}
+
 function checkMagicNumbers() {
   for (const file of magicNumberFiles) {
     errors.push(...magicNumberErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
   }
 }
 
-function checkDirectUnknownCasts() {
-  for (const file of trackedTypeScriptFiles) {
-    const relativePath = toWorkspacePath(file);
-    const source = readFileSync(file, 'utf8');
-    for (const match of source.matchAll(/\bas\s+unknown\b/g)) {
-      const line = source.slice(0, match.index).split('\n').length;
-      errors.push(`${relativePath}:${line} uses a direct cast through unknown. Use validation, typed fakes, or a named escape-hatch helper instead.`);
-    }
+function checkZodObjects() {
+  for (const file of zodObjectFiles) {
+    errors.push(...zodObjectErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
   }
 }
 
-function gitTrackedTypeScriptFiles() {
-  return execFileSync('git', ['ls-files', '*.ts', '*.tsx'], { cwd: workspaceRoot, encoding: 'utf8' })
-    .split('\n')
-    .filter((path) => path && !path.endsWith('.d.ts'))
-    .map((path) => resolve(workspaceRoot, path));
+function checkFiniteNumbers() {
+  for (const file of finiteNumberFiles) {
+    errors.push(...finiteNumberErrors(toWorkspacePath(file), readFileSync(file, 'utf8')));
+  }
 }
 
 function checkTestFolderLayout() {

@@ -1,7 +1,8 @@
 import { findGame } from '../../game/catalog/findGame';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
 import { normalizeRoomMaxPlayers } from '../roomLimits/normalizeRoomMaxPlayers';
 import { createGameModel } from './createGameModel';
-import { createId } from './createId';
+import { createSessionId } from './createSessionId';
 import { mainBeatRoomId } from './mainBeatRoomId';
 import type { RoomState } from './RoomState';
 
@@ -13,7 +14,7 @@ export const createServerManagedBeatRoom = (): RoomState => {
     roomName: 'Beat the House Main Room',
     gameId: 'beat-the-house',
     gameTitle: catalogGame.title,
-    hostProfileId: 'server',
+    hostProfileId: profileIdSchema.parse('server'),
     maxPlayers: normalizeRoomMaxPlayers('beat-the-house', undefined),
     allowSpectators: true,
     players: new Map(),
@@ -23,7 +24,7 @@ export const createServerManagedBeatRoom = (): RoomState => {
     model: createGameModel('beat-the-house', 0),
     createdAt: now,
     updatedAt: now,
-    sessionId: createId('session'),
+    sessionId: createSessionId(),
     revision: 0,
     serverManaged: true,
     settledSessionIds: new Set(),

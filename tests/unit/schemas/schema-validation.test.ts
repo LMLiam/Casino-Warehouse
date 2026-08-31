@@ -9,6 +9,7 @@ import { profileNameSchema } from '../../../src/schemas/casinoSchemas/profileNam
 import { roomNameSchema } from '../../../src/schemas/casinoSchemas/roomNameSchema';
 import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
 import { transactionTypeSchema } from '../../../src/schemas/casinoSchemas/transactionTypeSchema';
+import { audioSettingsSchema } from '../../../src/schemas/casinoSchemas/audioSettingsSchema';
 import { zodErrorSummary } from '../../../src/schemas/casinoSchemas/zodErrorSummary';
 import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
@@ -27,12 +28,19 @@ class MemoryStorage implements StorageLike {
   public setItem(key: string, value: string): void {
     this.values.set(key, value);
   }
+
+  public removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  public clear(): void {
+    this.values.clear();
+  }
 }
 
 describe('Zod-backed runtime validation', () => {
   it('normalizes valid realtime room requests and rejects malformed actions clearly', () => {
     const created = parseClientMessage({
-      version: 1,
       type: 'create-room',
       gameId: 'blackjack',
       roomName: ` Late   Table ${'x'.repeat(80)}`,
@@ -53,12 +61,12 @@ describe('Zod-backed runtime validation', () => {
       },
     });
 
-    expect(parseClientMessage({ version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 0 })).toEqual({
+    expect(parseClientMessage({ type: 'place-chip', seatId: 'left', betType: 'main', amount: 0 })).toEqual({
       ok: false,
       error: 'Amount must be greater than zero.',
     });
-    expect(parseClientMessage({ version: 1, type: 'place-tip', seatId: 'left', amount: 5 })).toMatchObject({ ok: true });
-    expect(parseClientMessage({ version: 1, type: 'place-tip', seatId: 'left', amount: 0 })).toEqual({
+    expect(parseClientMessage({ type: 'place-tip', seatId: 'left', amount: 5 })).toMatchObject({ ok: true });
+    expect(parseClientMessage({ type: 'place-tip', seatId: 'left', amount: 0 })).toEqual({
       ok: false,
       error: 'Amount must be greater than zero.',
     });
@@ -66,7 +74,6 @@ describe('Zod-backed runtime validation', () => {
 
   it('validates session room restore targets without trusting malformed rooms', () => {
     const saved = parseClientMessage({
-      version: 1,
       type: 'save-session',
       session: {
         profileId: 'profile-1',
@@ -94,7 +101,6 @@ describe('Zod-backed runtime validation', () => {
 
     expect(
       parseClientMessage({
-        version: 1,
         type: 'save-session',
         session: {
           profileId: 'profile-1',
@@ -114,41 +120,48 @@ describe('Zod-backed runtime validation', () => {
 
   it('recovers corrupted profile saves and explains bad imports', () => {
     const storage = new MemoryStorage();
-    storage.setItem('casino_warehouse_profiles_v1', '{"version":1,"profiles":[{"id":""}]}');
+    storage.setItem('casino_warehouse_profiles', '{"profiles":[{"id":""}]}');
 
     const loaded = loadProfileStore(storage);
     expect(loaded.recovered).toBe(true);
-    expect(loaded.error).toContain('Profile record is invalid');
+    expect(loaded.error).toContain('Profile id is required');
+    expect(storage.getItem('casino_warehouse_profiles')).toBeNull();
 
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
+    expect(parseProfileStoreJson('{"version":2,"profiles":[]}')).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Unrecognized key: "version"') },
+    });
   });
 
-  it('rejects wrong versions independently for protocol, profile store, and session state boundaries', () => {
-    expect(parseClientMessage({ version: 2, type: 'request-data' })).toEqual({ ok: false, error: 'Message version or type is invalid.' });
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
-    expect(() => parseSessionState({ version: 1, profileIds: [] })).toThrow('Session data version 1 is not supported.');
+  it('rejects obsolete version fields at every boundary', () => {
+    expect(parseClientMessage({ version: 2, type: 'request-data' })).toMatchObject({ ok: false });
+    expect(parseProfileStoreJson('{"version":2,"profiles":[]}')).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Unrecognized key: "version"') },
+    });
+    expect(parseSessionState({ version: 1, profileIds: [] })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Session data is not valid') },
+    });
   });
 
   it('validates settings and game/slot configuration at runtime boundaries', () => {
     expect(sanitizeAudioSettings({ masterVolume: 99, musicVolume: 0.4 }).masterVolume).toBe(1);
+    expect(audioSettingsSchema.safeParse({ unexpected: true }).success).toBe(false);
     expect(gameCatalogSchema.parse(gameCatalog)).toHaveLength(gameCatalog.length);
     expect(() => slotThemeSchema.parse({ id: 'bad', title: 'Bad', accent: 'purple', reelStrip: [], payouts: {}, jackpots: {}, bonus: {} })).toThrow();
   });
 
-  it('covers thin schema defaults and invalid parser envelopes directly', () => {
-    const profile = casinoProfileSchema.parse({ id: 'profile-a', name: '  Alice  ' });
-
-    expect(profile).toMatchObject({
-      bankroll: 0,
-      id: 'profile-a',
-      name: 'Alice',
-      houseAdvance: { outstandingBalance: 0, activeCount: 0 },
-      stats: { gamesPlayed: 0, netProfit: 0, perGame: {} },
-      transactions: [],
+  it('preserves finite heartbeat timestamps without applying credit normalization', () => {
+    expect(parseClientMessage({ type: 'heartbeat-ack', sentAt: 1.5 })).toEqual({
+      ok: true,
+      message: { type: 'heartbeat-ack', sentAt: 1.5 },
     });
-    expect(profile.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(profile.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(bankrollTransactionSchema.parse({ id: 'tx-a', gameId: 'admin', type: 'unknown', amount: 1 }).at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('rejects incomplete persisted records and invalid parser envelopes directly', () => {
+    expect(() => casinoProfileSchema.parse({ id: 'profile-a', name: 'Alice' })).toThrow();
+    expect(() => bankrollTransactionSchema.parse({ id: 'tx-a', gameId: 'admin', type: 'invalid', amount: 1 })).toThrow();
     expect(profileNameSchema.parse('   ')).toBe('Player');
     expect(transactionTypeSchema.parse('correction')).toBe('correction');
     expect(transactionTypeSchema.parse('dealer_tip')).toBe('dealer_tip');
@@ -157,7 +170,13 @@ describe('Zod-backed runtime validation', () => {
     expect(roomNameSchema.parse('  Late    Table  ')).toBe('Late Table');
     expect(roomNameSchema.parse(undefined)).toBeUndefined();
     expect(zodErrorSummary(new ZodError([]))).toBe('Payload is invalid.');
-    expect(() => parseCasinoSaveState(null)).toThrow('Save data is not a casino profile store: Invalid input: expected object, received null');
-    expect(() => parseSessionState(null)).toThrow('Session data is not valid. Invalid input: expected object, received null');
+    expect(parseCasinoSaveState(null)).toMatchObject({
+      ok: false,
+      error: { message: 'Save data is not a casino profile store: Invalid input: expected object, received null' },
+    });
+    expect(parseSessionState(null)).toMatchObject({
+      ok: false,
+      error: { message: 'Session data is not valid: Invalid input: expected object, received null' },
+    });
   });
 });

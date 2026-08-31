@@ -2,6 +2,13 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 
 const smokeUrl = process.env.PUBLIC_TUNNEL_SMOKE_URL ?? process.env.NGROK_SMOKE_URL;
 const smokeUrlSource = process.env.PUBLIC_TUNNEL_SMOKE_URL ? 'PUBLIC_TUNNEL_SMOKE_URL' : 'NGROK_SMOKE_URL';
+
+const requireSmokeUrl = (): string => {
+  if (!smokeUrl) {
+    throw new Error(`${smokeUrlSource} is required.`);
+  }
+  return smokeUrl;
+};
 const appReadyTimeoutMs = 30_000;
 const navigationAttempts = 3;
 const smokeTestTimeoutMs = 240_000;
@@ -79,9 +86,10 @@ const openSmokePage = async (browser: Browser, viewport: { readonly width: numbe
 };
 
 const waitForSmokePage = async (page: Page): Promise<void> => {
+  const url = requireSmokeUrl();
   for (let attempt = 1; attempt <= navigationAttempts; attempt += 1) {
     try {
-      await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       await waitForSmokeAppReady(page);
       return;
     } catch (error) {
@@ -94,12 +102,13 @@ const waitForSmokePage = async (page: Page): Promise<void> => {
 };
 
 const waitForSmokePageReload = async (page: Page): Promise<void> => {
+  const url = requireSmokeUrl();
   for (let attempt = 1; attempt <= navigationAttempts; attempt += 1) {
     try {
       if (attempt === 1) {
         await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
       } else {
-        await page.goto(smokeUrl!, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
       }
       await waitForSmokeAppReady(page);
       return;

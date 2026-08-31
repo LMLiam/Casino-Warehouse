@@ -1,60 +1,66 @@
 import { z } from 'zod';
 import { betTypeSchema } from '../casinoSchemas/betTypeSchema';
-import { currentProtocolVersionSchema } from '../casinoSchemas/currentProtocolVersionSchema';
+import { authTokenSchema } from '../casinoSchemas/authTokenSchema';
+import { finiteNumberSchema } from '../casinoSchemas/finiteNumberSchema';
 import { handIdSchema } from '../casinoSchemas/handIdSchema';
 import { networkCreditSchema } from '../casinoSchemas/networkCreditSchema';
+import { playerGameSnapshotsSchema } from '../casinoSchemas/playerGameSnapshotsSchema';
 import { positiveNetworkCreditSchema } from '../casinoSchemas/positiveNetworkCreditSchema';
 import { profileIdSchema } from '../casinoSchemas/profileIdSchema';
 import { profileNameSchema } from '../casinoSchemas/profileNameSchema';
+import { profileTokenSchema } from '../casinoSchemas/profileTokenSchema';
 import { roomGameIdSchema } from '../casinoSchemas/roomGameIdSchema';
+import { roomIdSchema } from '../casinoSchemas/roomIdSchema';
 import { roomNameSchema } from '../casinoSchemas/roomNameSchema';
 import { roomRoleSchema } from '../casinoSchemas/roomRoleSchema';
 import { roomSeatIdSchema } from '../casinoSchemas/roomSeatIdSchema';
 
 export const clientMessageSchema = (() => {
-  const baseClientMessageSchema = z.object({
-    version: currentProtocolVersionSchema,
-    type: z.string(),
-  });
+  const baseClientMessageSchema = z
+    .object({
+      type: z.string(),
+    })
+    .strict();
 
-  const identitySchema = z.object({
-    profileId: profileIdSchema,
-    profileName: profileNameSchema,
-    bankroll: networkCreditSchema,
-  });
+  const identitySchema = z
+    .object({
+      profileId: profileIdSchema,
+      profileName: profileNameSchema,
+      bankroll: networkCreditSchema,
+    })
+    .strict();
 
-  const profileTokenSchema = z.string().trim().min(1).max(256);
+  const profileTokenEntrySchema = z
+    .object({
+      profileId: profileIdSchema,
+      profileToken: profileTokenSchema,
+    })
+    .strict();
 
-  const profileTokenEntrySchema = z.object({
-    profileId: profileIdSchema,
-    profileToken: profileTokenSchema,
-  });
-
-  const clientSessionStateSchema = z.object({
-    profileId: profileIdSchema,
-    activeGame: roomGameIdSchema,
-    showingGameLobby: z.boolean(),
-    wagerLimit: networkCreditSchema,
-    wagered: networkCreditSchema,
-    gameSnapshot: z.record(z.string(), z.unknown()).optional(),
-    room: z
-      .object({
-        roomId: z
-          .string()
-          .trim()
-          .min(1)
-          .transform((value) => value.toUpperCase()),
-        gameId: roomGameIdSchema,
-        role: roomRoleSchema,
-        seatId: roomSeatIdSchema.optional(),
-      })
-      .optional(),
-  });
+  const clientSessionStateSchema = z
+    .object({
+      profileId: profileIdSchema,
+      activeGame: roomGameIdSchema,
+      showingGameLobby: z.boolean(),
+      wagerLimit: networkCreditSchema,
+      wagered: networkCreditSchema,
+      gameSnapshot: playerGameSnapshotsSchema.optional(),
+      room: z
+        .object({
+          roomId: roomIdSchema,
+          gameId: roomGameIdSchema,
+          role: roomRoleSchema,
+          seatId: roomSeatIdSchema.optional(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict();
 
   return z.discriminatedUnion('type', [
     baseClientMessageSchema.extend({ type: z.literal('request-data') }),
     baseClientMessageSchema.extend({ type: z.literal('authorize-profiles'), profileTokens: z.array(profileTokenEntrySchema) }),
-    baseClientMessageSchema.extend({ type: z.literal('authorize-admin'), adminToken: profileTokenSchema }),
+    baseClientMessageSchema.extend({ type: z.literal('authorize-admin'), adminToken: authTokenSchema }),
     baseClientMessageSchema.extend({ type: z.literal('create-profile'), profileName: profileNameSchema }),
     baseClientMessageSchema.extend({ type: z.literal('rename-profile'), profileId: profileIdSchema, profileName: profileNameSchema }),
     baseClientMessageSchema.extend({ type: z.literal('delete-profile'), profileId: profileIdSchema }),
@@ -68,7 +74,7 @@ export const clientMessageSchema = (() => {
     }),
     baseClientMessageSchema.extend({ type: z.literal('admin-reset-all') }),
     baseClientMessageSchema.extend({ type: z.literal('clear-server-data') }),
-    baseClientMessageSchema.extend({ type: z.literal('heartbeat-ack'), sentAt: networkCreditSchema }),
+    baseClientMessageSchema.extend({ type: z.literal('heartbeat-ack'), sentAt: finiteNumberSchema }),
     baseClientMessageSchema.extend({ type: z.literal('list-rooms'), gameId: roomGameIdSchema }),
     baseClientMessageSchema
       .extend({
@@ -83,11 +89,7 @@ export const clientMessageSchema = (() => {
       .extend({
         type: z.literal('join-room'),
         gameId: roomGameIdSchema,
-        roomId: z
-          .string()
-          .trim()
-          .min(1, 'Room id is required.')
-          .transform((value) => value.toUpperCase()),
+        roomId: roomIdSchema,
         role: roomRoleSchema.default('player'),
         seatId: roomSeatIdSchema.optional(),
       })

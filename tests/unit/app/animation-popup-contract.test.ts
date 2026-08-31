@@ -64,6 +64,9 @@ describe('Beat the House popup and animation behaviour', () => {
 
     const settled = game.stick();
     const summary = settled.summaries[0];
+    if (!summary) {
+      throw new Error('Missing summary.');
+    }
 
     expect(summary.mainResult).toBe('win');
     expect(summary.sideWins).toEqual([{ betType: 'dealerSevens', label: 'Dealer Sevens (1)', profit: 6, returned: 8 }]);
@@ -120,9 +123,10 @@ describe('Beat the House popup and animation behaviour', () => {
     const dependencies: PixiTableDependencies = {
       createCardRenderer: () => cardRenderer,
       createChipRenderer: () => chipRenderer,
-      createEffectRenderer: () => rendererTestDouble({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() }),
+      createEffectRenderer: () =>
+        rendererTestDouble<ReturnType<PixiTableDependencies['createEffectRenderer']>>({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() }),
       createTagRenderer: () =>
-        rendererTestDouble({
+        rendererTestDouble<ReturnType<PixiTableDependencies['createTagRenderer']>>({
           drawMarker: vi.fn(),
           drawPayoutTag: vi.fn(),
           drawResultPopup: vi.fn(),
@@ -303,6 +307,54 @@ describe('Beat the House popup and animation behaviour', () => {
       'push',
       false,
     );
+  });
+
+  it('draws wager amount indicators for every positive live bet during active phases', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, host, tagRenderer } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    game.placeBet('left', 'main', 5);
+    game.placeBet('left', 'dealerBust', 10);
+    game.placeBet('centre', 'main', 25);
+
+    table.render(game.snapshot());
+
+    const wagerAmounts = JSON.parse(host.dataset.wagerAmounts ?? '[]');
+    expect(wagerAmounts).toEqual(['left:main:5', 'left:dealerBust:10', 'centre:main:25']);
+    expect(tagRenderer.drawMarker).toHaveBeenCalledWith('£5', expect.any(Number), expect.any(Number));
+    expect(tagRenderer.drawMarker).toHaveBeenCalledWith('£10', expect.any(Number), expect.any(Number));
+    expect(tagRenderer.drawMarker).toHaveBeenCalledWith('£25', expect.any(Number), expect.any(Number));
+  });
+
+  it('hides wager amount indicators once the round settles and on the fresh betting round', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, host } = createInitializedTable();
+    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    game.placeBet('left', 'main', 10);
+    const settled = game.deal(rigDeck([card('2'), card('K')]));
+
+    table.render(settled);
+
+    expect(settled.phase).toBe('roundOver');
+    expect(JSON.parse(host.dataset.wagerAmounts ?? '[["stale"]]')).toEqual([]);
+
+    table.render(game.nextRound());
+
+    expect(JSON.parse(host.dataset.wagerAmounts ?? '[["stale"]]')).toEqual([]);
   });
 
   it('draws Dealer Thanks reward chips for every settled tipped seat', () => {
@@ -512,9 +564,16 @@ const createInitializedTable = () => {
   return { table, host, cardRenderer, chipRenderer, effectRenderer, tagRenderer };
 };
 
-const rendererTestDouble = <Renderer>(implementation: object): Renderer => implementation as Renderer;
+type PixiHostElementDouble = {
+  readonly dataset: Record<string, string>;
+  readonly clientWidth: number;
+  readonly clientHeight: number;
+  readonly classList: { readonly toggle: (token: string, force?: boolean) => boolean };
+};
 
-const hostElementTestDouble = (implementation: object): HTMLElement => implementation as HTMLElement;
+const rendererTestDouble = <Renderer>(implementation: Partial<Renderer> & Record<string, (...args: never[]) => void>): Renderer => implementation as Renderer;
+
+const hostElementTestDouble = (implementation: PixiHostElementDouble): HTMLElement => implementation as HTMLElement;
 
 const pixiTableInternals = (table: PixiTable): { initialized: boolean; chipRenderer: ReturnType<PixiTableDependencies['createChipRenderer']> } =>
-  rendererTestDouble(table);
+  table as PixiTable & { initialized: boolean; chipRenderer: ReturnType<PixiTableDependencies['createChipRenderer']> };

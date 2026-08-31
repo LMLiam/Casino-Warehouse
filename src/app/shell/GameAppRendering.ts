@@ -5,11 +5,12 @@ import { SlotsGame } from '../../game/slots/SlotsGame';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
 import type { RealtimeConnectionState } from '../../multiplayer/client/RealtimeConnectionState';
-import { currentProtocolVersion } from '../../multiplayer/protocol/currentProtocolVersion';
 import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
 import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
 import type { RoomSummary } from '../../multiplayer/protocol/RoomSummary';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
 import { PixiTable } from '../../ui/PixiTable/PixiTable';
 import type { PixiTableSettlementMetadata } from '../../ui/PixiTable/PixiTableSettlementMetadata';
 import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
@@ -55,16 +56,16 @@ export abstract class GameAppRendering {
   protected abstract sessionWagered: number;
   protected abstract multiplayerRooms: readonly RoomSummary[];
   protected abstract connectionState: RealtimeConnectionState;
-  protected abstract readonly ownedProfileIds: ReadonlySet<string>;
+  protected abstract readonly ownedProfileIds: Set<ProfileId>;
   protected abstract profileAccessReceived: boolean;
   protected abstract get currentPlayer(): CasinoPlayer | undefined;
 
   protected abstract currentProfile(): CasinoProfile | undefined;
   protected abstract currentSlots(): SlotsGame;
   protected abstract activeRoomForGame(): RoomSnapshot | undefined;
-  protected abstract beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: string | undefined): readonly PixiTableSettlementMetadata[];
+  protected abstract beatSettlementMetadataFor(room: RoomSnapshot | undefined, profileId: ProfileId | undefined): readonly PixiTableSettlementMetadata[];
   protected abstract claimRoomSeat(seatId: RoomSeatId): void;
-  protected abstract joinMultiplayerRoom(roomId: string, role: RoomRole): void;
+  protected abstract joinMultiplayerRoom(roomId: RoomId, role: RoomRole): void;
   protected abstract openRoomLobby(gameId: CasinoGameId): void;
   protected abstract saveSession(): void;
   protected abstract canUseServer(): boolean;
@@ -184,14 +185,14 @@ export abstract class GameAppRendering {
     snapshot: GameSnapshot,
     controlsAvailable = true,
     activeRoom?: RoomSnapshot,
-    profileId?: string,
+    profileId?: ProfileId,
     bankroll?: number,
     isBeatTheHouse = findGame(this.activeGame).kind === 'beat-the-house',
   ): void {
     this.beatControlsView.render(
       snapshot,
       isBeatTheHouse,
-      () => this.multiplayer.send({ version: currentProtocolVersion, type: 'start-round' }),
+      () => this.multiplayer.send({ type: 'start-round' }),
       controlsAvailable,
       activeRoom,
       profileId,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { validatePullRequest } from '../../../scripts/validate-pr-standards.mjs';
+import { validateCommitMessage, validatePullRequest } from '../../../scripts/validate-pr-standards.mjs';
 
 const validBody = `## Summary
 
@@ -143,5 +143,17 @@ describe('validatePullRequest', () => {
     );
 
     expect(failures).toContain('Replace the template placeholder: "Describe the change and why it is needed."');
+  });
+});
+
+describe('validateCommitMessage', () => {
+  it('accepts a conventional commit message', () => {
+    expect(validateCommitMessage('chore(tooling): add commit message checks\n\nDetails follow.')).toEqual([]);
+  });
+
+  it('rejects an ad-hoc commit without a summary', () => {
+    expect(validateCommitMessage('feat(ui)')).toEqual([
+      'Commit message must match "type(scope): summary" using one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security, deps.',
+    ]);
   });
 });

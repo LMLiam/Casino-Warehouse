@@ -4,5 +4,9 @@ import { parseSessionState } from './parseSessionState';
 import { sessionStorageKey } from './sessionStorageKey';
 
 export const saveSessionState = (storage: StorageLike, session: CasinoSessionState, key = sessionStorageKey): void => {
-  storage.setItem(key, JSON.stringify(parseSessionState(session)));
+  const parsed = parseSessionState(session);
+  if (!parsed.ok) {
+    throw new Error(parsed.error.message);
+  }
+  storage.setItem(key, JSON.stringify(parsed.value));
 };

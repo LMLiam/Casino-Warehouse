@@ -5,17 +5,17 @@ vi.mock('pixi.js', () => {
     public x = 0;
     public y = 0;
 
-    public set(x: number, y = x): void {
+    public set(x: number, y?: number): void {
       this.x = x;
-      this.y = y;
+      this.y = y ?? x;
     }
   }
 
   class Container {
-    public readonly children: unknown[] = [];
+    public readonly children: Container[] = [];
     public readonly position = new Point();
 
-    public addChild(...children: unknown[]): void {
+    public addChild(...children: Container[]): void {
       this.children.push(...children);
     }
   }
@@ -35,9 +35,9 @@ vi.mock('pixi.js', () => {
   }
 
   class TextStyle {
-    public readonly fill?: number;
+    public readonly fill?: number | undefined;
 
-    public constructor(options: { readonly fill?: number } = {}) {
+    public constructor(options: { readonly fill?: number | undefined } = {}) {
       this.fill = options.fill;
     }
   }
@@ -59,7 +59,7 @@ vi.mock('pixi.js', () => {
 
 describe('TagRenderer', () => {
   it("colors Dealer's Thanks settlement detail lines as rewards while keeping repayments red", async () => {
-    const { Container } = await import('pixi.js');
+    const { Container, Text } = await import('pixi.js');
     const { COLORS } = await import('../../../src/ui/renderers/renderingConstants/COLORS');
     const { TagRenderer } = await import('../../../src/ui/renderers/TagRenderer');
     const layer = new Container();
@@ -75,8 +75,8 @@ describe('TagRenderer', () => {
       false,
     );
 
-    const group = layer.children[0] as { readonly children: readonly unknown[] };
-    const labels = group.children.filter((child): child is { readonly style: { readonly fill?: number }; readonly text: string } => 'text' in Object(child));
+    const group = layer.children[0] as { readonly children: readonly InstanceType<typeof Container>[] };
+    const labels = group.children.filter((child) => child instanceof Text);
 
     expect(labels.find((label) => label.text === "Dealer's Thanks +£2")?.style.fill).toBe(COLORS.win);
     expect(labels.find((label) => label.text === 'House Advance payment -£2')?.style.fill).toBe(COLORS.lose);

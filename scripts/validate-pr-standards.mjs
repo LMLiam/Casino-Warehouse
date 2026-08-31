@@ -2,13 +2,16 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const titleTypes = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert', 'security', 'deps'];
+export const titleTypes = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert', 'security', 'deps'];
 
 const titlePattern = new RegExp(`^(${titleTypes.join('|')})\\([a-z0-9][a-z0-9-]*\\): .{5,}$`);
+const conventionalTitleDescription = `"type(scope): summary" using one of: ${titleTypes.join(', ')}`;
 
 const requiredHeadings = ['Summary', 'Type', 'Checks', 'Testing', 'Notes'];
 
 const typeOptions = ['Bug fix', 'Feature', 'Documentation', 'Refactor', 'Test or tooling'];
+
+const commitMessagePathArgumentIndex = 3;
 
 const requiredChecks = [
   'I read `CONTRIBUTING.md`.',
@@ -117,12 +120,17 @@ export function validatePullRequest(pullRequest) {
   }
 
   if (!titlePattern.test(title)) {
-    failures.push(`PR title must match "type(scope): summary" using one of: ${titleTypes.join(', ')}.`);
+    failures.push(`PR title must match ${conventionalTitleDescription}.`);
   }
 
   failures.push(...validateBody(body));
 
   return failures;
+}
+
+export function validateCommitMessage(message) {
+  const title = String(message).split(/\r?\n/, 1)[0]?.trim() ?? '';
+  return titlePattern.test(title) ? [] : [`Commit message must match ${conventionalTitleDescription}.`];
 }
 
 /* v8 ignore start -- CLI wiring is exercised by the pull_request workflow; unit tests cover the validator contract directly. */
@@ -137,6 +145,11 @@ function loadPullRequest(eventPath) {
 }
 
 function main() {
+  if (process.argv[2] === '--commit-message') {
+    validateCommitMessageFile(process.argv[commitMessagePathArgumentIndex]);
+    return;
+  }
+
   const eventPath = process.env.PR_STANDARDS_EVENT_PATH ?? process.env.GITHUB_EVENT_PATH;
 
   if (!eventPath) {
@@ -157,6 +170,21 @@ function main() {
   }
 
   console.log('PR standards passed.');
+}
+
+function validateCommitMessageFile(messagePath) {
+  if (!messagePath) {
+    console.error('A commit message file path is required.');
+    process.exit(1);
+  }
+
+  const failures = validateCommitMessage(readFileSync(messagePath, 'utf8'));
+  if (failures.length > 0) {
+    failures.forEach((failure) => console.error(failure));
+    process.exit(1);
+  }
+
+  console.log('Commit message standards passed.');
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

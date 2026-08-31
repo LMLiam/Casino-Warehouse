@@ -1,5 +1,7 @@
 import type { RoomSeatId } from '../../multiplayer/protocol/RoomSeatId';
 import type { RoomSnapshot } from '../../multiplayer/protocol/RoomSnapshot';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import { roomSeatIdSchema } from '../../schemas/casinoSchemas/roomSeatIdSchema';
 import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements/AppElements';
 import { capitalize } from '../format/appText';
@@ -11,7 +13,7 @@ export class RoomSeatsView {
     this.elements.roomSeats.textContent = 'No active room.';
   }
 
-  public render(room: RoomSnapshot, profileId?: string, onClaimSeat?: (seatId: RoomSeatId) => void): void {
+  public render(room: RoomSnapshot, profileId?: ProfileId, onClaimSeat?: (seatId: RoomSeatId) => void): void {
     const currentProfileHasSeat = room.seats.some((seat) => seat.profileId === profileId);
     const currentProfileCanClaimSeat =
       Boolean(profileId && onClaimSeat) &&
@@ -30,7 +32,12 @@ export class RoomSeatsView {
       })
       .join('');
     this.elements.roomSeats.querySelectorAll<HTMLButtonElement>('[data-claim-seat]').forEach((button) => {
-      button.addEventListener('click', () => onClaimSeat?.(button.dataset.claimSeat as RoomSeatId));
+      button.addEventListener('click', () => {
+        const seatId = roomSeatIdSchema.safeParse(button.dataset.claimSeat);
+        if (seatId.success) {
+          onClaimSeat?.(seatId.data);
+        }
+      });
     });
   }
 }

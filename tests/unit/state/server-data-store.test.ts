@@ -7,6 +7,16 @@ import { createDefaultServerDataStore } from '../../../src/state/serverDataStore
 import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
 import { createSessionState } from '../../../src/state/session/createSessionState';
+import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
+import { testProfileId, testProfileTokenHash, testRoomId, testSessionId } from '../schemas/testIds';
+
+const requireProfile = (profiles: readonly CasinoProfile[], index: number): CasinoProfile => {
+  const profile = profiles[index];
+  if (!profile) {
+    throw new Error(`Missing profile at index ${index}.`);
+  }
+  return profile;
+};
 
 const tempDirs: string[] = [];
 
@@ -19,7 +29,7 @@ describe('server data store', () => {
   it('keeps profile and session data server-owned in memory', () => {
     const store = createMemoryServerDataStore();
     const created = store.createProfile('Memory QA');
-    const profile = created.profileState.profiles[0];
+    const profile = requireProfile(created.profileState.profiles, 0);
 
     store.saveSession(
       createSessionState(profile.id, {
@@ -33,14 +43,14 @@ describe('server data store', () => {
 
     const snapshot = store.snapshot();
     expect(snapshot.database).toBe('memory');
-    expect(snapshot.profileState.profiles[0]).toMatchObject({ name: 'Memory QA', bankroll: 1000 });
+    expect(requireProfile(snapshot.profileState.profiles, 0)).toMatchObject({ name: 'Memory QA', bankroll: 1000 });
     expect(snapshot.session).toMatchObject({ activeGame: 'blackjack', wagerLimit: 200, wagered: 50 });
   });
 
   it('updates memory profiles, sessions, and missing-record paths explicitly', () => {
     const store = createMemoryServerDataStore();
-    const first = store.createProfile('Alpha').profileState.profiles[0];
-    const second = store.createProfile('Beta').profileState.profiles[1];
+    const first = requireProfile(store.createProfile('Alpha').profileState.profiles, 0);
+    const second = requireProfile(store.createProfile('Beta').profileState.profiles, 1);
 
     store.saveSession(
       createSessionState(first.id, {
@@ -53,13 +63,13 @@ describe('server data store', () => {
     );
 
     expect(store.ensureProfile(first.id, 'Ignored', 10)).toEqual(first);
-    expect(store.ensureProfile('manual', '   ', Number.NaN)).toMatchObject({ id: 'manual', name: 'Player', bankroll: 0 });
-    expect(store.renameProfile(first.id, 'Renamed').profileState.profiles[0].name).toBe('Renamed');
-    expect(store.setProfileBankroll('missing', 10)).toBeUndefined();
+    expect(store.ensureProfile(testProfileId('manual'), '   ', Number.NaN)).toMatchObject({ id: 'manual', name: 'Player', bankroll: 0 });
+    expect(requireProfile(store.renameProfile(first.id, 'Renamed').profileState.profiles, 0).name).toBe('Renamed');
+    expect(store.setProfileBankroll(testProfileId('missing'), 10)).toBeUndefined();
     expect(store.setProfileBankroll(first.id, Number.POSITIVE_INFINITY)?.bankroll).toBe(0);
     expect(
       store.recordTransaction(first.id, {
-        gameId: 'slots',
+        gameId: 'slots:thai-princess',
         type: 'bonus',
         amount: 40,
         description: 'Memory bonus',
@@ -67,8 +77,8 @@ describe('server data store', () => {
       })?.bankroll,
     ).toBe(40);
     expect(
-      store.recordTransaction('missing', {
-        gameId: 'slots',
+      store.recordTransaction(testProfileId('missing'), {
+        gameId: 'slots:thai-princess',
         type: 'bonus',
         amount: 40,
         description: 'Missing bonus',
@@ -81,7 +91,7 @@ describe('server data store', () => {
 
   it('accepts House Advances atomically and applies repayment only to net positive gameplay settlements', () => {
     const store = createMemoryServerDataStore();
-    const profile = store.createProfile('Advance QA', 0).profileState.profiles[0];
+    const profile = requireProfile(store.createProfile('Advance QA', 0).profileState.profiles, 0);
 
     expect(store.acceptHouseAdvance(profile.id)).toMatchObject({
       bankroll: 100,
@@ -97,10 +107,10 @@ describe('server data store', () => {
     store.setProfileBankroll(profile.id, 0);
     expect(store.acceptHouseAdvance(profile.id)).toBeUndefined();
 
-    const push = store.applyGameplaySettlement(profile.id, 25, 0, { gameId: 'blackjack', roomId: 'ROOM1', sessionId: 'SESSION1' });
+    const push = store.applyGameplaySettlement(profile.id, 25, 0, { gameId: 'blackjack', roomId: testRoomId('ROOM1'), sessionId: testSessionId('SESSION1') });
     expect(push).toMatchObject({ houseAdvanceRepayment: 0, profile: { bankroll: 25, houseAdvance: { outstandingBalance: 300, activeCount: 3 } } });
 
-    const win = store.applyGameplaySettlement(profile.id, 60, 50, { gameId: 'blackjack', roomId: 'ROOM1', sessionId: 'SESSION2' });
+    const win = store.applyGameplaySettlement(profile.id, 60, 50, { gameId: 'blackjack', roomId: testRoomId('ROOM1'), sessionId: testSessionId('SESSION2') });
     expect(win).toMatchObject({ houseAdvanceRepayment: 5, profile: { bankroll: 80, houseAdvance: { outstandingBalance: 295, activeCount: 3 } } });
     expect(win?.profile.transactions[0]).toMatchObject({
       type: 'house_advance_repayment',
@@ -112,13 +122,29 @@ describe('server data store', () => {
     expect(cleared).toMatchObject({ houseAdvanceRepayment: 295, profile: { bankroll: 785, houseAdvance: { outstandingBalance: 0, activeCount: 0 } } });
   });
 
+  it('floors decimal values in generic gameplay settlements', () => {
+    const store = createMemoryServerDataStore();
+    const profile = requireProfile(store.createProfile('Decimal QA', 0).profileState.profiles, 0);
+    store.acceptHouseAdvance(profile.id);
+
+    const result = store.applyGameplaySettlement(profile.id, 12.9, 19.9, { gameId: 'blackjack' });
+
+    expect(result).toMatchObject({
+      houseAdvanceRepayment: 1,
+      profile: { bankroll: 111, houseAdvance: { outstandingBalance: 99 } },
+    });
+    expect(result?.profile.transactions[0]).toMatchObject({
+      metadata: { grossReturned: 12, netWinnings: 19 },
+    });
+  });
+
   it('persists profile, ledger, and session data in SQLite', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
     tempDirs.push(dir);
     const dbPath = join(dir, 'casino.sqlite');
     const store = new SqliteServerDataStore(dbPath);
     const created = store.createProfile('SQLite QA');
-    const profile = created.profileState.profiles[0];
+    const profile = requireProfile(created.profileState.profiles, 0);
 
     store.recordTransaction(profile.id, {
       gameId: 'admin',
@@ -139,7 +165,7 @@ describe('server data store', () => {
 
     const reloaded = new SqliteServerDataStore(dbPath).snapshot();
     expect(reloaded.database).toBe('sqlite');
-    expect(reloaded.profileState.profiles[0]).toMatchObject({
+    expect(requireProfile(reloaded.profileState.profiles, 0)).toMatchObject({
       name: 'SQLite QA',
       bankroll: 1125,
       transactions: [expect.objectContaining({ type: 'admin_adjustment', amount: 125, description: 'SQLite persistence check' })],
@@ -152,20 +178,20 @@ describe('server data store', () => {
     tempDirs.push(dir);
     const dbPath = join(dir, 'casino.sqlite');
     const store = new SqliteServerDataStore(dbPath);
-    const profile = store.createProfile('SQLite Advance', 0).profileState.profiles[0];
+    const profile = requireProfile(store.createProfile('SQLite Advance', 0).profileState.profiles, 0);
 
     store.acceptHouseAdvance(profile.id);
 
-    expect(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles[0]).toMatchObject({
+    expect(requireProfile(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles, 0)).toMatchObject({
       bankroll: 100,
       houseAdvance: { outstandingBalance: 100, activeCount: 1 },
       transactions: [expect.objectContaining({ type: 'house_advance_credit', amount: 100 })],
     });
 
     const reloaded = new SqliteServerDataStore(dbPath);
-    reloaded.applyGameplaySettlement(profile.id, 50, 50, { gameId: 'blackjack', roomId: 'ROOM1', sessionId: 'SESSION1' });
+    reloaded.applyGameplaySettlement(profile.id, 50, 50, { gameId: 'blackjack', roomId: testRoomId('ROOM1'), sessionId: testSessionId('SESSION1') });
 
-    expect(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles[0]).toMatchObject({
+    expect(requireProfile(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles, 0)).toMatchObject({
       bankroll: 145,
       houseAdvance: { outstandingBalance: 95, activeCount: 1 },
       transactions: expect.arrayContaining([expect.objectContaining({ type: 'house_advance_repayment', amount: -5 })]),
@@ -178,7 +204,7 @@ describe('server data store', () => {
     const dbPath = join(dir, 'casino.sqlite');
     const store = new SqliteServerDataStore(dbPath);
     const created = store.createProfile('SQLite Mutations');
-    const profile = created.profileState.profiles[0];
+    const profile = requireProfile(created.profileState.profiles, 0);
 
     store.saveSession(
       createSessionState(profile.id, {
@@ -190,7 +216,7 @@ describe('server data store', () => {
       }),
     );
     store.renameProfile(profile.id, 'SQLite Renamed');
-    store.ensureProfile('manual-sqlite', 'Manual SQLite', Number.NaN);
+    store.ensureProfile(testProfileId('manual-sqlite'), 'Manual SQLite', Number.NaN);
     store.setProfileBankroll(profile.id, 250.75);
     store.recordTransaction(profile.id, {
       gameId: 'blackjack',
@@ -223,8 +249,9 @@ describe('server data store', () => {
     tempDirs.push(dir);
     const dbPath = join(dir, 'casino.sqlite');
     const store = new SqliteServerDataStore(dbPath);
-    const profile = store.createProfile('SQLite Survivor').profileState.profiles[0];
-    store.setProfileTokenHash(profile.id, 'token-hash');
+    const profile = requireProfile(store.createProfile('SQLite Survivor').profileState.profiles, 0);
+    const tokenHash = testProfileTokenHash('a'.repeat(64));
+    store.setProfileTokenHash(profile.id, tokenHash);
     store.saveSession(
       createSessionState(profile.id, {
         activeGame: 'blackjack',
@@ -244,7 +271,7 @@ describe('server data store', () => {
     expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toEqual(
       corruptKey === 'profiles' ? undefined : expect.objectContaining({ name: 'SQLite Survivor' }),
     );
-    expect(reloaded.profileTokenHash(profile.id)).toBe(corruptKey === 'profile_auth' ? undefined : 'token-hash');
+    expect(reloaded.profileTokenHash(profile.id)).toBe(corruptKey === 'profile_auth' ? undefined : tokenHash);
     expect(reloaded.snapshot().session).toEqual(corruptKey === 'session' ? undefined : expect.objectContaining({ activeGame: 'blackjack' }));
 
     warn.mockRestore();
@@ -255,8 +282,9 @@ describe('server data store', () => {
     tempDirs.push(dir);
     const dbPath = join(dir, 'casino.sqlite');
     const store = new SqliteServerDataStore(dbPath);
-    const profile = store.createProfile('SQLite Session Break').profileState.profiles[0];
-    store.setProfileTokenHash(profile.id, 'token-hash');
+    const profile = requireProfile(store.createProfile('SQLite Session Break').profileState.profiles, 0);
+    const tokenHash = testProfileTokenHash('a'.repeat(64));
+    store.setProfileTokenHash(profile.id, tokenHash);
     writeStateValue(
       dbPath,
       'session',
@@ -278,7 +306,7 @@ describe('server data store', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('server_state row "session"'), expect.any(Error));
     expect(readStateValue(dbPath, 'session')).toBeUndefined();
     expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({ name: 'SQLite Session Break' });
-    expect(reloaded.profileTokenHash(profile.id)).toBe('token-hash');
+    expect(reloaded.profileTokenHash(profile.id)).toBe(tokenHash);
     expect(reloaded.snapshot().session).toBeUndefined();
 
     warn.mockRestore();

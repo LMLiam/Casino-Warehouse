@@ -15,4 +15,5 @@ export const BET_RENDERING = {
   sidePayoutOffsetX: 58,
   sideChipRadius: 15,
   sideLabelOffsetY: 34,
+  wagerAmountOffsetY: -52,
 };

@@ -26,10 +26,10 @@ export class BlackjackGame {
   private dealerHoleHidden = false;
   private insuranceWager = 0;
   private splitHands: readonly (readonly Card[])[] = [];
-  private result?: BlackjackResult;
+  private result?: BlackjackResult | undefined;
   private returned = 0;
   private status = 'Choose a wager and deal Blackjack.';
-  private readonly rng?: Rng;
+  private readonly rng?: Rng | undefined;
 
   public constructor(options: BlackjackOptions = {}) {
     this.rng = options.rng;
@@ -91,7 +91,11 @@ export class BlackjackGame {
       if (playerBlackjack) {
         return this.settle('blackjack', this.wager + Math.floor(this.wager * BlackjackGame.blackjackPayoutMultiplier), 'Blackjack pays 3:2.');
       }
-      return this.settle('lose', 0, `Dealer has Blackjack with ${cardLabel(this.dealerCards[1])}.`);
+      const dealerHoleCard = this.dealerCards[1];
+      if (!dealerHoleCard) {
+        return this.settle('lose', 0, 'Dealer has Blackjack.');
+      }
+      return this.settle('lose', 0, `Dealer has Blackjack with ${cardLabel(dealerHoleCard)}.`);
     }
 
     this.status = `Player ${handText(this.playerCards)}. Hit or stand.`;
@@ -132,11 +136,13 @@ export class BlackjackGame {
   }
 
   public split(): BlackjackSnapshot {
-    if (this.phase !== 'player' || this.playerCards.length !== 2 || this.playerCards[0].rank !== this.playerCards[1].rank) {
+    const firstCard = this.playerCards[0];
+    const secondCard = this.playerCards[1];
+    if (this.phase !== 'player' || this.playerCards.length !== 2 || !firstCard || !secondCard || firstCard.rank !== secondCard.rank) {
       return this.snapshot();
     }
-    const first = [this.playerCards[0], this.draw()];
-    const second = [this.playerCards[1], this.draw()];
+    const first = [firstCard, this.draw()];
+    const second = [secondCard, this.draw()];
     this.splitHands = [first, second];
     this.wager *= 2;
     this.phase = 'dealer';

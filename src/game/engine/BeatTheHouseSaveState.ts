@@ -4,5 +4,5 @@ import type { GameSnapshot } from '../types/GameSnapshot';
 
 export interface BeatTheHouseSaveState extends Omit<GameSnapshot, 'lastEvents'> {
   readonly deck: readonly Card[];
-  readonly lastBets?: Bets;
+  readonly lastBets?: Bets | undefined;
 }

@@ -1,3 +1,4 @@
+import type { CasinoGameId } from '../../game/ids';
 import type { PerGameStats } from './PerGameStats';
 
 export interface ProfileStats {
@@ -7,6 +8,6 @@ export interface ProfileStats {
   readonly biggestWin: number;
   readonly biggestWager: number;
   readonly gamesPlayed: number;
-  readonly perGame: Readonly<Record<string, PerGameStats>>;
-  readonly favouriteGame?: string;
+  readonly perGame: Readonly<Partial<Record<CasinoGameId, PerGameStats>>>;
+  readonly favouriteGame?: CasinoGameId | undefined;
 }

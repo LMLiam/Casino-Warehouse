@@ -4,6 +4,7 @@ import type { BlackjackTableSeatSnapshot } from '../../game/blackjackTable/Black
 import type { BlackjackTableSnapshot } from '../../game/blackjackTable/BlackjackTableSnapshot';
 import { isBlackjackTableSnapshot } from '../../game/blackjackTable/isBlackjackTableSnapshot';
 import type { Card } from '../../game/cards/Card';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 import { capitalize } from '../format/appText';
@@ -11,7 +12,7 @@ import { capitalize } from '../format/appText';
 export class BlackjackView {
   public constructor(private readonly elements: AppElements) {}
 
-  public render(snapshot: BlackjackSnapshot | BlackjackTableSnapshot, profileId?: string): void {
+  public render(snapshot: BlackjackSnapshot | BlackjackTableSnapshot, profileId?: ProfileId): void {
     this.elements.blackjackView.style.setProperty('--blackjack-table-art', `url('${blackjackTableAsset().path}')`);
     if (isBlackjackTableSnapshot(snapshot)) {
       this.renderTable(snapshot, profileId);
@@ -38,7 +39,7 @@ export class BlackjackView {
     this.elements.blackjackSeats.replaceChildren();
   }
 
-  private renderTable(snapshot: BlackjackTableSnapshot, profileId?: string): void {
+  private renderTable(snapshot: BlackjackTableSnapshot, profileId?: ProfileId): void {
     const mySeat = snapshot.seats.find((seat) => seat.profileId === profileId);
     this.elements.blackjackStatus.textContent = snapshot.status;
     this.renderDealerCards(snapshot.dealerCards, snapshot.dealerHoleHidden);
@@ -63,7 +64,7 @@ export class BlackjackView {
     this.setActionButton(this.elements.blackjackNewButton, snapshot.phase === 'settled');
   }
 
-  private renderTableSeat(seat: BlackjackTableSeatSnapshot, profileId?: string): HTMLElement {
+  private renderTableSeat(seat: BlackjackTableSeatSnapshot, profileId?: ProfileId): HTMLElement {
     const seatElement = document.createElement('article');
     seatElement.classList.add('blackjack-table-seat');
     seatElement.classList.toggle('active', seat.isTurn);

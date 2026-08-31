@@ -4,7 +4,6 @@ import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
 import { houseAdvanceRepaymentForProfit } from '../../../src/state/profiles/houseAdvanceRepaymentForProfit';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
 import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
-import { parseCasinoProfile } from '../../../src/state/profiles/parseCasinoProfile';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import { recordTransaction } from '../../../src/state/profiles/recordTransaction';
 import { renameProfile } from '../../../src/state/profiles/renameProfile';
@@ -12,6 +11,23 @@ import { replaceProfile } from '../../../src/state/profiles/replaceProfile';
 import { saveProfileStore } from '../../../src/state/profiles/saveProfileStore';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
 import { createStateId } from '../../../src/state/profiles/createStateId';
+import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
+
+const requireProfileAt = (profiles: readonly CasinoProfile[], index: number): CasinoProfile => {
+  const profile = profiles[index];
+  if (!profile) {
+    throw new Error(`Missing profile at index ${index}.`);
+  }
+  return profile;
+};
+
+const requireTransactionAt = (profile: CasinoProfile, index: number): CasinoProfile['transactions'][number] => {
+  const transaction = profile.transactions[index];
+  if (!transaction) {
+    throw new Error(`Missing transaction at index ${index}.`);
+  }
+  return transaction;
+};
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -23,40 +39,48 @@ class MemoryStorage implements StorageLike {
   public setItem(key: string, value: string): void {
     this.values.set(key, value);
   }
+
+  public removeItem(key: string): void {
+    this.values.delete(key);
+  }
+
+  public clear(): void {
+    this.values.clear();
+  }
 }
 
 describe('profile store', () => {
   it('creates, saves, and reloads persistent profiles', () => {
     const storage = new MemoryStorage();
     expect(loadProfileStore(storage)).toMatchObject({ recovered: false, state: { profiles: [] } });
-    const state = createProfile({ version: 1, profiles: [] }, 'Liam', 1500, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Liam', 1500, new Date('2026-05-04T12:00:00Z'));
 
     saveProfileStore(storage, state);
     const loaded = loadProfileStore(storage);
 
     expect(loaded.recovered).toBe(false);
     expect(loaded.state.profiles).toHaveLength(1);
-    expect(loaded.state.profiles[0].name).toBe('Liam');
-    expect(loaded.state.profiles[0].bankroll).toBe(1500);
-    expect(loaded.state.profiles[0].houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
+    expect(requireProfileAt(loaded.state.profiles, 0).name).toBe('Liam');
+    expect(requireProfileAt(loaded.state.profiles, 0).bankroll).toBe(1500);
+    expect(requireProfileAt(loaded.state.profiles, 0).houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
   });
 
   it('renames and deletes profiles without touching other records', () => {
-    let state = createProfile({ version: 1, profiles: [] }, 'One', 100, new Date('2026-05-04T12:00:00Z'));
+    let state = createProfile({ profiles: [] }, 'One', 100, new Date('2026-05-04T12:00:00Z'));
     state = createProfile(state, 'Two', 200, new Date('2026-05-04T12:01:00Z'));
-    const secondId = state.profiles[1].id;
+    const secondId = requireProfileAt(state.profiles, 1).id;
 
     state = renameProfile(state, secondId, 'VIP Two', new Date('2026-05-04T12:02:00Z'));
-    state = deleteProfile(state, state.profiles[0].id);
+    state = deleteProfile(state, requireProfileAt(state.profiles, 0).id);
 
     expect(state.profiles).toHaveLength(1);
-    expect(state.profiles[0].name).toBe('VIP Two');
-    expect(state.profiles[0].bankroll).toBe(200);
+    expect(requireProfileAt(state.profiles, 0).name).toBe('VIP Two');
+    expect(requireProfileAt(state.profiles, 0).bankroll).toBe(200);
   });
 
   it('records bankroll transaction history and stats', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Stats', 1000, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    const state = createProfile({ profiles: [] }, 'Stats', 1000, new Date('2026-05-04T12:00:00Z'));
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       profile,
@@ -78,12 +102,12 @@ describe('profile store', () => {
     expect(profile.stats.gamesPlayed).toBe(1);
     expect(profile.stats.perGame.blackjack).toMatchObject({ gamesPlayed: 1, wagered: 25, won: 50, netProfit: 25 });
     expect(profile.transactions.map((tx) => tx.balanceAfter)).toEqual([1025, 975]);
-    expect(profile.transactions[0]).toMatchObject({ profileId: profile.id, balanceBefore: 975, description: 'Blackjack win' });
+    expect(requireTransactionAt(profile, 0)).toMatchObject({ profileId: profile.id, balanceBefore: 975, description: 'Blackjack win' });
   });
 
   it('keeps House Advance credits and repayments out of gameplay stats', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Advance Stats', 0, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    const state = createProfile({ profiles: [] }, 'Advance Stats', 0, new Date('2026-05-04T12:00:00Z'));
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       { ...profile, houseAdvance: { outstandingBalance: 100, activeCount: 1 } },
@@ -116,8 +140,8 @@ describe('profile store', () => {
   });
 
   it('keeps dealer tips and Dealer Thanks rewards out of wager and winnings stats', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Tip Stats', 100, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    const state = createProfile({ profiles: [] }, 'Tip Stats', 100, new Date('2026-05-04T12:00:00Z'));
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       profile,
@@ -168,12 +192,12 @@ describe('profile store', () => {
 
     try {
       const now = new Date('2026-05-04T12:00:00Z');
-      const state = createProfile(createProfile({ version: 1, profiles: [] }, 'One', 100, now), 'Two', 200, now);
-      const firstProfile = state.profiles[0];
-      const secondProfile = state.profiles[1];
+      const state = createProfile(createProfile({ profiles: [] }, 'One', 100, now), 'Two', 200, now);
+      const firstProfile = requireProfileAt(state.profiles, 0);
+      const secondProfile = requireProfileAt(state.profiles, 1);
       const updated = recordTransaction(
-        recordTransaction(firstProfile, { gameId: 'slots', type: 'wager', amount: -10, description: 'Spin', metadata: {} }, now),
-        { gameId: 'slots', type: 'payout', amount: 20, description: 'Win', metadata: {} },
+        recordTransaction(firstProfile, { gameId: 'slots:thai-princess', type: 'wager', amount: -10, description: 'Spin', metadata: {} }, now),
+        { gameId: 'slots:thai-princess', type: 'payout', amount: 20, description: 'Win', metadata: {} },
         now,
       );
 
@@ -198,16 +222,16 @@ describe('profile store', () => {
     const profileNow = new Date('2026-05-04T12:00:00Z');
     const transactionNow = new Date('2026-05-04T12:01:00Z');
     const idGenerator = vi.fn((prefix: string, now: Date) => `${prefix}-${now.toISOString()}`);
-    const state = createProfile({ version: 1, profiles: [] }, 'Deterministic', 1000, profileNow, idGenerator);
+    const state = createProfile({ profiles: [] }, 'Deterministic', 1000, profileNow, idGenerator);
     const profile = recordTransaction(
-      state.profiles[0],
+      requireProfileAt(state.profiles, 0),
       { gameId: 'blackjack', type: 'wager', amount: -25, description: 'Wager', metadata: {} },
       transactionNow,
       idGenerator,
     );
 
-    expect(state.profiles[0].id).toBe('profile-2026-05-04T12:00:00.000Z');
-    expect(profile.transactions[0].id).toBe('tx-2026-05-04T12:01:00.000Z');
+    expect(requireProfileAt(state.profiles, 0).id).toBe('profile-2026-05-04T12:00:00.000Z');
+    expect(requireTransactionAt(profile, 0).id).toBe('tx-2026-05-04T12:01:00.000Z');
     expect(idGenerator).toHaveBeenNthCalledWith(1, 'profile', profileNow);
     expect(idGenerator).toHaveBeenNthCalledWith(2, 'tx', transactionNow);
   });
@@ -244,8 +268,8 @@ describe('profile store', () => {
   });
 
   it('does not count pushes or admin adjustments as gambling wins', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Clean stats', 100, new Date('2026-05-04T12:00:00Z'));
-    let profile = state.profiles[0];
+    const state = createProfile({ profiles: [] }, 'Clean stats', 100, new Date('2026-05-04T12:00:00Z'));
+    let profile = requireProfileAt(state.profiles, 0);
 
     profile = recordTransaction(
       profile,
@@ -264,136 +288,61 @@ describe('profile store', () => {
   });
 
   it('parses a validated save file', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'Stored', 777, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'Stored', 777, new Date('2026-05-04T12:00:00Z'));
 
     const imported = parseProfileStoreJson(JSON.stringify(state));
 
-    expect(imported).toEqual(state);
+    expect(imported).toEqual({ ok: true, value: state });
   });
 
-  it('migrates profile-store v1 legacy transactions and missing optional profile fields', () => {
-    const imported = parseCasinoSaveState({
-      version: 1,
-      profiles: [
-        {
-          id: 'legacy',
-          name: 'Legacy',
-          bankroll: 50,
-          stats: { totalWagered: 10, totalWon: 20, biggestWin: 20, gamesPlayed: 1 },
-          transactions: [
-            { id: 'tx1', gameId: 'blackjack', type: 'push', amount: 10, balanceAfter: 50, note: 'Old push' },
-            { id: 'tx2', gameId: 'admin', type: 'admin', amount: 5, balanceAfter: 40, note: 'Old admin' },
-          ],
-        },
-      ],
+  it('rejects obsolete and malformed profile stores instead of migrating them', () => {
+    expect(parseCasinoSaveState({ version: 1, profiles: [] })).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Unrecognized key: "version"') },
     });
-
-    expect(imported.version).toBe(1);
-    expect(imported.profiles[0].color).toMatch(/^#/);
-    expect(imported.profiles[0].houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
-    expect(imported.profiles[0].stats.netProfit).toBe(10);
-    expect(imported.profiles[0].transactions.map((transaction) => transaction.type)).toEqual(['push_refund', 'admin_adjustment']);
-    expect(imported.profiles[0].transactions[0].description).toBe('Old push');
-  });
-
-  it('rejects malformed and unsupported profile-store migration inputs clearly', () => {
-    expect(() => parseCasinoSaveState({ version: 1 })).toThrow('Profile store v1 data is not valid');
-    expect(() => parseProfileStoreJson('{"version":2,"profiles":[]}')).toThrow('Profile store data version 2 is not supported.');
-  });
-
-  it('normalizes partial profile records that bypass save-state schema defaults', () => {
-    const empty = parseCasinoProfile({ id: 'empty', name: '   ', stats: null });
-    const rich = parseCasinoProfile({
-      id: 'rich',
-      name: '  Rich  ',
-      bankroll: Number.NaN,
-      houseAdvance: {
-        outstandingBalance: 425,
-        activeCount: 99,
-      },
-      stats: {
-        perGame: {
-          ignored: null,
-          slots: { gamesPlayed: 2, wagered: Number.NaN, won: 25, netProfit: 7 },
-        },
-      },
-      transactions: [
-        {
-          id: 'reset',
-          gameId: 'admin',
-          roomId: 'room-1',
-          sessionId: 'session-1',
-          type: 'reset',
-          amount: Number.NaN,
-          balanceBefore: Number.NaN,
-          balanceAfter: Number.NaN,
-          metadata: { keep: 'yes', count: 2, flag: false, drop: {} },
-        },
-        { id: 'import', gameId: 'admin', type: 'import', amount: 5, balanceBefore: 0, balanceAfter: 5 },
-        { id: 'correction', gameId: 'admin', type: 'correction', amount: -5, balanceBefore: 5, balanceAfter: 0 },
-      ],
+    expect(parseProfileStoreJson('{"profiles":[{"id":1}]}')).toMatchObject({
+      ok: false,
+      error: { message: expect.stringContaining('Save data is not a casino profile store') },
     });
-
-    expect(empty).toMatchObject({ name: 'Player', bankroll: 0, transactions: [] });
-    expect(rich).toMatchObject({
-      name: 'Rich',
-      bankroll: 0,
-      transactions: [
-        expect.objectContaining({
-          roomId: 'room-1',
-          sessionId: 'session-1',
-          type: 'reset',
-          amount: 0,
-          description: 'Imported legacy transaction.',
-          metadata: { keep: 'yes', count: 2, flag: false },
-        }),
-        expect.objectContaining({ type: 'import' }),
-        expect.objectContaining({ type: 'correction' }),
-      ],
-    });
-    expect(rich.stats.perGame.slots).toMatchObject({ gamesPlayed: 2, wagered: 0, won: 25, netProfit: 7 });
-    expect(rich.houseAdvance).toEqual({ outstandingBalance: 300, activeCount: 3 });
-  });
-
-  it('normalizes invalid House Advance imports without rejecting profiles', () => {
-    expect(parseCasinoProfile({ id: 'missing', name: 'Missing' }).houseAdvance).toEqual({ outstandingBalance: 0, activeCount: 0 });
-    expect(parseCasinoProfile({ id: 'negative', name: 'Negative', houseAdvance: { outstandingBalance: -100, activeCount: 2 } }).houseAdvance).toEqual({
-      outstandingBalance: 0,
-      activeCount: 0,
-    });
-    expect(
-      parseCasinoProfile({ id: 'active-missing', name: 'Active Missing', houseAdvance: { outstandingBalance: 100, activeCount: -5 } }).houseAdvance,
-    ).toEqual({
-      outstandingBalance: 100,
-      activeCount: 1,
-    });
-    expect(parseCasinoProfile({ id: 'too-high', name: 'Too High', houseAdvance: { outstandingBalance: 999, activeCount: 8 } }).houseAdvance).toEqual({
-      outstandingBalance: 300,
-      activeCount: 3,
-    });
-  });
-
-  it('rejects invalid imported profiles and transactions', () => {
-    expect(() => parseProfileStoreJson(JSON.stringify({ version: 1, profiles: [{ id: 1 }] }))).toThrow('Profile record is invalid.');
-    expect(() =>
-      parseProfileStoreJson(
-        JSON.stringify({
-          version: 1,
-          profiles: [{ id: 'bad', name: 'Bad', transactions: [{ id: 1 }] }],
-        }),
-      ),
-    ).toThrow('Transaction record is invalid.');
   });
 
   it('recovers gracefully from corrupted storage data', () => {
     const storage = new MemoryStorage();
-    storage.setItem('casino_warehouse_profiles_v1', '{ broken');
+    storage.setItem('casino_warehouse_profiles', '{ broken');
 
     const loaded = loadProfileStore(storage);
 
     expect(loaded.recovered).toBe(true);
     expect(loaded.state.profiles).toEqual([]);
     expect(loaded.error).toBeTruthy();
+    expect(storage.getItem('casino_warehouse_profiles')).toBeNull();
+  });
+
+  it('keeps the recovery result when corrupted storage cannot be removed', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('casino_warehouse_profiles', '{ broken');
+    vi.spyOn(storage, 'removeItem').mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+
+    const loaded = loadProfileStore(storage);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.state.profiles).toEqual([]);
+  });
+
+  it('recovers when profile storage access throws', () => {
+    const storage: StorageLike = {
+      getItem: () => {
+        throw Symbol('storage unavailable');
+      },
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    };
+
+    expect(loadProfileStore(storage)).toMatchObject({ recovered: true, error: 'Unknown save-data error.' });
+    expect(storage.removeItem).toHaveBeenCalledWith('casino_warehouse_profiles');
   });
 
   it('keeps save failures visible to the caller', () => {
@@ -402,22 +351,24 @@ describe('profile store', () => {
       setItem: vi.fn(() => {
         throw new Error('quota exceeded');
       }),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
     };
 
-    expect(() => saveProfileStore(storage, { version: 1, profiles: [] })).toThrow('quota exceeded');
+    expect(() => saveProfileStore(storage, { profiles: [] })).toThrow('quota exceeded');
   });
 
   it('replaces one profile in a save state', () => {
-    const state = createProfile({ version: 1, profiles: [] }, 'A', 100, new Date('2026-05-04T12:00:00Z'));
+    const state = createProfile({ profiles: [] }, 'A', 100, new Date('2026-05-04T12:00:00Z'));
     const updated = recordTransaction(
-      state.profiles[0],
-      { gameId: 'slots', type: 'bonus', amount: 500, description: 'Bonus win', metadata: { slotTheme: 'thai-princess' } },
+      requireProfileAt(state.profiles, 0),
+      { gameId: 'slots:thai-princess', type: 'bonus', amount: 500, description: 'Bonus win', metadata: { slotTheme: 'thai-princess' } },
       new Date('2026-05-04T12:01:00Z'),
     );
 
     const next = replaceProfile(state, updated);
 
-    expect(next.profiles[0].bankroll).toBe(600);
-    expect(next.profiles[0].transactions[0].description).toBe('Bonus win');
+    expect(requireProfileAt(next.profiles, 0).bankroll).toBe(600);
+    expect(requireTransactionAt(requireProfileAt(next.profiles, 0), 0).description).toBe('Bonus win');
   });
 });

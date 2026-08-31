@@ -14,7 +14,7 @@ export interface GameSnapshot {
   readonly bets: Bets;
   readonly dealerTips: DealerTips;
   readonly dealerTipRewards: DealerTips;
-  readonly activeHand?: HandId;
+  readonly activeHand?: HandId | undefined;
   readonly hands: Record<HandId, PlayerHand>;
   readonly dealer: DealerHand;
   readonly sideStates: SideStates;

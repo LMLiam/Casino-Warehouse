@@ -1,1 +1,4 @@
-export type Phase = 'betting' | 'dealing' | 'playing' | 'dealer' | 'roundOver';
+import type { z } from 'zod';
+import { phaseSchema } from '../../schemas/casinoSchemas/phaseSchema';
+
+export type Phase = z.infer<typeof phaseSchema>;

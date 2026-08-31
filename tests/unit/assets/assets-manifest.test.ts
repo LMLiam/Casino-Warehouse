@@ -17,6 +17,7 @@ const forbiddenAssetLanguage =
   /generated-placeholder|manual placeholder|legacy placeholder|temporary fallback|optional-deferred|deferred required|missing required asset/i;
 const forbiddenLegacyPath =
   /(?:\.\.\/\.\.\/(?:table|chips-sheet)\.png|['"`]\/(?:table|chips-sheet)\.png['"`]|\/assets\/blackjack\/table\.svg|\/assets\/lobby\/game-tiles\/[^'"`)]+\.svg|\/assets\/slots\/[^'"`)]+\/frame\.svg)/;
+const assetPixelInspectionTimeoutMs = 30_000;
 
 const assetFilePath = (assetPath: string): string => {
   const relativePath = assetPath.replace(/^\//, '');
@@ -86,23 +87,70 @@ const pngAlphaSummary = (
   let transparentCorners = 0;
 
   for (let y = 0; y < height; y += 1) {
-    const filter = bytes[byteIndex];
+    const filterByte = bytes[byteIndex];
+    if (filterByte === undefined) {
+      throw new Error(`Missing filter byte at index ${byteIndex}.`);
+    }
+    const filter = filterByte;
     byteIndex += 1;
     const row = Buffer.alloc(stride);
     for (let x = 0; x < stride; x += 1) {
-      const left = x >= rgbaChannelCount ? row[x - rgbaChannelCount] : 0;
-      const up = previousRow[x];
-      const upperLeft = x >= rgbaChannelCount ? previousRow[x - rgbaChannelCount] : 0;
-      row[x] = reconstructPngByte(filter, bytes[byteIndex], left, up, upperLeft);
+      const leftIndex = x - rgbaChannelCount;
+      const left =
+        x >= rgbaChannelCount
+          ? (() => {
+              const value = row[leftIndex];
+              if (value === undefined) {
+                throw new Error(`Missing left byte at index ${leftIndex}.`);
+              }
+              return value;
+            })()
+          : 0;
+      const upValue = previousRow[x];
+      if (upValue === undefined) {
+        throw new Error(`Missing up byte at index ${x}.`);
+      }
+      const up = upValue;
+      const upperLeft =
+        x >= rgbaChannelCount
+          ? (() => {
+              const value = previousRow[leftIndex];
+              if (value === undefined) {
+                throw new Error(`Missing upperLeft byte at index ${leftIndex}.`);
+              }
+              return value;
+            })()
+          : 0;
+      const rawByte = bytes[byteIndex];
+      if (rawByte === undefined) {
+        throw new Error(`Missing raw byte at index ${byteIndex}.`);
+      }
+      row[x] = reconstructPngByte(filter, rawByte, left, up, upperLeft);
       byteIndex += 1;
     }
 
     for (let x = 0; x < width; x += 1) {
       const pixel = x * rgbaChannelCount;
-      const red = row[pixel];
-      const green = row[pixel + 1];
-      const blue = row[pixel + 2];
-      const alpha = row[pixel + 3];
+      const redByte = row[pixel];
+      if (redByte === undefined) {
+        throw new Error(`Missing red byte at pixel ${pixel}.`);
+      }
+      const red = redByte;
+      const greenByte = row[pixel + 1];
+      if (greenByte === undefined) {
+        throw new Error(`Missing green byte at pixel ${pixel + 1}.`);
+      }
+      const green = greenByte;
+      const blueByte = row[pixel + 2];
+      if (blueByte === undefined) {
+        throw new Error(`Missing blue byte at pixel ${pixel + 2}.`);
+      }
+      const blue = blueByte;
+      const alphaByte = row[pixel + 3];
+      if (alphaByte === undefined) {
+        throw new Error(`Missing alpha byte at pixel ${pixel + 3}.`);
+      }
+      const alpha = alphaByte;
       alphaMin = Math.min(alphaMin, alpha);
       alphaMax = Math.max(alphaMax, alpha);
       if (green > 220 && red < 40 && blue < 80 && alpha > 200) {
@@ -205,14 +253,18 @@ describe('casino asset manifest', () => {
     expect(new Set(Object.values(casinoAssets.slotSymbols).map((asset) => pngDimensions(asset.path))).size).toBe(1);
   });
 
-  it('provides transparent generated image assets for every slot reel symbol', () => {
-    const symbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
-    for (const symbol of symbols) {
-      const asset = slotSymbolAsset(symbol);
-      expect(asset).toMatchObject({ category: 'slot-symbol', source: 'imagegen', transparent: true, dimensions: '512x512' });
-      expect(pngAlphaSummary(asset.path)).toEqual({ alphaMin: 0, alphaMax: 255, opaqueChromaPixels: 0, transparentCorners: 4 });
-    }
-  });
+  it(
+    'provides transparent generated image assets for every slot reel symbol',
+    () => {
+      const symbols: readonly SlotSymbol[] = ['princess', 'lotus', 'elephant', 'temple', 'fan', 'orchid'];
+      for (const symbol of symbols) {
+        const asset = slotSymbolAsset(symbol);
+        expect(asset).toMatchObject({ category: 'slot-symbol', source: 'imagegen', transparent: true, dimensions: '512x512' });
+        expect(pngAlphaSummary(asset.path)).toEqual({ alphaMin: 0, alphaMax: 255, opaqueChromaPixels: 0, transparentCorners: 4 });
+      }
+    },
+    assetPixelInspectionTimeoutMs,
+  );
 
   it('keeps stale placeholders, legacy paths, and duplicate asset routes out of code and docs', () => {
     expect(readFileSync(join(workspaceRoot, 'src', 'assets', 'manifest', 'casinoAssets.ts'), 'utf8')).not.toMatch(forbiddenAssetLanguage);

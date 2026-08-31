@@ -1,5 +1,7 @@
 import type { CasinoProfile } from './CasinoProfile';
 import type { CasinoSaveState } from './CasinoSaveState';
+import { createIsoTimestamp } from '../../schemas/casinoSchemas/createIsoTimestamp';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
 import { createStateId } from './createStateId';
 import { defaultHouseAdvanceState } from './defaultHouseAdvanceState';
 import { emptyStats } from './emptyStats';
@@ -15,9 +17,9 @@ export const createProfile = (
   idGenerator: StateIdGenerator = createStateId,
 ): CasinoSaveState => {
   const profileName = normalizeProfileName(name);
-  const at = now.toISOString();
+  const at = createIsoTimestamp(now);
   const profile: CasinoProfile = {
-    id: idGenerator('profile', now),
+    id: profileIdSchema.parse(idGenerator('profile', now)),
     name: profileName,
     color: profileColorFromName(profileName),
     bankroll: Math.max(0, Math.floor(bankroll)),

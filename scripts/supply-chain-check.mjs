@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ const fullShaPattern = /^[a-f0-9]{40}$/i;
 function main() {
   const failures = [];
 
+  checkNpmAudit(failures);
   checkWorkflowActionPins(failures);
   checkDependabotActionsUpdates(failures);
   checkDependencyReviewPolicy(failures);
@@ -25,6 +27,14 @@ function main() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
+}
+
+function checkNpmAudit(failures) {
+  try {
+    execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['audit', '--audit-level=moderate'], { stdio: 'inherit' });
+  } catch {
+    failures.push('npm audit --audit-level=moderate found moderate-or-higher vulnerabilities.');
+  }
 }
 
 function checkWorkflowActionPins(failures) {

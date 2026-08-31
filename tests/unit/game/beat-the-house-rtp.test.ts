@@ -34,7 +34,7 @@ type RoundStats = {
 };
 type DealerOutcome = {
   first: number;
-  finalValue?: number;
+  finalValue?: number | undefined;
   bust: boolean;
   blackAce: boolean;
   sevenCount: number;
@@ -120,6 +120,14 @@ const cardKinds = [
 ] as const satisfies readonly CardKind[];
 const initialCounts = cardKinds.map((kind) => kind.count);
 
+const requireKind = (index: number): CardKind => {
+  const kind = cardKinds[index];
+  if (!kind) {
+    throw new Error(`Missing card kind at index ${index}.`);
+  }
+  return kind;
+};
+
 // Shared forced cases: first-card black Ace auto-wins, first-card 2 auto-loses, hit 2 loses, and four player cards force standing.
 const mainOnlyStrategy = { oneCardHitThrough: JACK_VALUE, twoCardHitThrough: JACK_VALUE, threeCardHitThrough: TEN_VALUE } as const;
 const matchPushStrategy = { oneCardHitThrough: TEN_VALUE, twoCardHitThrough: TEN_VALUE, threeCardHitThrough: TEN_VALUE } as const;
@@ -151,6 +159,14 @@ const wagerProfiles = [
   ),
 ] as const satisfies readonly WagerProfile[];
 
+const requireWagerProfile = (index: number): WagerProfile => {
+  const profile = wagerProfiles[index];
+  if (!profile) {
+    throw new Error(`Missing wager profile at index ${index}.`);
+  }
+  return profile;
+};
+
 describe('Beat the House RTP guardrails', () => {
   it('documents every normalized wager profile and the optimal strategy row used by the RTP guardrail', () => {
     expect(wagerProfiles).toHaveLength(16);
@@ -177,8 +193,8 @@ describe('Beat the House RTP guardrails', () => {
   });
 
   it('includes active side-bet returns when checking the J hit/stick action value', () => {
-    const mainOnly = wagerProfiles[0]!;
-    const matchPush = wagerProfiles[4]!;
+    const mainOnly = requireWagerProfile(0);
+    const matchPush = requireWagerProfile(4);
     const oneCardJack = [kindIndex('J')];
     const twoCardJack = [kindIndex('3'), kindIndex('J')];
 
@@ -246,13 +262,24 @@ function simulateProductionProfile(wagerProfile: WagerProfile, seed: number): Ro
 
     let snapshot = game.deal();
     while (snapshot.phase === 'playing') {
-      const activeHand = snapshot.activeHand!;
+      const activeHand = snapshot.activeHand;
+      if (!activeHand) {
+        throw new Error('Missing activeHand.');
+      }
       const cards = snapshot.hands[activeHand].cards;
-      const finalCard = cards.at(-1)!;
-      const action = strategyAction(wagerProfile.strategy, cards.length, rankValues[finalCard.rank]);
+      const finalCard = cards.at(-1);
+      if (!finalCard) {
+        throw new Error('Missing finalCard.');
+      }
+      const finalRankValue = rankValues[finalCard.rank];
+      const action = strategyAction(wagerProfile.strategy, cards.length, finalRankValue);
       snapshot = action === 'hit' ? game.hit() : game.stick();
     }
-    returned.push(snapshot.summaries[0]!.returned);
+    const summary = snapshot.summaries[0];
+    if (!summary) {
+      throw new Error('Missing summary.');
+    }
+    returned.push(summary.returned);
   }
 
   return sampleStats(returned);
@@ -264,7 +291,15 @@ function estimatedActionValue(wagerProfile: WagerProfile, visibleHand: readonly 
 
   for (let round = 0; round < ACTION_VALUE_SAMPLE_ROUNDS; round += 1) {
     const counts = removeCards(initialCounts, visibleHand);
-    returned.push(playPlayerContinuation(wagerProfile, counts, visibleHand[0]!, visibleHand.at(-1)!, visibleHand.length, firstAction, rng));
+    const firstVisible = visibleHand[0];
+    if (firstVisible === undefined) {
+      throw new Error('Missing firstVisible.');
+    }
+    const lastVisible = visibleHand.at(-1);
+    if (lastVisible === undefined) {
+      throw new Error('Missing lastVisible.');
+    }
+    returned.push(playPlayerContinuation(wagerProfile, counts, firstVisible, lastVisible, visibleHand.length, firstAction, rng));
   }
 
   return sampleStats(returned);
@@ -280,18 +315,18 @@ function playPlayerContinuation(
   rng: () => number,
 ): number {
   if (action === 'stick') {
-    return simulateDealerAndSettle(wagerProfile, counts, playerFirst, cardKinds[playerFinal].value, 'compare', rng);
+    return simulateDealerAndSettle(wagerProfile, counts, playerFirst, requireKind(playerFinal).value, 'compare', rng);
   }
 
   const { drawn, nextCounts } = drawKind(counts, rng);
-  if (cardKinds[drawn].value === TWO_VALUE) {
+  if (requireKind(drawn).value === TWO_VALUE) {
     return simulateDealerAndSettle(wagerProfile, nextCounts, playerFirst, undefined, 'lose', rng);
   }
   if (playerCardCount + 1 >= MAX_PLAYER_CARDS) {
-    return simulateDealerAndSettle(wagerProfile, nextCounts, playerFirst, cardKinds[drawn].value, 'compare', rng);
+    return simulateDealerAndSettle(wagerProfile, nextCounts, playerFirst, requireKind(drawn).value, 'compare', rng);
   }
 
-  const nextAction = strategyAction(wagerProfile.strategy, playerCardCount + 1, cardKinds[drawn].value);
+  const nextAction = strategyAction(wagerProfile.strategy, playerCardCount + 1, requireKind(drawn).value);
   return playPlayerContinuation(wagerProfile, nextCounts, playerFirst, drawn, playerCardCount + 1, nextAction, rng);
 }
 
@@ -306,7 +341,7 @@ function simulateDealerAndSettle(
   const firstDraw = drawKind(counts, rng);
   let nextCounts = firstDraw.nextCounts;
   const first = firstDraw.drawn;
-  const firstKind = cardKinds[first];
+  const firstKind = requireKind(first);
   const dealer: DealerOutcome = {
     first,
     finalValue: firstKind.value,
@@ -320,7 +355,7 @@ function simulateDealerAndSettle(
     while (dealer.finalValue !== undefined && dealer.finalValue <= TEN_VALUE && dealerCardCount < MAX_DEALER_CARDS) {
       const dealerDraw = drawKind(nextCounts, rng);
       nextCounts = dealerDraw.nextCounts;
-      const drawnKind = cardKinds[dealerDraw.drawn];
+      const drawnKind = requireKind(dealerDraw.drawn);
       dealerCardCount += 1;
       dealer.finalValue = drawnKind.value;
       dealer.sevenCount += drawnKind.value === SEVEN_VALUE ? 1 : 0;
@@ -346,8 +381,8 @@ function settleReturned(
   let returned = mainResult === 'win' ? MAIN_WIN_RETURNED : mainResult === 'push' ? MAIN_PUSH_RETURNED : 0;
 
   if (wagerProfile.sideBets.includes('aceFlash')) {
-    const playerAce = cardKinds[playerFirst].blackAce;
-    const dealerAce = cardKinds[dealer.first].blackAce;
+    const playerAce = requireKind(playerFirst).blackAce;
+    const dealerAce = requireKind(dealer.first).blackAce;
     returned += playerAce && dealerAce ? ACE_FLASH_BOTH_RETURNED : playerAce || dealerAce ? ACE_FLASH_SINGLE_RETURNED : 0;
   }
   if (wagerProfile.sideBets.includes('dealerBust') && dealer.bust) {
@@ -420,7 +455,11 @@ function drawKind(counts: readonly number[], rng: () => number): { readonly draw
       continue;
     }
     const nextCounts = [...counts];
-    nextCounts[index] -= 1;
+    const current = nextCounts[index];
+    if (current === undefined) {
+      throw new Error(`Missing count at index ${index}.`);
+    }
+    nextCounts[index] = current - 1;
     return { drawn: index, nextCounts };
   }
   throw new Error('Card draw failed.');
@@ -429,7 +468,11 @@ function drawKind(counts: readonly number[], rng: () => number): { readonly draw
 function removeCards(counts: readonly number[], cardIndexes: readonly number[]): readonly number[] {
   const nextCounts = [...counts];
   for (const cardIndex of cardIndexes) {
-    nextCounts[cardIndex] -= 1;
+    const current = nextCounts[cardIndex];
+    if (current === undefined) {
+      throw new Error(`Missing count at card index ${cardIndex}.`);
+    }
+    nextCounts[cardIndex] = current - 1;
   }
   return nextCounts;
 }

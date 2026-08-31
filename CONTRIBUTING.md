@@ -35,7 +35,7 @@ The package is marked `"private": true` in `package.json` intentionally. Casino 
 
 The `main` branch ruleset requires the CodeQL workflow status check `Analyze (javascript-typescript)` before protected refs can update. The native ruleset `code_scanning` rule for CodeQL is not enabled right now because, on May 12, 2026, GitHub generated a `CodeQL` check that stayed queued even after the CodeQL workflow completed successfully and code scanning analyses were uploaded. Keep the required workflow status check in place while that native ruleset behavior is unresolved, and re-enable the native code scanning gate only after a pull request proves that the generated `CodeQL` check completes reliably.
 
-The required pull request status contexts are `Required Quality Gate`, `Analyze (javascript-typescript)`, `Validate Pull Request Metadata`, and `Review Dependency Changes`. GitHub displays the CI aggregate as `Project Checks / Required Quality Gate`. Its prerequisite checks use descriptive names such as `Project Checks / Quality, Coverage, and Server Build` and `Project Checks / Visual and E2E (Laptop Visual)`.
+The required pull request status contexts are `Required Quality Gate`, `Analyze (javascript-typescript)`, `Validate Pull Request Metadata`, and `Review Dependency Changes`. GitHub displays the CI aggregate as `Project Checks / Required Quality Gate`. Its prerequisite checks use descriptive names such as `Project Checks / Quality and Server Build`, `Project Checks / Architecture and Knip`, `Project Checks / Coverage`, and `Project Checks / Visual and E2E (Laptop Visual)`.
 
 GitHub Code Quality is not enabled for this repository, so the ruleset does not enforce a Code Quality gate. As of May 12, 2026, GitHub documents Code Quality as available for organization-owned repositories on GitHub Team or GitHub Enterprise Cloud plans; `LMLiam/Casino-Warehouse` is a public repository owned by the personal `LMLiam` user account. Repository Actions are enabled and the TypeScript codebase is a supported analysis target, but there is no dynamic `Code Quality` workflow, no `CodeQL - Code Quality / Analyze` pull request check, and no default-branch Code Quality analysis for this repository yet.
 
@@ -47,7 +47,7 @@ Supply-chain controls are documented in [docs/supply-chain-security.md](docs/sup
 
 Keep new `src/` modules focused on one module-scope top-level element. Classes, React components, functions, constants, variables, interfaces, types, enums, and schemas all count as top-level elements whether or not they are exported. File-local implementation details must be nested inside the element they support or extracted into focused module files.
 
-`npm run architecture:check` enforces this convention. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
+`npm run architecture:check` enforces this convention and checks for unused files, exports, types, and npm dependencies with Knip and depcheck. Re-export-only files are not allowed; import the focused module file directly instead of adding a barrel. Pure type aggregation files and other mixed modules are not grandfathered; split each declaration into a focused module instead. Avoid vague split targets such as `utils.ts` or `helpers.ts`; use names that describe the domain concept being extracted.
 
 The architecture check also rejects unexplained magic numbers in source, TypeScript tests, and repository tooling scripts. Name game rules, payout multipliers, layout values, protocol bytes, thresholds, and reusable test-helper values in the narrowest owner, or use the documented inline exception marker only when an inline number is intentionally clearer.
 
@@ -70,6 +70,12 @@ For visual or browser workflow changes, also run:
 
 ```bash
 npm run visual
+```
+
+For any change under `src/ui/`, also run:
+
+```bash
+npm run visual:serial
 ```
 
 Playwright defaults to two workers so browser tests catch shared-state
@@ -98,7 +104,8 @@ PUBLIC_TUNNEL_SMOKE_URL=https://example.trycloudflare.com npm run visual -- --pr
 
 `NGROK_SMOKE_URL` remains an ngrok-specific alias for existing workflows.
 
-Serial execution is reserved for debugging with `npm run visual:serial`.
+The `Project Checks` workflow selects `npm run visual:serial` when a change
+includes `src/ui/` files. It uses `npm run visual` for other changes.
 `tests/e2e/multiplayer-flow.spec.ts` opts into Playwright's parallel test mode
 because every scenario owns an ephemeral realtime server and fresh browser
 contexts. The `Project Checks` e2e matrix is generated from
@@ -113,7 +120,7 @@ node scripts/ci-e2e-matrix.mjs --report-balance   # shard balance per lane
 npm run visual -- --workers=1 --project=laptop --shard=1/2 tests/e2e/multiplayer-flow.spec.ts tests/e2e/public-tunnel-smoke.spec.ts
 ```
 
-For debugging a flaky browser test serially, use:
+For a change under `src/ui/`, or to debug a flaky browser test serially, use:
 
 ```bash
 npm run visual:serial

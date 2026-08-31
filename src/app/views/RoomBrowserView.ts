@@ -2,6 +2,8 @@ import { findGame } from '../../game/catalog/findGame';
 import type { CasinoGameId } from '../../game/ids';
 import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
 import type { RoomSummary } from '../../multiplayer/protocol/RoomSummary';
+import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
+import { roomIdSchema } from '../../schemas/casinoSchemas/roomIdSchema';
 import { escapeHtml } from '../../shared/html';
 import type { AppElements } from '../dom/appElements/AppElements';
 import { defaultRoomMaxPlayers } from '../rooms/roomDefaults';
@@ -10,7 +12,7 @@ import { minRoomPlayers } from '../../multiplayer/roomLimits/minRoomPlayers';
 export class RoomBrowserView {
   public constructor(private readonly elements: AppElements) {}
 
-  public render(activeGame: CasinoGameId, rooms: readonly RoomSummary[], onJoin: (roomId: string, role: RoomRole) => void): void {
+  public render(activeGame: CasinoGameId, rooms: readonly RoomSummary[], onJoin: (roomId: RoomId, role: RoomRole) => void): void {
     const game = findGame(activeGame);
     const maxPlayers = defaultRoomMaxPlayers(activeGame);
     this.elements.roomGameTitle.textContent = game.title;
@@ -36,10 +38,20 @@ export class RoomBrowserView {
             )
             .join('');
     this.elements.roomBrowser.querySelectorAll<HTMLButtonElement>('[data-room-join]').forEach((button) => {
-      button.addEventListener('click', () => onJoin(button.dataset.roomJoin ?? '', 'player'));
+      button.addEventListener('click', () => {
+        const parsedRoomId = roomIdSchema.safeParse(button.dataset.roomJoin ?? '');
+        if (parsedRoomId.success) {
+          onJoin(parsedRoomId.data, 'player');
+        }
+      });
     });
     this.elements.roomBrowser.querySelectorAll<HTMLButtonElement>('[data-room-spectate]').forEach((button) => {
-      button.addEventListener('click', () => onJoin(button.dataset.roomSpectate ?? '', 'spectator'));
+      button.addEventListener('click', () => {
+        const parsedRoomId = roomIdSchema.safeParse(button.dataset.roomSpectate ?? '');
+        if (parsedRoomId.success) {
+          onJoin(parsedRoomId.data, 'spectator');
+        }
+      });
     });
   }
 }

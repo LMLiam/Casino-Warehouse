@@ -109,7 +109,7 @@ describe('audio controls', () => {
 
     expect(setTimeout).toHaveBeenCalledOnce();
     expect(toggleMusic).toHaveBeenLastCalledWith(false);
-    expect(storage.setItem).toHaveBeenCalledWith('casino_audio_settings_v1', expect.stringContaining('"musicVolume":0'));
+    expect(storage.setItem).toHaveBeenCalledWith('casino_audio_settings', expect.stringContaining('"musicVolume":0'));
   });
 
   it('falls back to default settings when persisted JSON is invalid or browser storage is unavailable', () => {
@@ -229,6 +229,8 @@ function createClosestButtonEvent(textContent: string): Partial<Event> {
   });
 }
 
-function createTargetEvent(target: unknown): Partial<Event> {
-  return { target: target as EventTarget };
+function createTargetEvent(
+  target: { readonly id: string } | { readonly matches: () => boolean } | { readonly closest: (selector: string) => { readonly textContent: string } | null },
+): Partial<Event> {
+  return { target: Object.assign(new EventTarget(), target) };
 }

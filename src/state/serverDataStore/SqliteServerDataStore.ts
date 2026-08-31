@@ -1,16 +1,24 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { z } from 'zod';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
+import type { ProfileTokenHash } from '../../schemas/casinoSchemas/ProfileTokenHash';
+import { parseJsonText } from '../../schemas/casinoSchemas/parseJsonText';
+import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
+import { profileTokenHashSchema } from '../../schemas/casinoSchemas/profileTokenHashSchema';
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
 import { parseSessionState } from '../session/parseSessionState';
+import type { ParseError } from '../ParseError';
 import type { GameplaySettlementContext } from './GameplaySettlementContext';
 import type { GameplaySettlementResult } from './GameplaySettlementResult';
 import { MemoryServerDataStore } from './MemoryServerDataStore';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
 import { defaultSqlitePath } from './defaultSqlitePath';
+import { parseProfileStoreJson } from '../profiles/parseProfileStoreJson';
 
 export class SqliteServerDataStore extends MemoryServerDataStore {
   public override readonly database: ServerDatabaseChoice = 'sqlite';
@@ -37,11 +45,11 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     return this.persist(super.createProfile(name, bankroll));
   }
 
-  public override renameProfile(profileId: string, name: string): ServerDataSnapshot {
+  public override renameProfile(profileId: ProfileId, name: string): ServerDataSnapshot {
     return this.persist(super.renameProfile(profileId, name));
   }
 
-  public override deleteProfile(profileId: string): ServerDataSnapshot {
+  public override deleteProfile(profileId: ProfileId): ServerDataSnapshot {
     const snapshot = super.deleteProfile(profileId);
     this.persistProfileAuth();
     return this.persist(snapshot);
@@ -57,12 +65,12 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     return this.persist(snapshot);
   }
 
-  public override setProfileTokenHash(profileId: string, tokenHash: string): void {
+  public override setProfileTokenHash(profileId: ProfileId, tokenHash: ProfileTokenHash): void {
     super.setProfileTokenHash(profileId, tokenHash);
     this.persistProfileAuth();
   }
 
-  public override deleteProfileTokenHash(profileId: string): void {
+  public override deleteProfileTokenHash(profileId: ProfileId): void {
     super.deleteProfileTokenHash(profileId);
     this.persistProfileAuth();
   }
@@ -72,26 +80,26 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
     this.persistProfileAuth();
   }
 
-  public override ensureProfile(profileId: string, profileName: string, bankroll: number): CasinoProfile {
+  public override ensureProfile(profileId: ProfileId, profileName: string, bankroll: number): CasinoProfile {
     const profile = super.ensureProfile(profileId, profileName, bankroll);
     this.persist(this.snapshot());
     return profile;
   }
 
-  public override setProfileBankroll(profileId: string, bankroll: number): CasinoProfile | undefined {
+  public override setProfileBankroll(profileId: ProfileId, bankroll: number): CasinoProfile | undefined {
     const profile = super.setProfileBankroll(profileId, bankroll);
     this.persist(this.snapshot());
     return profile;
   }
 
-  public override acceptHouseAdvance(profileId: string): CasinoProfile | undefined {
+  public override acceptHouseAdvance(profileId: ProfileId): CasinoProfile | undefined {
     const profile = super.acceptHouseAdvance(profileId);
     this.persist(this.snapshot());
     return profile;
   }
 
   public override applyGameplaySettlement(
-    profileId: string,
+    profileId: ProfileId,
     returned: number,
     profit: number,
     context: GameplaySettlementContext,
@@ -102,7 +110,7 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   public override recordTransaction(
-    profileId: string,
+    profileId: ProfileId,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
   ): CasinoProfile | undefined {
     const profile = super.recordTransaction(profileId, transaction);
@@ -125,14 +133,13 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   }
 
   private readStoredState(): Partial<Pick<ServerDataSnapshot, 'profileState' | 'session'> & { readonly profileAuth: Record<string, string> }> {
-    const rows = this.db.prepare('SELECT key, value FROM server_state').all() as Array<{ key: string; value: string }>;
+    const rows = z.array(z.object({ key: z.string(), value: z.string() }).strict()).parse(this.db.prepare('SELECT key, value FROM server_state').all());
     const stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] } = {};
     for (const row of rows) {
-      try {
-        this.assignStoredStateValue(stored, row.key, JSON.parse(row.value));
-      } catch (error) {
+      const parseError = this.assignStoredStateValue(stored, row.key, row.value);
+      if (parseError) {
         this.db.prepare('DELETE FROM server_state WHERE key = ?').run(row.key);
-        console.warn(`SQLite server_state row "${row.key}" could not be parsed and was deleted.`, error);
+        console.warn(`SQLite server_state row "${row.key}" could not be parsed and was deleted.`, parseError);
       }
     }
     return stored;
@@ -141,23 +148,45 @@ export class SqliteServerDataStore extends MemoryServerDataStore {
   private assignStoredStateValue(
     stored: { profileState?: ServerDataSnapshot['profileState']; profileAuth?: Record<string, string>; session?: ServerDataSnapshot['session'] },
     key: string,
-    value: unknown,
-  ): void {
+    value: string,
+  ): ParseError | undefined {
     const storedKey = SqliteServerDataStore.storedStateKey(key);
     if (storedKey === 'profileState') {
-      stored.profileState = value as ServerDataSnapshot['profileState'];
-      return;
+      const parsed = parseProfileStoreJson(value);
+      if (!parsed.ok) {
+        return parsed.error;
+      }
+      stored.profileState = parsed.value;
+      return undefined;
     }
     if (storedKey === 'profileAuth') {
-      stored.profileAuth = value as Record<string, string>;
-      return;
+      try {
+        const parsed = z.record(profileIdSchema, profileTokenHashSchema).safeParse(parseJsonText(value));
+        if (!parsed.success) {
+          return new Error(parsed.error.message);
+        }
+        stored.profileAuth = parsed.data;
+        return undefined;
+      } catch (error) {
+        return error instanceof Error ? error : new Error('Profile authentication data is invalid.');
+      }
     }
     if (storedKey === 'session') {
-      stored.session = parseSessionState(value);
+      try {
+        const parsed = parseSessionState(parseJsonText(value));
+        if (!parsed.ok) {
+          return parsed.error;
+        }
+        stored.session = parsed.value;
+        return undefined;
+      } catch (error) {
+        return error instanceof Error ? error : new Error('Session data is invalid.');
+      }
     }
+    return undefined;
   }
 
-  private writeValue(key: string, value: unknown): void {
+  private writeValue<Value>(key: string, value: Value): void {
     this.db
       .prepare('INSERT INTO server_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run(key, JSON.stringify(value));

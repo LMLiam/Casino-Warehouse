@@ -1,16 +1,16 @@
+import type { IsoTimestamp } from '../../schemas/casinoSchemas/IsoTimestamp';
 import type { CasinoGameId } from '../../game/ids';
+import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { CasinoSessionRoomState } from './CasinoSessionRoomState';
-import type { currentSessionStateVersion } from './currentSessionStateVersion';
 import type { PlayerGameSnapshots } from './PlayerGameSnapshots';
 
 export interface CasinoSessionState {
-  readonly version: typeof currentSessionStateVersion;
-  readonly profileId: string;
+  readonly profileId: ProfileId;
   readonly activeGame: CasinoGameId;
   readonly showingGameLobby: boolean;
   readonly wagerLimit: number;
   readonly wagered: number;
-  readonly gameSnapshot?: PlayerGameSnapshots;
-  readonly room?: CasinoSessionRoomState;
-  readonly updatedAt: string;
+  readonly gameSnapshot?: PlayerGameSnapshots | undefined;
+  readonly room?: CasinoSessionRoomState | undefined;
+  readonly updatedAt: IsoTimestamp;
 }

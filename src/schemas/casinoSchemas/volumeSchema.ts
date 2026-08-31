@@ -1,3 +1,3 @@
 import { z } from 'zod';
 
-export const volumeSchema = z.coerce.number().finite().min(0).max(1);
+export const volumeSchema = z.coerce.number().transform((value) => Math.max(0, Math.min(1, value)));

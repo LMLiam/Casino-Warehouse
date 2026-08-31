@@ -15,6 +15,10 @@ import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapsho
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
+import { testConnectionId, testProfileId, testRoomId, testServerInstanceId, testSessionId, testSettlementId } from '../schemas/testIds';
+
+const aliceId = testProfileId('alice');
+const room42 = testRoomId('ROOM42');
 
 class SocketProbe {
   private readonly messages: ServerMessage[] = [];
@@ -200,8 +204,16 @@ class RawSocketProbe {
   private readFrames(): void {
     let offset = 0;
     while (offset + RawSocketProbe.minimumFrameHeaderLength <= this.buffer.length) {
-      const first = this.buffer[offset];
-      const second = this.buffer[offset + 1];
+      const firstByte = this.buffer[offset];
+      if (firstByte === undefined) {
+        throw new Error(`Missing byte at offset ${offset}.`);
+      }
+      const first = firstByte;
+      const secondByte = this.buffer[offset + 1];
+      if (secondByte === undefined) {
+        throw new Error(`Missing byte at offset ${offset + 1}.`);
+      }
+      const second = secondByte;
       const opcode = first & RawSocketProbe.opcodeMask;
       const masked = Boolean(second & RawSocketProbe.maskBit);
       let length = second & RawSocketProbe.payloadLengthMask;
@@ -231,7 +243,15 @@ class RawSocketProbe {
       if (masked) {
         const mask = this.buffer.subarray(offset + headerLength, offset + headerLength + RawSocketProbe.maskingKeyBytes);
         for (let index = 0; index < payload.length; index += 1) {
-          payload[index] ^= mask[index % RawSocketProbe.maskingKeyBytes];
+          const payloadByte = payload[index];
+          if (payloadByte === undefined) {
+            throw new Error(`Missing payload byte at index ${index}.`);
+          }
+          const maskByte = mask[index % RawSocketProbe.maskingKeyBytes];
+          if (maskByte === undefined) {
+            throw new Error(`Missing mask byte at index ${index % RawSocketProbe.maskingKeyBytes}.`);
+          }
+          payload[index] = (payloadByte ^ maskByte) & 255; // casino-magic-number-allow: 8-bit mask
         }
       }
       this.recordFrame(opcode, payload);
@@ -366,7 +386,7 @@ describe('multiplayer WebSocket server', () => {
     await waitForMessageSince(raw, 0, (message) => message.type === 'error' && message.code === 'connected');
     await waitForMessageSince(raw, 0, (message) => message.type === 'data-state');
     const splitCheckpoint = raw.checkpoint();
-    const splitFrame = encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' }));
+    const splitFrame = encodeClientFrame(encodeMessage({ type: 'request-data' }));
 
     raw.send(splitFrame.subarray(0, 3));
     raw.send(splitFrame.subarray(3));
@@ -376,8 +396,8 @@ describe('multiplayer WebSocket server', () => {
     const coalescedCheckpoint = raw.checkpoint();
     raw.send(
       Buffer.concat([
-        encodeClientFrame(encodeMessage({ version: 1, type: 'create-profile', profileName: 'Raw Coalesced Player' })),
-        encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' })),
+        encodeClientFrame(encodeMessage({ type: 'create-profile', profileName: 'Raw Coalesced Player' })),
+        encodeClientFrame(encodeMessage({ type: 'request-data' })),
       ]),
     );
 
@@ -393,7 +413,7 @@ describe('multiplayer WebSocket server', () => {
 
     const unmasked = await connectRawWebSocket(baseUrl.port);
     const unmaskedCloseCheckpoint = unmasked.closeCodeCheckpoint();
-    unmasked.send(encodeClientFrame(encodeMessage({ version: 1, type: 'request-data' }), { masked: false }));
+    unmasked.send(encodeClientFrame(encodeMessage({ type: 'request-data' }), { masked: false }));
     await waitForCloseCodeSince(unmasked, unmaskedCloseCheckpoint, 1002);
 
     const invalidOpcode = await connectRawWebSocket(baseUrl.port);
@@ -435,13 +455,13 @@ describe('multiplayer WebSocket server', () => {
 
     const initialData = await alice.waitFor((message) => message.type === 'data-state');
     expect(initialData.type === 'data-state' ? initialData.database : '').toBe('memory');
-    alice.send({ version: 1, type: 'create-profile', profileName: 'Server Alice' });
+    alice.send({ type: 'create-profile', profileName: 'Server Alice' });
     const profileData = await alice.waitFor(
       (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Server Alice'),
     );
     const aliceProfile = profileData.type === 'data-state' ? profileData.profileState.profiles.find((profile) => profile.name === 'Server Alice') : undefined;
     expect(aliceProfile?.bankroll).toBe(1000);
-    bob.send({ version: 1, type: 'create-profile', profileName: 'Server Bob' });
+    bob.send({ type: 'create-profile', profileName: 'Server Bob' });
     const bobProfileData = await bob.waitFor(
       (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Server Bob'),
     );
@@ -451,7 +471,7 @@ describe('multiplayer WebSocket server', () => {
     }
     const heartbeat = await alice.waitFor((message) => message.type === 'heartbeat', 4_000);
     if (heartbeat.type === 'heartbeat') {
-      alice.send({ version: 1, type: 'heartbeat-ack', sentAt: heartbeat.sentAt });
+      alice.send({ type: 'heartbeat-ack', sentAt: heartbeat.sentAt });
     }
 
     alice.sendRaw('not-json');
@@ -460,16 +480,15 @@ describe('multiplayer WebSocket server', () => {
 
     alice.sendRaw('{"version":99,"type":"resync"}');
     const badMessage = await alice.waitFor((message) => message.type === 'error' && message.code === 'bad-message');
-    expect(badMessage.type === 'error' ? badMessage.message : '').toBe('Message version or type is invalid.');
+    expect(badMessage.type === 'error' ? badMessage.message : '').toBe('Unrecognized key: "version"');
 
-    alice.send({ version: 1, type: 'create-room', gameId: 'beat-the-house', profileId: 'missing-profile', profileName: 'Missing', bankroll: 500 });
+    alice.send({ type: 'create-room', gameId: 'beat-the-house', profileId: testProfileId('missing-profile'), profileName: 'Missing', bankroll: 500 });
     const unknownProfile = await alice.waitFor(
       (message) => message.type === 'error' && message.code === 'rejected' && message.message === 'Profile was not found.',
     );
     expect(unknownProfile.type === 'error' ? unknownProfile.message : '').toBe('Profile was not found.');
 
     alice.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -485,11 +504,10 @@ describe('multiplayer WebSocket server', () => {
     expect(created.room.spectators[0]).toMatchObject({ profileId: aliceProfile.id, profileName: 'Server Alice', bankroll: 1000 });
     const roomId = created.room.roomId;
 
-    alice.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    alice.send({ type: 'assign-seat', seatId: 'left' });
     await waitForRoom(alice, (room) => room.seats.some((seat) => seat.seatId === 'left' && seat.profileId === aliceProfile.id));
 
     bob.send({
-      version: 1,
       type: 'join-room',
       gameId: 'beat-the-house',
       roomId,
@@ -499,18 +517,18 @@ describe('multiplayer WebSocket server', () => {
       bankroll: 1,
     });
     await waitForRoom(bob, (room) => room.spectators.some((player) => player.profileId === bobProfile.id));
-    bob.send({ version: 1, type: 'assign-seat', seatId: 'centre' });
+    bob.send({ type: 'assign-seat', seatId: 'centre' });
     await waitForRoom(alice, (room) => room.seats.some((seat) => seat.seatId === 'centre' && seat.profileId === bobProfile.id));
 
-    alice.send({ version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    alice.send({ type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
     const wagered = await waitForRoom(bob, (room) => beat(room).bets.left.main === 25);
     expect(wagered.players.find((player) => player.profileId === aliceProfile.id)?.bankroll).toBe(975);
 
-    bob.send({ version: 1, type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    bob.send({ type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
     const rejected = await bob.waitFor((message) => message.type === 'error' && message.code === 'rejected');
     expect(rejected.type === 'error' ? rejected.message : '').toBe('You can only bet on your own seat.');
 
-    alice.send({ version: 1, type: 'resync' });
+    alice.send({ type: 'resync' });
     const resynced = await alice.waitFor(
       (message) => message.type === 'room-created' && message.room.roomId === roomId && beat(message.room).bets.left.main === 25,
     );
@@ -518,7 +536,11 @@ describe('multiplayer WebSocket server', () => {
 
     bob.close();
     const afterDisconnect = await waitForRoom(alice, (room) => room.players.length === 1);
-    expect(afterDisconnect.players[0].profileId).toBe(aliceProfile.id);
+    const afterDisconnectPlayer = afterDisconnect.players[0];
+    if (!afterDisconnectPlayer) {
+      throw new Error('Missing afterDisconnect player.');
+    }
+    expect(afterDisconnectPlayer.profileId).toBe(aliceProfile.id);
   });
 
   it('rejects second-socket profile impersonation and locks admin-only data actions', async () => {
@@ -526,7 +548,7 @@ describe('multiplayer WebSocket server', () => {
     const alice = await connect(baseUrl.ws);
     const intruder = await connect(baseUrl.ws);
 
-    alice.send({ version: 1, type: 'create-profile', profileName: 'Protected Alice' });
+    alice.send({ type: 'create-profile', profileName: 'Protected Alice' });
     const credentials = await alice.waitFor((message) => message.type === 'profile-credentials');
     const profileData = await alice.waitFor(
       (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Protected Alice'),
@@ -538,11 +560,10 @@ describe('multiplayer WebSocket server', () => {
     }
     expect(credentials.profileId).toBe(aliceProfile.id);
 
-    intruder.send({ version: 1, type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Stolen Alice' });
-    intruder.send({ version: 1, type: 'delete-profile', profileId: aliceProfile.id });
-    intruder.send({ version: 1, type: 'house-advance', profileId: aliceProfile.id });
+    intruder.send({ type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Stolen Alice' });
+    intruder.send({ type: 'delete-profile', profileId: aliceProfile.id });
+    intruder.send({ type: 'house-advance', profileId: aliceProfile.id });
     intruder.send({
-      version: 1,
       type: 'save-session',
       session: {
         profileId: aliceProfile.id,
@@ -553,7 +574,6 @@ describe('multiplayer WebSocket server', () => {
       },
     });
     intruder.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -563,7 +583,6 @@ describe('multiplayer WebSocket server', () => {
     await waitForReceivedCount(intruder, unauthorizedProfileError, 5);
 
     alice.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -575,7 +594,6 @@ describe('multiplayer WebSocket server', () => {
       throw new Error('Expected Alice to create a room.');
     }
     intruder.send({
-      version: 1,
       type: 'join-room',
       gameId: 'beat-the-house',
       roomId: created.room.roomId,
@@ -586,23 +604,54 @@ describe('multiplayer WebSocket server', () => {
     });
     await waitForReceivedCount(intruder, unauthorizedProfileError, 6);
 
-    intruder.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 500 });
-    intruder.send({ version: 1, type: 'admin-reset-all' });
-    intruder.send({ version: 1, type: 'clear-server-data' });
+    intruder.send({ type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 500 });
+    intruder.send({ type: 'admin-reset-all' });
+    intruder.send({ type: 'clear-server-data' });
     await waitForReceivedCount(intruder, adminLockedError, 3);
 
-    intruder.send({ version: 1, type: 'authorize-admin', adminToken: 'wrong-secret' });
+    intruder.send({ type: 'authorize-admin', adminToken: 'wrong-secret' });
     await expect(intruder.waitFor((message) => message.type === 'admin-access' && !message.authorized)).resolves.toMatchObject({ authorized: false });
 
-    intruder.send({ version: 1, type: 'authorize-admin', adminToken: 'server-admin-secret' });
+    intruder.send({ type: 'authorize-admin', adminToken: 'server-admin-secret' });
     await expect(intruder.waitFor((message) => message.type === 'admin-access' && message.authorized)).resolves.toMatchObject({ authorized: true });
-    intruder.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 75 });
+    intruder.send({ type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 75 });
     const updated = await intruder.waitFor(
       (message) =>
         message.type === 'data-state' &&
         message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.name === 'Protected Alice' && profile.bankroll === 1075),
     );
     expect(updated.type === 'data-state' ? updated.profileState.profiles.find((profile) => profile.id === aliceProfile.id)?.bankroll : 0).toBe(1075);
+  });
+
+  it('uses the rotated CASINO_ADMIN_TOKEN for a newly created server', async () => {
+    const originalAdminToken = process.env.CASINO_ADMIN_TOKEN;
+    const firstAdminToken = 'first-server-admin-secret';
+    const rotatedAdminToken = 'rotated-server-admin-secret';
+
+    try {
+      process.env.CASINO_ADMIN_TOKEN = firstAdminToken;
+      const firstServer = await startServer();
+      const firstAdmin = await connect(firstServer.ws);
+      await authorizeAdmin(firstAdmin, firstAdminToken);
+
+      await closeCurrentServer();
+      process.env.CASINO_ADMIN_TOKEN = rotatedAdminToken;
+      const rotatedServer = await startServer();
+      const rotatedAdmin = await connect(rotatedServer.ws);
+
+      rotatedAdmin.send({ type: 'authorize-admin', adminToken: firstAdminToken });
+      await expect(rotatedAdmin.waitFor((message) => message.type === 'admin-access')).resolves.toMatchObject({ authorized: false });
+      rotatedAdmin.send({ type: 'clear-server-data' });
+      await expect(rotatedAdmin.waitFor(adminLockedError)).resolves.toMatchObject({ type: 'error', code: 'rejected' });
+
+      await authorizeAdmin(rotatedAdmin, rotatedAdminToken);
+    } finally {
+      if (originalAdminToken === undefined) {
+        delete process.env.CASINO_ADMIN_TOKEN;
+      } else {
+        process.env.CASINO_ADMIN_TOKEN = originalAdminToken;
+      }
+    }
   });
 
   it('authorizes House Advance at zero balance, prevents duplicate accepts, and reconciles active rooms before data-state', async () => {
@@ -615,18 +664,17 @@ describe('multiplayer WebSocket server', () => {
     if (credentials.type !== 'profile-credentials') {
       throw new Error('Expected profile credentials.');
     }
-    aliceTab.send({ version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: aliceProfile.id, profileToken: credentials.profileToken }] });
+    aliceTab.send({ type: 'authorize-profiles', profileTokens: [{ profileId: aliceProfile.id, profileToken: credentials.profileToken }] });
     await expect(aliceTab.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(aliceProfile.id))).resolves.toMatchObject({
       type: 'profile-access',
     });
     await authorizeAdmin(admin, 'server-admin-secret');
 
-    admin.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'subtract', amount: 1000 });
+    admin.send({ type: 'admin-bankroll', profileId: aliceProfile.id, action: 'subtract', amount: 1000 });
     await alice.waitFor(
       (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.id === aliceProfile.id && profile.bankroll === 0),
     );
     alice.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -640,8 +688,8 @@ describe('multiplayer WebSocket server', () => {
 
     const checkpoint = alice.checkpoint();
     const tabCheckpoint = aliceTab.checkpoint();
-    alice.send({ version: 1, type: 'house-advance', profileId: aliceProfile.id });
-    aliceTab.send({ version: 1, type: 'house-advance', profileId: aliceProfile.id });
+    alice.send({ type: 'house-advance', profileId: aliceProfile.id });
+    aliceTab.send({ type: 'house-advance', profileId: aliceProfile.id });
 
     const roomUpdate = await waitForMessageSince(
       alice,
@@ -697,7 +745,6 @@ describe('multiplayer WebSocket server', () => {
     const bobProfile = await createServerProfile(bob, 'Delete Room Bob');
 
     alice.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -708,13 +755,12 @@ describe('multiplayer WebSocket server', () => {
     if (created.type !== 'room-created') {
       throw new Error('Expected room-created message.');
     }
-    alice.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    alice.send({ type: 'assign-seat', seatId: 'left' });
     await waitForRoom(
       alice,
       (room) => room.roomId === created.room.roomId && room.seats.some((seat) => seat.seatId === 'left' && seat.profileId === aliceProfile.id),
     );
     bob.send({
-      version: 1,
       type: 'join-room',
       gameId: 'beat-the-house',
       roomId: created.room.roomId,
@@ -724,7 +770,7 @@ describe('multiplayer WebSocket server', () => {
       bankroll: bobProfile.bankroll,
     });
     await waitForRoom(bob, (room) => room.roomId === created.room.roomId && room.spectators.some((player) => player.profileId === bobProfile.id));
-    bob.send({ version: 1, type: 'assign-seat', seatId: 'centre' });
+    bob.send({ type: 'assign-seat', seatId: 'centre' });
     await waitForRoom(
       alice,
       (room) => room.roomId === created.room.roomId && room.seats.some((seat) => seat.seatId === 'centre' && seat.profileId === bobProfile.id),
@@ -732,7 +778,7 @@ describe('multiplayer WebSocket server', () => {
 
     const aliceCheckpoint = alice.checkpoint();
     const bobCheckpoint = bob.checkpoint();
-    bob.send({ version: 1, type: 'delete-profile', profileId: bobProfile.id });
+    bob.send({ type: 'delete-profile', profileId: bobProfile.id });
 
     const aliceRoomState = await waitForMessageSince(
       alice,
@@ -785,7 +831,6 @@ describe('multiplayer WebSocket server', () => {
     const aliceProfile = await createServerProfile(alice, 'Rename Room Alice');
 
     alice.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -798,7 +843,7 @@ describe('multiplayer WebSocket server', () => {
     }
 
     const checkpoint = alice.checkpoint();
-    alice.send({ version: 1, type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Renamed Room Alice' });
+    alice.send({ type: 'rename-profile', profileId: aliceProfile.id, profileName: 'Renamed Room Alice' });
     const renamedRoom = await waitForMessageSince(
       alice,
       checkpoint,
@@ -837,7 +882,6 @@ describe('multiplayer WebSocket server', () => {
     await authorizeAdmin(admin, 'server-admin-secret');
 
     alice.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: aliceProfile.id,
@@ -848,11 +892,11 @@ describe('multiplayer WebSocket server', () => {
     if (created.type !== 'room-created') {
       throw new Error('Expected room-created message.');
     }
-    alice.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    alice.send({ type: 'assign-seat', seatId: 'left' });
     await waitForRoom(alice, (room) => room.roomId === created.room.roomId && room.players.some((player) => player.profileId === aliceProfile.id));
 
     const bankrollCheckpoint = alice.checkpoint();
-    admin.send({ version: 1, type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 125 });
+    admin.send({ type: 'admin-bankroll', profileId: aliceProfile.id, action: 'add', amount: 125 });
     const increasedRoom = await waitForMessageSince(
       alice,
       bankrollCheckpoint,
@@ -883,7 +927,7 @@ describe('multiplayer WebSocket server', () => {
     );
 
     const resetCheckpoint = alice.checkpoint();
-    admin.send({ version: 1, type: 'admin-reset-all' });
+    admin.send({ type: 'admin-reset-all' });
     const resetRoom = await waitForMessageSince(
       alice,
       resetCheckpoint,
@@ -922,7 +966,6 @@ describe('multiplayer WebSocket server', () => {
     const mainProfile = await createServerProfile(mainPlayer, 'Clear Main Player');
 
     host.send({
-      version: 1,
       type: 'create-room',
       gameId: 'beat-the-house',
       profileId: hostProfile.id,
@@ -933,11 +976,10 @@ describe('multiplayer WebSocket server', () => {
     if (created.type !== 'room-created') {
       throw new Error('Expected room-created message.');
     }
-    host.send({ version: 1, type: 'assign-seat', seatId: 'left' });
+    host.send({ type: 'assign-seat', seatId: 'left' });
     await waitForRoom(host, (room) => room.roomId === created.room.roomId && room.players.some((player) => player.profileId === hostProfile.id));
 
     mainPlayer.send({
-      version: 1,
       type: 'join-room',
       gameId: 'beat-the-house',
       roomId: mainBeatRoomId,
@@ -947,13 +989,13 @@ describe('multiplayer WebSocket server', () => {
       bankroll: mainProfile.bankroll,
     });
     await waitForRoom(mainPlayer, (room) => room.roomId === mainBeatRoomId && room.spectators.some((player) => player.profileId === mainProfile.id));
-    mainPlayer.send({ version: 1, type: 'assign-seat', seatId: 'centre' });
+    mainPlayer.send({ type: 'assign-seat', seatId: 'centre' });
     await waitForRoom(mainPlayer, (room) => room.roomId === mainBeatRoomId && room.players.some((player) => player.profileId === mainProfile.id));
 
     const hostCheckpoint = host.checkpoint();
     const mainCheckpoint = mainPlayer.checkpoint();
     const adminCheckpoint = admin.checkpoint();
-    admin.send({ version: 1, type: 'clear-server-data' });
+    admin.send({ type: 'clear-server-data' });
 
     await waitForMessageSince(host, hostCheckpoint, (message) => message.type === 'profile-access' && !message.ownedProfileIds.includes(hostProfile.id));
     await waitForMessageSince(mainPlayer, mainCheckpoint, (message) => message.type === 'profile-access' && !message.ownedProfileIds.includes(mainProfile.id));
@@ -986,7 +1028,7 @@ describe('multiplayer WebSocket server', () => {
     );
 
     const listCheckpoint = admin.checkpoint();
-    admin.send({ version: 1, type: 'list-rooms', gameId: 'beat-the-house' });
+    admin.send({ type: 'list-rooms', gameId: 'beat-the-house' });
     const roomList = await waitForMessageSince(admin, listCheckpoint, (message) => message.type === 'room-list' && message.gameId === 'beat-the-house');
     if (roomList.type !== 'room-list') {
       throw new Error('Expected room-list after clear-server-data.');
@@ -1002,7 +1044,7 @@ describe('multiplayer WebSocket server', () => {
 
     let baseUrl = await startServer('.', undefined, { dataStore: new SqliteServerDataStore(dbPath) });
     const alice = await connect(baseUrl.ws);
-    alice.send({ version: 1, type: 'create-profile', profileName: 'Returning Alice' });
+    alice.send({ type: 'create-profile', profileName: 'Returning Alice' });
     const credentials = await alice.waitFor((message) => message.type === 'profile-credentials');
     const profileData = await alice.waitFor(
       (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Returning Alice'),
@@ -1021,17 +1063,17 @@ describe('multiplayer WebSocket server', () => {
     );
 
     expect(restored.type === 'data-state' ? restored.profileState.profiles.map((profile) => profile.name) : []).toContain('Returning Alice');
-    returning.send({ version: 1, type: 'authorize-profiles', profileTokens: [{ profileId: profile.id, profileToken: credentials.profileToken }] });
+    returning.send({ type: 'authorize-profiles', profileTokens: [{ profileId: profile.id, profileToken: credentials.profileToken }] });
     await expect(returning.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(profile.id))).resolves.toMatchObject({
       type: 'profile-access',
       ownedProfileIds: [profile.id],
     });
-    returning.send({ version: 1, type: 'create-room', gameId: 'beat-the-house', profileId: profile.id, profileName: 'Spoofed', bankroll: 1 });
+    returning.send({ type: 'create-room', gameId: 'beat-the-house', profileId: profile.id, profileName: 'Spoofed', bankroll: 1 });
     await expect(returning.waitFor((message) => message.type === 'room-created')).resolves.toMatchObject({ type: 'room-created' });
   });
 
   it('tells clients from a previous server instance to reload on reconnect', async () => {
-    const baseUrl = await startServer('.', undefined, { serverInstanceId: 'server-after-restart' });
+    const baseUrl = await startServer('.', undefined, { serverInstanceId: testServerInstanceId('server-after-restart') });
 
     const current = await connect(`${baseUrl.ws}?clientServerInstanceId=server-after-restart`);
     await expect(current.waitFor((message) => message.type === 'server-hello')).resolves.toMatchObject({
@@ -1061,7 +1103,7 @@ describe('multiplayer WebSocket server', () => {
     try {
       const baseUrl = await startServer();
       const alice = await connect(baseUrl.ws);
-      alice.send({ version: 1, type: 'create-profile', profileName: 'Alice' });
+      alice.send({ type: 'create-profile', profileName: 'Alice' });
       const profileData = await alice.waitFor(
         (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === 'Alice'),
       );
@@ -1069,7 +1111,7 @@ describe('multiplayer WebSocket server', () => {
       if (!profile) {
         throw new Error('Expected Alice profile.');
       }
-      alice.send({ version: 1, type: 'create-room', gameId: 'blackjack', profileId: profile.id, profileName: 'Spoof Alice', bankroll: 1 });
+      alice.send({ type: 'create-room', gameId: 'blackjack', profileId: profile.id, profileName: 'Spoof Alice', bankroll: 1 });
       const created = await alice.waitFor((message) => message.type === 'room-created');
       if (created.type !== 'room-created') {
         throw new Error('Expected room-created message.');
@@ -1087,11 +1129,11 @@ describe('multiplayer WebSocket server', () => {
 
   it('broadcasts authoritative settlement events returned by the room layer', async () => {
     const authority: CasinoRoomAuthority = {
-      handle: (connectionId: string) => {
+      handle: (connectionId) => {
         const room = createRoomSnapshot(connectionId);
         return {
           broadcasts: [room],
-          settlements: [{ id: 'settlement-1', profileId: 'alice', seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
+          settlements: [{ id: testSettlementId('settlement-1'), profileId: aliceId, seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
         };
       },
       disconnect: () => ({ broadcasts: [], settlements: [] }),
@@ -1103,10 +1145,17 @@ describe('multiplayer WebSocket server', () => {
     const baseUrl = await startServer('.', authority);
     const alice = await connect(baseUrl.ws);
 
-    alice.send({ version: 1, type: 'resync' });
+    alice.send({ type: 'resync' });
     const settlement = await alice.waitFor((message) => message.type === 'settlement');
 
-    expect(settlement.type === 'settlement' ? settlement.settlements[0].profit : 0).toBe(25);
+    if (settlement.type !== 'settlement') {
+      throw new Error('Expected settlement message.');
+    }
+    const settlementEntry = settlement.settlements[0];
+    if (!settlementEntry) {
+      throw new Error('Missing settlement.');
+    }
+    expect(settlementEntry.profit).toBe(25);
   });
 });
 
@@ -1350,7 +1399,7 @@ const messageIndexSince = (probe: MessageProbe, checkpoint: number, predicate: (
 };
 
 const createServerProfile = async (probe: SocketProbe, profileName: string): Promise<CasinoProfile> => {
-  probe.send({ version: 1, type: 'create-profile', profileName });
+  probe.send({ type: 'create-profile', profileName });
   const profileData = await probe.waitFor(
     (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === profileName),
   );
@@ -1362,7 +1411,7 @@ const createServerProfile = async (probe: SocketProbe, profileName: string): Pro
 };
 
 const authorizeAdmin = async (probe: SocketProbe, adminToken: string): Promise<void> => {
-  probe.send({ version: 1, type: 'authorize-admin', adminToken });
+  probe.send({ type: 'authorize-admin', adminToken });
   await expect(probe.waitFor((message) => message.type === 'admin-access' && message.authorized)).resolves.toMatchObject({ authorized: true });
 };
 
@@ -1397,7 +1446,15 @@ const encodeClientFrame = (payload: string | Buffer, options: { readonly fin?: b
   const mask = Buffer.from([0x12, 0x34, 0x56, 0x78]);
   mask.copy(frame, headerLength);
   for (let index = 0; index < data.length; index += 1) {
-    frame[headerLength + maskLength + index] = data[index] ^ mask[index % 4];
+    const dataByte = data[index];
+    if (dataByte === undefined) {
+      throw new Error(`Missing data byte at index ${index}.`);
+    }
+    const maskByte = mask[index % 4];
+    if (maskByte === undefined) {
+      throw new Error(`Missing mask byte at index ${index % 4}.`);
+    }
+    frame[headerLength + maskLength + index] = dataByte ^ maskByte;
   }
   return frame;
 };
@@ -1405,21 +1462,23 @@ const encodeClientFrame = (payload: string | Buffer, options: { readonly fin?: b
 const beat = (room: RoomSnapshot) => room.game as ReturnType<BeatTheHouseGame['snapshot']>;
 
 const createRoomSnapshot = (connectionId: string): RoomSnapshot => ({
-  roomId: 'ROOM42',
+  roomId: room42,
   roomName: 'Room 42',
-  hostProfileId: 'alice',
+  hostProfileId: aliceId,
   gameId: 'beat-the-house',
   gameTitle: 'Beat the House',
   status: 'complete',
   phase: 'settled',
-  sessionId: 'session-1',
+  sessionId: testSessionId('session-1'),
   revision: 1,
   maxPlayers: 3,
   allowSpectators: true,
   createdAt: 1,
   updatedAt: 2,
-  players: [{ connectionId, profileId: 'alice', profileName: 'Alice', bankroll: 525, sessionStartBankroll: 500, role: 'player' }],
+  players: [
+    { connectionId: testConnectionId(connectionId), profileId: aliceId, profileName: 'Alice', bankroll: 525, sessionStartBankroll: 500, role: 'player' },
+  ],
   spectators: [],
-  seats: [{ seatId: 'left', profileId: 'alice' }, { seatId: 'centre' }, { seatId: 'right' }],
+  seats: [{ seatId: 'left', profileId: aliceId }, { seatId: 'centre' }, { seatId: 'right' }],
   game: new BeatTheHouseGame({ initialBankroll: 0 }).snapshot(),
 });

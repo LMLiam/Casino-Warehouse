@@ -6,6 +6,7 @@ import type { CasinoProfile } from '../../state/profiles/CasinoProfile';
 import { houseAdvanceConfig } from '../../state/profiles/houseAdvanceConfig';
 import { isHouseAdvanceCapped } from '../../state/profiles/isHouseAdvanceCapped';
 import { escapeHtml } from '../../shared/html';
+import { roomGameIdSchema } from '../../schemas/casinoSchemas/roomGameIdSchema';
 import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 
@@ -28,7 +29,10 @@ export class GameLobbyView {
       .join('');
     this.elements.gameLobbyTiles.querySelectorAll<HTMLButtonElement>('[data-lobby-game]').forEach((button) => {
       button.addEventListener('click', () => {
-        onOpenRoomLobby(button.dataset.lobbyGame as CasinoGameId);
+        const gameId = roomGameIdSchema.safeParse(button.dataset.lobbyGame);
+        if (gameId.success) {
+          onOpenRoomLobby(gameId.data);
+        }
       });
     });
   }

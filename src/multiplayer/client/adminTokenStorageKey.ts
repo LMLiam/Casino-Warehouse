@@ -1,1 +1,1 @@
-export const adminTokenStorageKey = 'casino_warehouse_admin_token_v1';
+export const adminTokenStorageKey = 'casino_warehouse_admin_token';

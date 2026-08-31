@@ -1,18 +1,14 @@
-import { z } from 'zod';
+import type { JsonValue } from '../../schemas/casinoSchemas/JsonValue';
+import { sessionStateSchema } from '../../schemas/casinoSchemas/sessionStateSchema';
 import { zodErrorSummary } from '../../schemas/casinoSchemas/zodErrorSummary';
 import type { CasinoSessionState } from './CasinoSessionState';
-import { parseSessionStateV2 } from './parseSessionStateV2';
+import type { ParseError } from '../ParseError';
+import type { Result } from '../Result';
 
-export const parseSessionState = (value: unknown): CasinoSessionState => {
-  const parsed = z.object({ version: z.number().int() }).safeParse(value);
+export const parseSessionState = (value: JsonValue | CasinoSessionState): Result<CasinoSessionState, ParseError> => {
+  const parsed = sessionStateSchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`Session data is not valid. ${zodErrorSummary(parsed.error)}`);
+    return { ok: false, error: new Error(`Session data is not valid: ${zodErrorSummary(parsed.error)}`) };
   }
-
-  switch (parsed.data.version) {
-    case 2:
-      return parseSessionStateV2(value);
-    default:
-      throw new Error(`Session data version ${parsed.data.version} is not supported.`);
-  }
+  return { ok: true, value: parsed.data };
 };

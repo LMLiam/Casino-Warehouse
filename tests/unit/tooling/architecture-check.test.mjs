@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { RuleTester } from 'eslint';
 
+import { finiteNumberErrors } from '../../../scripts/finite-number-check.mjs';
 import { magicNumberErrors } from '../../../scripts/magic-number-check.mjs';
+import requireZodRecordKeyValue from '../../../scripts/require-zod-record-key-value.mjs';
 import { mathRandomErrors } from '../../../scripts/math-random-check.mjs';
+import { stateLoaderErrors } from '../../../scripts/state-loader-check.mjs';
 import { topLevelElementErrors } from '../../../scripts/top-level-elements-check.mjs';
+import { checkVagueFilename } from '../../../scripts/vagueFilenameCheck.mjs';
+import { zodObjectErrors } from '../../../scripts/zod-object-check.mjs';
 
 describe('topLevelElementErrors', () => {
   it('rejects a file with one exported top-level element and a private helper', () => {
@@ -23,6 +29,13 @@ export const scoreTotal = (value: number): number => value * privateScale;
     expect(topLevelElementErrors('src/game/example.ts', 'export default function example() { return 1; }')).toEqual([]);
     expect(topLevelElementErrors('src/game/Phase.ts', "export enum Phase { Betting = 'betting' }")).toEqual([]);
     expect(topLevelElementErrors('src/game/ignored.ts', '')).toEqual([]);
+  });
+
+  it('accepts anonymous declarations and let or var declarations', () => {
+    expect(topLevelElementErrors('src/ui/Example.tsx', 'export default class {}')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'export default function () { return 1; }')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'let score = 1;')).toEqual([]);
+    expect(topLevelElementErrors('src/game/example.ts', 'var score = 1;')).toEqual([]);
   });
 
   it('rejects multiple top-level elements', () => {
@@ -101,6 +114,31 @@ describe('mathRandomErrors', () => {
   });
 });
 
+describe('stateLoaderErrors', () => {
+  it('rejects throws from state loader modules', () => {
+    expect(stateLoaderErrors('src/state/profiles/loadProfileStore.ts', 'export const loadProfileStore = () => { throw new Error("bad"); };')).toEqual([
+      'src/state/profiles/loadProfileStore.ts:1:41 throws from a state loader. Return a Result and let the caller recover or delete invalid state.',
+    ]);
+  });
+
+  it('allows result-based recovery and non-loader writes', () => {
+    expect(stateLoaderErrors('src/state/session/loadSessionState.ts', 'export const loadSessionState = () => ({ recovered: true });')).toEqual([]);
+    expect(stateLoaderErrors('src/state/session/saveSessionState.ts', 'export const saveSessionState = () => { throw new Error("bad"); };')).toEqual([]);
+  });
+});
+
+describe('checkVagueFilename', () => {
+  it('rejects utility-style filenames, including compound names', () => {
+    expect(checkVagueFilename('src/game/utils.ts')).toContain('vague filename');
+    expect(checkVagueFilename('src/state/storageUtils.ts')).toContain('vague filename');
+    expect(checkVagueFilename('src/state/profile-utils.ts')).toContain('vague filename');
+  });
+
+  it('accepts domain-specific filenames', () => {
+    expect(checkVagueFilename('src/state/profileStore.ts')).toBeUndefined();
+  });
+});
+
 describe('magicNumberErrors', () => {
   it('rejects unexplained executable numeric literals in source files', () => {
     expect(
@@ -165,5 +203,82 @@ export function timeoutMs(seconds) {
     ).toEqual([
       'scripts/example.mjs:3:20 uses unexplained numeric literal 1000. Name the value with a domain constant/config/fixture, or add "casino-magic-number-allow: <reason>" for an intentional inline exception.',
     ]);
+  });
+});
+
+describe('zodObjectErrors', () => {
+  it('rejects z.object calls without a strict chain', () => {
+    expect(zodObjectErrors('src/schemas/example.ts', 'const schema = z.object({ value: z.string() });')).toEqual([
+      'src/schemas/example.ts:1:16 calls z.object without .strict(). Add .strict() to reject unrecognised keys.',
+    ]);
+  });
+
+  it('accepts multiline strict chains and ignores unrelated object text', () => {
+    expect(
+      zodObjectErrors(
+        'src/schemas/example.ts',
+        `
+const plainObject = { value: 'text' };
+const schema = z
+  .object({ value: z.string() })
+  .strict()
+  .optional();
+`,
+      ),
+    ).toEqual([]);
+  });
+
+  it('checks TSX files and rejects incomplete strict chains', () => {
+    expect(zodObjectErrors('scripts/example.mjs', 'z.object({ value: 1 });')).toEqual([]);
+    expect(
+      zodObjectErrors(
+        'tests/unit/tooling/example.tsx',
+        `
+const plain = object({ value: 'text' });
+const other = otherNamespace.object({ value: 'text' });
+const extended = z.object({ value: z.string() }).extend({ label: z.string() });
+const property = z.object({ value: z.string() }).strict;
+const chainedProperty = z.object({ value: z.string() }).strict.call(null);
+`,
+      ),
+    ).toHaveLength(3);
+  });
+});
+
+describe('finiteNumberErrors', () => {
+  it('rejects direct finite-number declarations outside the shared primitive', () => {
+    expect(finiteNumberErrors('src/schemas/example.ts', 'const schema = z.number().finite().int();')).toEqual([
+      'src/schemas/example.ts:1:16 uses z.number().finite() directly. Import finiteNumberSchema from src/schemas/casinoSchemas/finiteNumberSchema instead.',
+    ]);
+  });
+
+  it('allows the shared primitive, coercing schemas, and custom finite errors', () => {
+    expect(finiteNumberErrors('src/schemas/casinoSchemas/finiteNumberSchema.ts', 'export const schema = z.number().finite();')).toEqual([]);
+    expect(
+      finiteNumberErrors(
+        'tests/unit/schemas/example.tsx',
+        `
+const coerced = z.coerce.number().finite();
+const custom = z.number().finite('Amount must be finite.');
+`,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('requireZodRecordKeyValue', () => {
+  const ruleTester = new RuleTester();
+  ruleTester.run('require-zod-record-key-value', requireZodRecordKeyValue, {
+    valid: ['z.record(z.string(), z.number());', 'other.record(z.number());'],
+    invalid: [
+      {
+        code: 'z.record(z.number());',
+        errors: [{ messageId: 'missingKeyValueSchemas' }],
+      },
+      {
+        code: 'z.record();',
+        errors: [{ messageId: 'missingKeyValueSchemas' }],
+      },
+    ],
   });
 });

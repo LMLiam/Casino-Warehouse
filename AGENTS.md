@@ -45,7 +45,7 @@ Primary references:
 - `npm run visual:serial`: run Playwright with one worker for debugging shared-state issues.
 - `npm run check`: run lint, format, coverage, server build, and visual tests.
 
-Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual` or `npm run visual:serial`. The `Project Checks` workflow displays those lanes as `Visual and E2E (Laptop Visual)`, `Visual and E2E (Tablet Visual)`, and `Visual and E2E (Laptop Multiplayer)` with the aggregate `Required Quality Gate` check; reproduce one lane locally with `npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts`.
+Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For any `src/ui/` change, run `npm run visual:serial`. For other UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual`. The `Project Checks` workflow displays those lanes as `Visual and E2E (Laptop Visual)`, `Visual and E2E (Tablet Visual)`, and `Visual and E2E (Laptop Multiplayer)` with the aggregate `Required Quality Gate` check; reproduce one lane locally with `npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts`.
 
 ## Repository Rules
 
@@ -92,8 +92,18 @@ Keep authoritative game, payout, bankroll, persistence, and realtime rules out o
 - File-local implementation details must be nested inside the element they support or extracted into focused module files.
 - Avoid vague filenames such as `utils`, `helpers`, `misc`, and `manager`.
 - Do not add barrel files; import focused module files directly.
+- Hard ban: never use the TypeScript `unknown` or `object` types, `z.unknown()`, `as unknown`, or a chained assertion through `unknown` anywhere in source or tests. Use a named domain type, runtime type guard, schema, or type-safe construction instead.
 - Name non-neutral numeric values with the narrowest domain constant, class-private constant, config object, or test fixture. Use same-line `casino-magic-number-allow: <reason>` comments only for intentional inline exceptions.
 - Respect the architecture checker instead of bypassing it.
+
+## Runtime Data Boundaries
+
+- Keep JSON at transport and persistence boundaries. Convert JSON text with `parseJsonText`, then immediately parse it with the exact domain Zod schema.
+- Use strict schemas for persisted profile state, persisted session state, and WebSocket messages. Do not silently strip unrecognised fields.
+- Keep profile state, session state, browser storage keys, and WebSocket messages unversioned. Reject obsolete version fields. Do not add migration dispatch, legacy normalisers, or compatibility aliases for old saved data.
+- Delete invalid SQLite state rows and recover invalid browser state to the documented empty state. Do not convert obsolete records into the current format.
+- Validate every restored Beat the House, Blackjack, and slots snapshot with its complete schema before an engine receives it.
+- Do not use `z.json()`, a record check, a shallow type guard, `z.custom<T>()`, or a type assertion as proof of a domain type. These checks can establish a JSON boundary but cannot establish a profile, session, protocol message, room snapshot, or game snapshot.
 
 ## Testing Guidance
 

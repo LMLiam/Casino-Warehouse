@@ -1,1 +1,3 @@
-export const betTypes = ['main', 'aceFlash', 'dealerBust', 'matchPush', 'dealerSevens'] as const;
+import { sideBetTypes } from './sideBetTypes';
+
+export const betTypes = ['main', ...sideBetTypes] as const;

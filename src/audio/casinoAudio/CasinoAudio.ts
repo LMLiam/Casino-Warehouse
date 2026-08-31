@@ -23,9 +23,9 @@ export class CasinoAudio {
     ambience: { type: 'triangle', startFrequency: 120, endFrequency: 130, duration: 0.8, volume: 0.08 },
   };
 
-  private context?: AudioContext;
-  private musicOscillator?: OscillatorNode;
-  private musicGain?: GainNode;
+  private context?: AudioContext | undefined;
+  private musicOscillator?: OscillatorNode | undefined;
+  private musicGain?: GainNode | undefined;
   private audioUnavailable = false;
 
   public constructor(private settings: CasinoAudioSettings = defaultAudioSettings()) {}

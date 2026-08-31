@@ -46,7 +46,7 @@ export { expect };
 export type { Locator, Page };
 
 export const e2eAdminToken = 'casino-e2e-admin-token';
-const adminTokenStorageKey = 'casino_warehouse_admin_token_v1';
+const adminTokenStorageKey = 'casino_warehouse_admin_token';
 
 export const resetBrowserStorage = async (page: Page, realtimeUrl: string): Promise<void> => {
   await page.evaluate(
@@ -58,9 +58,6 @@ export const resetBrowserStorage = async (page: Page, realtimeUrl: string): Prom
     { key: adminTokenStorageKey, token: e2eAdminToken, url: realtimeUrl },
   );
 };
-
-export const currentRealtimeUrl = async (page: Page): Promise<string> =>
-  page.evaluate(() => localStorage.getItem('casino_realtime_url') ?? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`);
 
 const closeServer = async (server: CasinoServer): Promise<void> => {
   server.closePeers();

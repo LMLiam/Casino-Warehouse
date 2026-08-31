@@ -1,9 +1,11 @@
 import type { SlotTheme } from './SlotTheme';
+import { hexColourSchema } from '../../schemas/casinoSchemas/hexColourSchema';
+import { slotThemeIdSchema } from '../../schemas/casinoSchemas/slotThemeIdSchema';
 
 export const defaultSlotTheme: SlotTheme = {
-  id: 'thai-princess',
+  id: slotThemeIdSchema.parse('thai-princess'),
   title: 'Thai Princess',
-  accent: '#f4bf58',
+  accent: hexColourSchema.parse('#f4bf58'),
   columns: 3,
   rows: 5,
   wildSymbol: 'princess',
