@@ -41,7 +41,7 @@
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-tooltip": "^1.2.8",
     "gsap": "^3.13.0",
-    "helmet": "^8.2.0",
+    "helmet": "^8.3.0",
     "pixi.js": "8.20.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.8",
