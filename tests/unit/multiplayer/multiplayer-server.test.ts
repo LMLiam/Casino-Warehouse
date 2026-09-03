@@ -553,6 +553,10 @@ describe('multiplayer WebSocket server', () => {
     if (credentials.type !== 'profile-credentials') {
       throw new Error('Expected profile credentials.');
     }
+    const bobProfile = await createServerProfile(bob, 'Private Shoe Bob');
+    await expect(bob.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(bobProfile.id))).resolves.toMatchObject({
+      type: 'profile-access',
+    });
 
     const beatTheHouse = new BeatTheHouseGame({ initialBankroll: aliceProfile.bankroll }).saveState();
     const gameSnapshot = playerGameSnapshotsSchema.parse({ beatTheHouse });

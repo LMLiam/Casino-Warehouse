@@ -261,9 +261,9 @@ function strategyAction(strategy: StrategyRow, cardCount: number, finalRankValue
 function simulateProductionProfile(wagerProfile: WagerProfile, seed: number): RoundStats {
   const rng = mulberry32(seed);
   const returned: number[] = [];
+  const game = new BeatTheHouseGame({ initialBankroll: wagerProfile.stake, rng });
 
   for (let round = 0; round < RTP_SAMPLE_ROUNDS_PER_PROFILE; round += 1) {
-    const game = new BeatTheHouseGame({ initialBankroll: wagerProfile.stake, rng });
     game.placeBet('left', 'main', MAIN_STAKE);
     for (const sideBet of wagerProfile.sideBets) {
       game.placeBet('left', sideBet, SIDE_STAKE);
@@ -289,6 +289,10 @@ function simulateProductionProfile(wagerProfile: WagerProfile, seed: number): Ro
       throw new Error('Missing summary.');
     }
     returned.push(summary.returned);
+    if (round + 1 < RTP_SAMPLE_ROUNDS_PER_PROFILE) {
+      game.syncBankroll(wagerProfile.stake);
+      game.nextRound();
+    }
   }
 
   return sampleStats(returned);

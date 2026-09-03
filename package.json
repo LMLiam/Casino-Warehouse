@@ -79,7 +79,7 @@
     "vitest": "^4.1.11"
   },
   "overrides": {
-    "@xmldom/xmldom": "^0.8.15",
+    "@xmldom/xmldom": "0.8.15",
     "localtunnel": {
       "axios": "^1.16.1"
     }
