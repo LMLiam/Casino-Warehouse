@@ -1,16 +1,19 @@
 import type { Card } from '../cards/Card';
-import { createDeck } from '../cards/createDeck';
 import type { Rng } from '../rng/Rng';
 import { secureRandomInt } from '../rng/secureRandomInt';
+import { BeatTheHouseShoe } from '../beatTheHouse/shoe/BeatTheHouseShoe';
+import { createBeatTheHouseShoe } from '../beatTheHouse/shoe/createBeatTheHouseShoe';
 import type { Bets } from '../types/Bets';
 import type { BetType } from '../types/BetType';
 import { betTypes } from '../types/betTypes';
+import type { DealerHand } from '../types/DealerHand';
 import type { DealerTips } from '../types/DealerTips';
 import type { GameEvent } from '../types/GameEvent';
 import type { GameSnapshot } from '../types/GameSnapshot';
 import type { HandId } from '../types/HandId';
 import { handIds } from '../types/handIds';
 import type { PlayerHand } from '../types/PlayerHand';
+import type { PublicDealerHand } from '../types/PublicDealerHand';
 import type { RoundSummary } from '../types/RoundSummary';
 import type { SideBetState } from '../types/SideBetState';
 import type { SideBetType } from '../types/SideBetType';
@@ -45,9 +48,9 @@ export abstract class BeatTheHouseState {
   protected dealerTips = BeatTheHouseState.emptyDealerTips();
   protected dealerTipRewards = BeatTheHouseState.emptyDealerTips();
   protected lastBets?: Bets | undefined;
-  protected deck: Card[];
+  protected shoe: BeatTheHouseShoe | undefined;
   protected hands = BeatTheHouseState.emptyHands();
-  protected dealer: GameSnapshot['dealer'] = { cards: [], holeRevealed: false, bust: false, blackAce: false };
+  protected dealer: DealerHand = { cards: [], holeRevealed: false, bust: false, blackAce: false };
   protected activeHand?: HandId | undefined;
   protected sideStates = BeatTheHouseState.emptySideStates();
   protected summaries: RoundSummary[] = [];
@@ -59,7 +62,7 @@ export abstract class BeatTheHouseState {
     this.bankroll = options.initialBankroll ?? BeatTheHouseState.defaultInitialBankroll;
     this.rng = options.rng;
     this.randomInt = options.randomInt ?? secureRandomInt;
-    this.deck = options.deck ? [...options.deck] : createDeck(this.rng);
+    this.shoe = options.shoe;
   }
 
   public snapshot(lastEvents: GameEvent[] = []): GameSnapshot {
@@ -71,10 +74,8 @@ export abstract class BeatTheHouseState {
       dealerTipRewards: BeatTheHouseState.cloneDealerTips(this.dealerTipRewards),
       activeHand: this.activeHand,
       hands: BeatTheHouseState.cloneHands(this.hands),
-      dealer: {
-        ...this.dealer,
-        cards: [...this.dealer.cards],
-      },
+      dealer: BeatTheHouseState.publicDealer(this.dealer),
+      shoe: this.getShoe().snapshot(),
       sideStates: BeatTheHouseState.handRecord((handId) => ({ ...(this.sideStates[handId] ?? BeatTheHouseState.emptySideState()) })),
       summaries: [...this.summaries],
       lastEvents,
@@ -85,10 +86,11 @@ export abstract class BeatTheHouseState {
   }
 
   public saveState(): BeatTheHouseSaveState {
-    const { lastEvents: _lastEvents, ...snapshot } = this.snapshot();
+    const { lastEvents: _lastEvents, dealer: _dealer, shoe: _shoe, ...snapshot } = this.snapshot();
     return {
       ...snapshot,
-      deck: [...this.deck],
+      dealer: { ...this.dealer, cards: [...this.dealer.cards] },
+      shoe: this.getShoe().saveState(),
       ...(this.lastBets ? { lastBets: BeatTheHouseState.cloneBets(this.lastBets) } : {}),
     };
   }
@@ -100,7 +102,7 @@ export abstract class BeatTheHouseState {
     this.dealerTips = BeatTheHouseState.cloneDealerTips(state.dealerTips);
     this.dealerTipRewards = BeatTheHouseState.cloneDealerTips(state.dealerTipRewards);
     this.lastBets = state.lastBets ? BeatTheHouseState.cloneBets(state.lastBets) : undefined;
-    this.deck = [...state.deck];
+    this.shoe = BeatTheHouseShoe.fromSaveState(state.shoe);
     this.hands = BeatTheHouseState.cloneHands(state.hands);
     this.dealer = { ...state.dealer, cards: [...state.dealer.cards] };
     this.activeHand = state.activeHand;
@@ -119,13 +121,22 @@ export abstract class BeatTheHouseState {
     return this.snapshot(events);
   }
 
-  protected draw(): Card {
-    const card = this.deck.pop();
-    if (!card) {
-      throw new Error('Deck exhausted.');
+  protected draw(events: GameEvent[]): Card {
+    const shoe = this.getShoe();
+    const cutCardReachedBeforeDraw = shoe.snapshot().cutCardReached;
+    const card = shoe.draw();
+    if (!cutCardReachedBeforeDraw && shoe.snapshot().cutCardReached) {
+      events.push({ type: 'shoe-cut-reached', message: 'The shoe cut card has been reached.' });
     }
-
     return card;
+  }
+
+  protected prepareShoeForDeal(): GameEvent[] {
+    if (!this.getShoe().snapshot().cutCardReached) {
+      return [];
+    }
+    this.shoe = createBeatTheHouseShoe(this.rng);
+    return [{ type: 'shoe-shuffled', message: 'A fresh six-deck shoe is ready.' }];
   }
 
   protected setBankroll(amount: number): void {
@@ -138,6 +149,13 @@ export abstract class BeatTheHouseState {
 
   protected debitBankroll(amount: number): void {
     this.bankroll -= amount;
+  }
+
+  private getShoe(): BeatTheHouseShoe {
+    if (!this.shoe) {
+      this.shoe = createBeatTheHouseShoe(this.rng);
+    }
+    return this.shoe;
   }
 
   protected static handRecord<Value>(valueFor: (handId: HandId) => Value): Record<HandId, Value> {
@@ -235,6 +253,11 @@ export abstract class BeatTheHouseState {
 
   protected static cloneHands(hands: Record<HandId, PlayerHand>): Record<HandId, PlayerHand> {
     return BeatTheHouseState.handRecord((handId) => ({ ...hands[handId], cards: [...hands[handId].cards] }));
+  }
+
+  private static publicDealer(dealer: DealerHand): PublicDealerHand {
+    const { holeCard: _holeCard, ...publicDealer } = dealer;
+    return { ...publicDealer, cards: [...dealer.cards] };
   }
 
   protected static wholeChipPayout(stake: number, multiplier: number): { readonly profit: number; readonly returned: number } {

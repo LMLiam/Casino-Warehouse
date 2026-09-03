@@ -1,10 +1,11 @@
 import type { Card } from '../../cards/Card';
+import { beatTheHouseRules } from '../beatTheHouseRules';
 import type { BeatTheHouseShoeSaveState } from './BeatTheHouseShoeSaveState';
 import type { BeatTheHouseShoeSnapshot } from './BeatTheHouseShoeSnapshot';
 import { validateBeatTheHouseShoeSaveState } from './validateBeatTheHouseShoeSaveState';
 
 export class BeatTheHouseShoe {
-  private readonly totalCards: number;
+  private readonly totalCards: BeatTheHouseShoeSnapshot['totalCards'];
   private readonly cutThresholdCardsDealt: number;
   private remainingCards: Card[];
   private shufflePending: boolean;
@@ -12,7 +13,7 @@ export class BeatTheHouseShoe {
   public constructor(state: BeatTheHouseShoeSaveState) {
     validateBeatTheHouseShoeSaveState(state);
     this.remainingCards = [...state.remainingCards];
-    this.totalCards = state.totalCards;
+    this.totalCards = beatTheHouseRules.cardsPerShoe;
     this.cutThresholdCardsDealt = state.cutThresholdCardsDealt;
     this.shufflePending = state.shufflePending;
   }

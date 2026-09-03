@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Card } from '../../../src/game/cards/Card';
-import { rigDeck } from '../../../src/game/cards/rigDeck';
+import { createDeterministicBeatTheHouseShoe } from '../game/createDeterministicBeatTheHouseShoe';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { PixiTable } from '../../../src/ui/PixiTable/PixiTable';
 import type { PixiTableDependencies } from '../../../src/ui/PixiTable/PixiTableDependencies';
@@ -9,6 +9,8 @@ import { dealerChipBank } from '../../../src/ui/layout/dealerChipBank';
 import { toPixels } from '../../../src/ui/layout/toPixels';
 
 const card = (rank: Card['rank'], suit: Card['suit'] = 'spades'): Card => ({ rank, suit });
+const createGame = (initialBankroll: number, dealOrder: readonly Card[]): BeatTheHouseGame =>
+  new BeatTheHouseGame({ initialBankroll, shoe: createDeterministicBeatTheHouseShoe({ dealOrder }) });
 
 describe('Beat the House popup and animation behaviour', () => {
   afterEach(() => {
@@ -16,14 +18,14 @@ describe('Beat the House popup and animation behaviour', () => {
   });
 
   it('emits the visible initial deal order: player seats left to right, then dealer hole', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('9'), card('10'), card('J'), card('7')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('centre', 'main', 10);
     game.placeBet('right', 'main', 10);
 
-    const snapshot = game.deal(rigDeck([card('9'), card('10'), card('J'), card('7')]));
+    const snapshot = game.deal();
 
-    expect(snapshot.dealer.holeCard).toEqual(card('7'));
+    expect(snapshot.dealer.cards).toEqual([]);
     expect(snapshot.dealer.holeRevealed).toBe(false);
     expect(snapshot.lastEvents.map((event) => [event.type, event.handId, event.cardIndex])).toEqual([
       ['round-started', undefined, undefined],
@@ -35,11 +37,10 @@ describe('Beat the House popup and animation behaviour', () => {
   });
 
   it('reveals the dealer hole first, then queues dealer hits one by one before settlement', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('9'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
-    const playing = game.deal(rigDeck([card('9'), card('7'), card('K')]));
+    const playing = game.deal();
 
-    expect(playing.dealer.holeCard).toEqual(card('7'));
     expect(playing.dealer.cards).toEqual([]);
 
     const settled = game.stick();
@@ -56,11 +57,11 @@ describe('Beat the House popup and animation behaviour', () => {
   });
 
   it('keeps side-bet win and loss state in the engine summary for UI popups', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('A', 'hearts'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'dealerSevens', 2);
     game.placeBet('left', 'dealerBust', 2);
-    game.deal(rigDeck([card('A', 'hearts'), card('7'), card('K')]));
+    game.deal();
 
     const settled = game.stick();
     const summary = settled.summaries[0];
@@ -75,10 +76,10 @@ describe('Beat the House popup and animation behaviour', () => {
   });
 
   it('next round clears cards, side states, summaries, and active hand state', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('9'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'dealerSevens', 2);
-    game.deal(rigDeck([card('9'), card('7'), card('K')]));
+    game.deal();
     game.stick();
 
     const next = game.nextRound();
@@ -86,17 +87,17 @@ describe('Beat the House popup and animation behaviour', () => {
     expect(next.phase).toBe('betting');
     expect(next.hands.left.cards).toEqual([]);
     expect(next.dealer.cards).toEqual([]);
-    expect(next.dealer.holeCard).toBeUndefined();
+    expect(next.dealer.holeRevealed).toBe(false);
     expect(next.summaries).toEqual([]);
     expect(next.sideStates.left).toMatchObject({ dealerSevens: 'idle', dealerBust: 'idle', aceFlash: 'idle', matchPush: 'idle' });
     expect(next.activeHand).toBeUndefined();
   });
 
   it('uses a stable round-start animation key for immediate first-card 2 settlements', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('2'), card('2')]);
     game.placeBet('left', 'main', 10);
 
-    const settled = game.deal(rigDeck([card('2'), card('2')]));
+    const settled = game.deal();
     const repeatedRender = game.snapshot(settled.lastEvents);
     const betting = game.nextRound();
 
@@ -139,10 +140,10 @@ describe('Beat the House popup and animation behaviour', () => {
     const mutableTable = pixiTableInternals(table);
     mutableTable.initialized = true;
     mutableTable.chipRenderer = chipRenderer;
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('2'), card('2')]);
     game.placeBet('left', 'main', 10);
 
-    const settled = game.deal(rigDeck([card('2'), card('2')]));
+    const settled = game.deal();
     table.render(settled);
     table.render(game.snapshot(settled.lastEvents));
 
@@ -159,11 +160,11 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, host, chipRenderer, effectRenderer, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('A', 'hearts'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'dealerSevens', 2);
     game.placeBet('left', 'dealerBust', 2);
-    game.deal(rigDeck([card('A', 'hearts'), card('7'), card('K')]));
+    game.deal();
 
     table.render(game.stick());
 
@@ -219,11 +220,11 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('A', 'hearts'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'dealerSevens', 2);
     game.placeBet('left', 'dealerBust', 2);
-    game.deal(rigDeck([card('A', 'hearts'), card('7'), card('K')]));
+    game.deal();
 
     table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 2 }]);
 
@@ -248,9 +249,9 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('A', 'spades'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('A', 'spades'), card('7'), card('K')]));
+    game.deal();
 
     table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 0 }]);
 
@@ -277,7 +278,11 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, host, chipRenderer, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    const game = new BeatTheHouseGame({
+      initialBankroll: 500,
+      randomInt: () => 0,
+      shoe: createDeterministicBeatTheHouseShoe({ dealOrder: [card('2'), card('K')] }),
+    });
     game.placeBet('left', 'main', 10);
     const tipped = game.placeDealerTip('left', 5);
 
@@ -287,7 +292,7 @@ describe('Beat the House popup and animation behaviour', () => {
     expect(chipRenderer.drawStack).toHaveBeenCalledWith(5, expect.any(Number), expect.any(Number), expect.any(Number), 'tip-left-5');
 
     vi.clearAllMocks();
-    const settled = game.deal(rigDeck([card('2'), card('K')]));
+    const settled = game.deal();
     table.render(settled);
 
     expect(JSON.parse(host.dataset.dealerThanksRewards ?? '[]')).toEqual(['left:10']);
@@ -343,9 +348,13 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, host } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    const game = new BeatTheHouseGame({
+      initialBankroll: 500,
+      randomInt: () => 0,
+      shoe: createDeterministicBeatTheHouseShoe({ dealOrder: [card('2'), card('K')] }),
+    });
     game.placeBet('left', 'main', 10);
-    const settled = game.deal(rigDeck([card('2'), card('K')]));
+    const settled = game.deal();
 
     table.render(settled);
 
@@ -367,14 +376,18 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, host, chipRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
+    const game = new BeatTheHouseGame({
+      initialBankroll: 500,
+      randomInt: () => 0,
+      shoe: createDeterministicBeatTheHouseShoe({ dealOrder: [card('2'), card('2'), card('2'), card('K')] }),
+    });
     const tippedSeats = ['left', 'centre', 'right'] as const;
     tippedSeats.forEach((handId) => {
       game.placeBet(handId, 'main', 10);
       game.placeDealerTip(handId, 5);
     });
 
-    table.render(game.deal(rigDeck([card('2'), card('2'), card('2'), card('K')])));
+    table.render(game.deal());
 
     expect(JSON.parse(host.dataset.dealerThanksRewards ?? '[]')).toEqual(['left:10', 'centre:10', 'right:10']);
     tippedSeats.forEach((handId) => {
@@ -399,9 +412,9 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('A', 'spades'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('A', 'spades'), card('7'), card('K')]));
+    game.deal();
 
     table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 1 }]);
     expect(tagRenderer.drawResultPopup).not.toHaveBeenCalled();
@@ -426,10 +439,10 @@ describe('Beat the House popup and animation behaviour', () => {
       setTimeout: vi.fn(() => 0),
     });
     const { table, host, cardRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('9'), card('7'), card('K')]);
     game.placeBet('left', 'main', 10);
 
-    table.render(game.deal(rigDeck([card('9'), card('7'), card('K')])));
+    table.render(game.deal());
     expect(cardRenderer.drawBack).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 'dealer-hole', expect.any(Number));
     vi.clearAllMocks();
 
@@ -462,11 +475,11 @@ describe('Beat the House popup and animation behaviour', () => {
       }),
     });
     const { table, host, chipRenderer, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('J', 'hearts'), card('K')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'aceFlash', 3);
     game.placeBet('left', 'dealerBust', 2);
-    game.deal(rigDeck([card('J', 'hearts'), card('K')]));
+    game.deal();
 
     table.render(game.stick());
 
@@ -514,11 +527,11 @@ describe('Beat the House popup and animation behaviour', () => {
       setTimeout: vi.fn(() => 0),
     });
     const { table, chipRenderer, tagRenderer } = createInitializedTable();
-    const game = new BeatTheHouseGame({ initialBankroll: 500 });
+    const game = createGame(500, [card('A', 'spades'), card('9'), card('K')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('centre', 'main', 10);
 
-    table.render(game.deal(rigDeck([card('A', 'spades'), card('9'), card('K')])));
+    table.render(game.deal());
 
     expect(chipRenderer.drawStack).toHaveBeenCalledWith(10, expect.any(Number), expect.any(Number), expect.any(Number));
     expect(tagRenderer.drawPayoutTag).toHaveBeenCalledWith('PAID +£10', expect.any(Number), expect.any(Number), 'win');

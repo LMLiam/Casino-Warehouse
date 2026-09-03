@@ -14,6 +14,7 @@ import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
+import { playerGameSnapshotsSchema } from '../../../src/schemas/casinoSchemas/playerGameSnapshotsSchema';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
 import { testConnectionId, testProfileId, testRoomId, testServerInstanceId, testSessionId, testSettlementId } from '../schemas/testIds';
 
@@ -541,6 +542,52 @@ describe('multiplayer WebSocket server', () => {
       throw new Error('Missing afterDisconnect player.');
     }
     expect(afterDisconnectPlayer.profileId).toBe(aliceProfile.id);
+  });
+
+  it('sends a saved private Beat shoe only to its authorised profile owner', async () => {
+    const baseUrl = await startServer();
+    const alice = await connect(baseUrl.ws);
+    const bob = await connect(baseUrl.ws);
+    const aliceProfile = await createServerProfile(alice, 'Private Shoe Alice');
+    const credentials = await alice.waitFor((message) => message.type === 'profile-credentials');
+    if (credentials.type !== 'profile-credentials') {
+      throw new Error('Expected profile credentials.');
+    }
+    const bobProfile = await createServerProfile(bob, 'Private Shoe Bob');
+    await expect(bob.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(bobProfile.id))).resolves.toMatchObject({
+      type: 'profile-access',
+    });
+
+    const beatTheHouse = new BeatTheHouseGame({ initialBankroll: aliceProfile.bankroll }).saveState();
+    const gameSnapshot = playerGameSnapshotsSchema.parse({ beatTheHouse });
+    const aliceCheckpoint = alice.checkpoint();
+    alice.send({
+      type: 'save-session',
+      session: {
+        profileId: aliceProfile.id,
+        activeGame: 'beat-the-house',
+        showingGameLobby: false,
+        wagerLimit: 0,
+        wagered: 0,
+        gameSnapshot,
+      },
+    });
+
+    const aliceData = await waitForMessageSince(alice, aliceCheckpoint, (message) => message.type === 'data-state' && message.session !== undefined);
+    if (aliceData.type !== 'data-state' || !aliceData.session) {
+      throw new Error('Expected Alice to receive her saved session.');
+    }
+    expect(aliceData.session.profileId).toBe(aliceProfile.id);
+
+    const bobCheckpoint = bob.checkpoint();
+    bob.send({ type: 'request-data' });
+    const bobData = await waitForMessageSince(bob, bobCheckpoint, (message) => message.type === 'data-state');
+    if (bobData.type !== 'data-state') {
+      throw new Error('Expected Bob to receive a data-state message.');
+    }
+    expect(bobData.session).toBeUndefined();
+    expect(JSON.stringify(bobData)).not.toContain('remainingCards');
+    expect(JSON.stringify(bobData)).not.toContain('cutThresholdCardsDealt');
   });
 
   it('rejects second-socket profile impersonation and locks admin-only data actions', async () => {

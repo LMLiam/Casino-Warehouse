@@ -114,7 +114,7 @@ export class PixiTable extends PixiTableDrawing {
     );
     this.host.dataset.sideBetLabels = JSON.stringify(this.settledSideBetLabels(snapshot));
     this.host.dataset.activeMainBets = JSON.stringify(handLayouts.filter((hand) => snapshot.bets[hand.id].main > 0).map((hand) => hand.id));
-    this.host.dataset.dealerCardCount = String(snapshot.dealer.cards.length + (snapshot.dealer.holeCard && !snapshot.dealer.holeRevealed ? 1 : 0));
+    this.host.dataset.dealerCardCount = String(snapshot.dealer.cards.length + (!snapshot.dealer.holeRevealed && snapshot.phase !== 'betting' ? 1 : 0));
     this.host.dataset.cardAnimationOrders = JSON.stringify([...this.cardAnimationQueue.entries()]);
     this.host.dataset.dealerAnimationOrders = JSON.stringify(
       [...this.cardAnimationQueue.entries()].filter(([key]) => key.startsWith('dealer-')).map(([, order]) => order),

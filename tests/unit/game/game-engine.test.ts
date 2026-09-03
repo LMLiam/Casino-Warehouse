@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Card } from '../../../src/game/cards/Card';
-import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { createDeterministicBeatTheHouseShoe } from './createDeterministicBeatTheHouseShoe';
 
 const requireSummary = <T>(snapshot: { readonly summaries: readonly T[] }): T => {
   const summary = snapshot.summaries[0];
@@ -12,13 +12,18 @@ const requireSummary = <T>(snapshot: { readonly summaries: readonly T[] }): T =>
 };
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
+const createGame = (initialBankroll: number, dealOrder: readonly Card[]): BeatTheHouseGame =>
+  new BeatTheHouseGame({ initialBankroll, shoe: createDeterministicBeatTheHouseShoe({ dealOrder }) });
 
 describe('BeatTheHouseGame', () => {
+  const createShortShoe = (dealOrder: readonly Card[], cutThresholdCardsDealt: number, cardsDealt: number) =>
+    createDeterministicBeatTheHouseShoe({ dealOrder, cutThresholdCardsDealt, cardsDealt });
+
   it('pays a player first-card black Ace automatically', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('A', 'spades'), card('K', 'hearts')]);
     game.placeBet('left', 'main', 10);
 
-    const snapshot = game.deal(rigDeck([card('A', 'spades'), card('K', 'hearts')]));
+    const snapshot = game.deal();
 
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('win');
@@ -27,11 +32,11 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('keeps a player black-Ace automatic win when the dealer opens with a black Ace', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('A', 'clubs'), card('A', 'spades')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'aceFlash', 1);
 
-    const snapshot = game.deal(rigDeck([card('A', 'clubs'), card('A', 'spades')]));
+    const snapshot = game.deal();
 
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('win');
@@ -40,10 +45,10 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('pushes the main bet and pays Match Push on equal final ranks', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('K', 'diamonds'), card('K', 'clubs')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'matchPush', 2);
-    game.deal(rigDeck([card('K', 'diamonds'), card('K', 'clubs')]));
+    game.deal();
 
     const snapshot = game.stick();
 
@@ -54,11 +59,11 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('pays Match Push when another side bet on the same pushed hand loses', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('K', 'diamonds'), card('K', 'clubs')]);
     game.placeBet('left', 'main', 5);
     game.placeBet('left', 'aceFlash', 1);
     game.placeBet('left', 'matchPush', 1);
-    game.deal(rigDeck([card('K', 'diamonds'), card('K', 'clubs')]));
+    game.deal();
 
     const snapshot = game.stick();
 
@@ -69,20 +74,20 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('activates the left-most playable hand first after initial deal', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('J', 'hearts'), card('Q', 'clubs'), card('K', 'diamonds'), card('9', 'spades')]);
     game.placeBet('left', 'main', 5);
     game.placeBet('centre', 'main', 5);
     game.placeBet('right', 'main', 5);
 
-    const snapshot = game.deal(rigDeck([card('J', 'hearts'), card('Q', 'clubs'), card('K', 'diamonds'), card('9', 'spades')]));
+    const snapshot = game.deal();
 
     expect(snapshot.activeHand).toBe('left');
   });
 
-  it('restores an in-progress Beat the House round including deck state', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+  it('restores an in-progress Beat the House round including shoe state', () => {
+    const game = createGame(100, [card('K', 'hearts'), card('9', 'spades'), card('Q', 'clubs')]);
     game.placeBet('left', 'main', 10);
-    const snapshot = game.deal(rigDeck([card('K', 'hearts'), card('9', 'spades'), card('Q', 'clubs')]));
+    const snapshot = game.deal();
     const restored = new BeatTheHouseGame({ initialBankroll: 1 });
 
     expect(restored.restoreState(game.saveState())).toMatchObject({
@@ -96,13 +101,117 @@ describe('BeatTheHouseGame', () => {
     expect(restored.stick().phase).toBe('roundOver');
   });
 
+  it('keeps one shoe across rounds and starts the next round with its next card', () => {
+    const game = new BeatTheHouseGame({
+      initialBankroll: 100,
+      shoe: createShortShoe([card('2', 'clubs'), card('K', 'spades'), card('3', 'hearts'), card('Q', 'diamonds')], 219, 216),
+    });
+    game.placeBet('left', 'main', 10);
+
+    const firstRound = game.deal();
+    const shoeAfterFirstRound = game.saveState().shoe;
+    expect(firstRound.phase).toBe('roundOver');
+    expect(firstRound.hands.left.cards).toEqual([card('2', 'clubs')]);
+    expect(firstRound.shoe).toEqual({ cardsRemaining: 94, cardsDealt: 218, totalCards: 312, cutCardReached: false });
+
+    const nextRound = game.nextRound();
+    expect(nextRound.shoe).toEqual(firstRound.shoe);
+    expect(game.saveState().shoe).toEqual(shoeAfterFirstRound);
+
+    game.placeBet('left', 'main', 10);
+    const secondRound = game.deal();
+
+    expect(secondRound.hands.left.cards).toEqual([card('3', 'hearts')]);
+    expect(secondRound.shoe).toEqual({ cardsRemaining: 92, cardsDealt: 220, totalCards: 312, cutCardReached: true });
+    expect(secondRound.lastEvents.filter((event) => event.type === 'shoe-cut-reached')).toHaveLength(1);
+  });
+
+  it('crosses the cut during a player draw and lets the dealer finish without shuffling', () => {
+    const game = new BeatTheHouseGame({
+      initialBankroll: 100,
+      shoe: createShortShoe([card('3', 'clubs'), card('7', 'hearts'), card('4', 'diamonds'), card('K', 'spades')], 219, 216),
+    });
+    game.placeBet('left', 'main', 10);
+
+    const dealing = game.deal();
+    const afterHit = game.hit();
+    const settled = game.stick();
+
+    expect(dealing.phase).toBe('playing');
+    expect(dealing.shoe.cutCardReached).toBe(false);
+    expect(afterHit.phase).toBe('playing');
+    expect(afterHit.hands.left.cards).toEqual([card('3', 'clubs'), card('4', 'diamonds')]);
+    expect(afterHit.shoe).toEqual({ cardsRemaining: 93, cardsDealt: 219, totalCards: 312, cutCardReached: true });
+    expect(afterHit.lastEvents).toEqual(expect.arrayContaining([{ type: 'shoe-cut-reached', message: 'The shoe cut card has been reached.' }]));
+    expect(Object.keys(dealing.dealer)).not.toContain('holeCard');
+    expect(JSON.stringify(dealing)).not.toContain('cutThresholdCardsDealt');
+    expect(JSON.stringify(dealing)).not.toContain('remainingCards');
+    expect(settled.phase).toBe('roundOver');
+    expect(settled.dealer.cards).toEqual([card('7', 'hearts'), card('K', 'spades')]);
+    expect(settled.lastEvents.map((event) => event.type)).not.toContain('shoe-shuffled');
+  });
+
+  it('replaces a pending shoe only on the next deal and not on nextRound', () => {
+    const rng = vi.fn(() => 0);
+    const game = new BeatTheHouseGame({
+      initialBankroll: 100,
+      rng,
+      shoe: createShortShoe([card('2', 'clubs'), card('K', 'spades')], 219, 217),
+    });
+    game.placeBet('left', 'main', 10);
+
+    const settled = game.deal();
+    const pendingShoe = game.saveState().shoe;
+    expect(settled.shoe.cutCardReached).toBe(true);
+    expect(rng).not.toHaveBeenCalled();
+
+    const nextRound = game.nextRound();
+    expect(nextRound.shoe).toEqual(settled.shoe);
+    expect(game.saveState().shoe).toEqual(pendingShoe);
+    expect(rng).not.toHaveBeenCalled();
+
+    game.placeBet('left', 'main', 10);
+    const freshShoeRound = game.deal();
+
+    expect(rng).toHaveBeenCalledTimes(312);
+    expect(freshShoeRound.lastEvents.filter((event) => event.type === 'shoe-shuffled')).toHaveLength(1);
+    expect(freshShoeRound.shoe).toMatchObject({ cardsRemaining: 310, cardsDealt: 2, totalCards: 312, cutCardReached: false });
+  });
+
+  it('restores the exact next card and pending cut without consuming either random source', () => {
+    const game = new BeatTheHouseGame({
+      initialBankroll: 100,
+      shoe: createShortShoe([card('3', 'clubs'), card('7', 'hearts'), card('4', 'diamonds'), card('K', 'spades')], 219, 216),
+    });
+    game.placeBet('left', 'main', 10);
+    game.deal();
+    const pending = game.hit();
+    const saved = game.saveState();
+    const restoreRng = vi.fn(() => 0);
+    const restoreRandomInt = vi.fn(() => 0);
+    const restored = new BeatTheHouseGame({
+      initialBankroll: 1,
+      rng: restoreRng,
+      randomInt: restoreRandomInt,
+    });
+
+    expect(saved.shoe.remainingCards.at(-1)).toEqual(card('K', 'spades'));
+    expect(saved.shoe.remainingCards).toHaveLength(93);
+    expect(saved.shoe).toMatchObject({ cutThresholdCardsDealt: 219, shufflePending: true });
+    expect(restored.restoreState(saved)).toMatchObject({ phase: 'playing', shoe: pending.shoe });
+    expect(restoreRng).not.toHaveBeenCalled();
+    expect(restoreRandomInt).not.toHaveBeenCalled();
+    expect(restored.saveState()).toEqual(saved);
+    expect(restored.stick()).toEqual(game.stick());
+  });
+
   it('immediately marks a later first-card 2 as lost before that hand becomes active', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('J', 'hearts'), card('2', 'clubs'), card('K', 'diamonds'), card('9', 'spades')]);
     game.placeBet('left', 'main', 5);
     game.placeBet('centre', 'main', 5);
     game.placeBet('right', 'main', 5);
 
-    const snapshot = game.deal(rigDeck([card('J', 'hearts'), card('2', 'clubs'), card('K', 'diamonds'), card('9', 'spades')]));
+    const snapshot = game.deal();
 
     expect(snapshot.activeHand).toBe('left');
     expect(snapshot.hands.centre.result).toBe('lose');
@@ -110,11 +219,11 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('pays Dealer Bust and Dealer Sevens when a dealer seven appears before a bust', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('J', 'hearts'), card('7', 'hearts'), card('2', 'clubs')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'dealerBust', 2);
     game.placeBet('left', 'dealerSevens', 2);
-    game.deal(rigDeck([card('J', 'hearts'), card('7', 'hearts'), card('2', 'clubs')]));
+    game.deal();
 
     const snapshot = game.stick();
 
@@ -129,10 +238,10 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('makes a player lose immediately when revealing a 2', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('2', 'diamonds'), card('K', 'spades')]);
     game.placeBet('left', 'main', 10);
 
-    const snapshot = game.deal(rigDeck([card('2', 'diamonds'), card('K', 'spades')]));
+    const snapshot = game.deal();
 
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('lose');
@@ -141,11 +250,11 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('sums multi-hand wins and losses with the correct sign', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('K', 'hearts'), card('4', 'clubs'), card('5', 'diamonds'), card('Q', 'spades')]);
     game.placeBet('left', 'main', 5);
     game.placeBet('centre', 'main', 5);
     game.placeBet('right', 'main', 5);
-    game.deal(rigDeck([card('K', 'hearts'), card('4', 'clubs'), card('5', 'diamonds'), card('Q', 'spades')]));
+    game.deal();
     game.stick();
     game.stick();
 
@@ -158,7 +267,7 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('handles bet management and rejected betting states', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 20 });
+    const game = createGame(20, [card('K', 'hearts'), card('Q', 'spades')]);
     expect(game.rebet().status).toBe('No previous bet saved.');
     expect(game.snapshot().canRebet).toBe(false);
     expect(game.placeBet('left', 'main', 25).status).toContain('Need £25');
@@ -178,7 +287,7 @@ describe('BeatTheHouseGame', () => {
     game.placeBet('left', 'main', 10);
     expect(game.clearBets().bets.left.main).toBe(0);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('K', 'hearts'), card('Q', 'spades')]));
+    game.deal();
     game.stick();
     const next = game.nextRound();
     expect(next.phase).toBe('betting');
@@ -188,7 +297,7 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('manages dealer tips as pending table credits before the round starts', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 50 });
+    const game = createGame(50, [card('2', 'diamonds'), card('K', 'spades')]);
 
     const firstTip = game.placeDealerTip('left', 10);
     expect(firstTip.bankroll).toBe(40);
@@ -213,11 +322,15 @@ describe('BeatTheHouseGame', () => {
 
   it('settles Dealer Thanks independently of a losing game result', () => {
     const randomInt = vi.fn(() => 0);
-    const game = new BeatTheHouseGame({ initialBankroll: 100, randomInt });
+    const game = new BeatTheHouseGame({
+      initialBankroll: 100,
+      randomInt,
+      shoe: createDeterministicBeatTheHouseShoe({ dealOrder: [card('2', 'clubs'), card('K', 'spades')] }),
+    });
     game.placeBet('left', 'main', 10);
     game.placeDealerTip('left', 5);
 
-    const snapshot = game.deal(rigDeck([card('2', 'diamonds'), card('K', 'spades')]));
+    const snapshot = game.deal();
 
     expect(snapshot.phase).toBe('roundOver');
     expect(requireSummary(snapshot)).toMatchObject({ handId: 'left', mainResult: 'lose', profit: -10 });
@@ -239,10 +352,10 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('clears and rebets individual hands without changing other hands', () => {
-    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const game = createGame(100, [card('A', 'spades'), card('2', 'hearts'), card('K', 'clubs')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('right', 'main', 15);
-    game.deal(rigDeck([card('A', 'spades'), card('2', 'hearts'), card('K', 'clubs')]));
+    game.deal();
     const next = game.nextRound();
     expect(next.rebetAmounts).toMatchObject({ left: 10, right: 15 });
 
@@ -254,10 +367,10 @@ describe('BeatTheHouseGame', () => {
     expect(game.rebetHand('centre').status).toBe('No previous bet saved for this seat.');
   });
 
-  it('covers invalid bankroll withdrawals, invalid rebet affordability, and exhausted decks', () => {
-    let game = new BeatTheHouseGame({ initialBankroll: 10 });
+  it('covers invalid bankroll withdrawals, invalid rebet affordability, and exhausted shoes', () => {
+    const game = createGame(10, [card('3', 'hearts'), card('K', 'spades')]);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('3', 'hearts'), card('K', 'spades')]));
+    game.deal();
 
     expect(game.withdrawBankroll(1)).toBe(false);
     expect(game.withdrawBankroll(0)).toBe(false);
@@ -267,23 +380,23 @@ describe('BeatTheHouseGame', () => {
     expect(game.nextRound().canRebet).toBe(false);
     expect(game.rebet().status).toBe('Need £10 to rebet.');
 
-    game = new BeatTheHouseGame({ initialBankroll: 10 });
-    game.placeBet('left', 'main', 5);
-    expect(() => game.deal([])).toThrow('Deck exhausted.');
+    const exhaustedShoe = createDeterministicBeatTheHouseShoe({ dealOrder: [card('3', 'hearts')], cardsDealt: 311 });
+    exhaustedShoe.draw();
+    expect(() => exhaustedShoe.draw()).toThrow('shoe exhausted');
   });
 
   it('settles Ace Flash, Match Push, and multi-seven side-bet branches', () => {
-    let game = new BeatTheHouseGame({ initialBankroll: 100 });
+    let game = createGame(100, [card('A', 'spades'), card('Q', 'hearts')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'aceFlash', 2);
-    game.deal(rigDeck([card('A', 'spades'), card('Q', 'hearts')]));
+    game.deal();
 
     expect(requireSummary(game.snapshot()).sideWins).toEqual([{ betType: 'aceFlash', label: 'Ace Flash', profit: 20, returned: 22 }]);
 
-    game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game = createGame(100, [card('K', 'hearts'), card('7', 'spades'), card('7', 'clubs'), card('7', 'diamonds'), card('Q', 'hearts')]);
     game.placeBet('left', 'main', 10);
     game.placeBet('left', 'dealerSevens', 1);
-    game.deal(rigDeck([card('K', 'hearts'), card('7', 'spades'), card('7', 'clubs'), card('7', 'diamonds'), card('Q', 'hearts')]));
+    game.deal();
 
     const threeSevens = game.stick();
     expect(threeSevens.dealer.cards.map((dealerCard) => dealerCard.rank)).toEqual(['7', '7', '7', 'Q']);
@@ -291,7 +404,7 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('covers defensive phase guards and default bankroll paths', () => {
-    const game = new BeatTheHouseGame();
+    const game = createGame(100, [card('K', 'hearts'), card('Q', 'spades')]);
     const idle = game.snapshot();
 
     expect(idle.bankroll).toBe(100);
@@ -303,8 +416,8 @@ describe('BeatTheHouseGame', () => {
     expect(game.resetBankroll().bankroll).toBe(100);
 
     game.placeBet('left', 'main', 10);
-    const playing = game.deal(rigDeck([card('K', 'hearts'), card('Q', 'spades')]));
-    expect(game.deal(rigDeck([card('A', 'clubs')]))).toMatchObject({
+    const playing = game.deal();
+    expect(game.deal()).toMatchObject({
       phase: playing.phase,
       bets: playing.bets,
       hands: playing.hands,
@@ -338,26 +451,26 @@ describe('BeatTheHouseGame', () => {
   });
 
   it('covers player hit bust, four-card auto-stand, and dealer black-Ace settlement', () => {
-    let game = new BeatTheHouseGame({ initialBankroll: 100 });
+    let game = createGame(100, [card('K', 'hearts'), card('Q', 'spades'), card('2', 'clubs')]);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('K', 'hearts'), card('Q', 'spades'), card('2', 'clubs')]));
+    game.deal();
 
     const bust = game.hit();
     expect(bust.hands.left.result).toBe('lose');
     expect(bust.phase).toBe('roundOver');
 
-    game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game = createGame(100, [card('3', 'hearts'), card('K', 'spades'), card('4', 'clubs'), card('5', 'diamonds'), card('6', 'hearts')]);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('3', 'hearts'), card('K', 'spades'), card('4', 'clubs'), card('5', 'diamonds'), card('6', 'hearts')]));
+    game.deal();
     game.hit();
     game.hit();
     const stoodOnFour = game.hit();
     expect(stoodOnFour.hands.left.done).toBe(true);
     expect(stoodOnFour.phase).toBe('roundOver');
 
-    game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game = createGame(100, [card('K', 'hearts'), card('A', 'spades')]);
     game.placeBet('left', 'main', 10);
-    game.deal(rigDeck([card('K', 'hearts'), card('A', 'spades')]));
+    game.deal();
     const dealerBlackAce = game.stick();
     expect(dealerBlackAce.dealer.blackAce).toBe(true);
     expect(dealerBlackAce.hands.left.result).toBe('lose');

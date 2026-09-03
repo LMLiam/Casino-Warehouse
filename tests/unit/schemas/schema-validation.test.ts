@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import { sanitizeAudioSettings } from '../../../src/audio/casinoAudio/sanitizeAudioSettings';
 import { gameCatalog } from '../../../src/game/catalog/gameCatalog';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { bankrollTransactionSchema } from '../../../src/schemas/casinoSchemas/bankrollTransactionSchema';
 import { casinoProfileSchema } from '../../../src/schemas/casinoSchemas/casinoProfileSchema';
+import { beatTheHouseShoeSaveStateSchema } from '../../../src/schemas/casinoSchemas/beatTheHouseShoeSaveStateSchema';
 import { gameCatalogSchema } from '../../../src/schemas/casinoSchemas/gameCatalogSchema';
+import { gameSnapshotSchema } from '../../../src/schemas/casinoSchemas/gameSnapshotSchema';
 import { profileNameSchema } from '../../../src/schemas/casinoSchemas/profileNameSchema';
 import { roomNameSchema } from '../../../src/schemas/casinoSchemas/roomNameSchema';
 import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
@@ -150,6 +153,27 @@ describe('Zod-backed runtime validation', () => {
     expect(audioSettingsSchema.safeParse({ unexpected: true }).success).toBe(false);
     expect(gameCatalogSchema.parse(gameCatalog)).toHaveLength(gameCatalog.length);
     expect(() => slotThemeSchema.parse({ id: 'bad', title: 'Bad', accent: 'purple', reelStrip: [], payouts: {}, jackpots: {}, bonus: {} })).toThrow();
+  });
+
+  it('validates the complete private shoe and public snapshot contracts', () => {
+    const snapshot = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
+    const savedShoe = new BeatTheHouseGame({ initialBankroll: 100 }).saveState().shoe;
+
+    expect(gameSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    expect(gameSnapshotSchema.safeParse({ ...snapshot, dealer: { ...snapshot.dealer, holeCard: { rank: 'A', suit: 'spades' } } }).success).toBe(false);
+    expect(
+      gameSnapshotSchema.safeParse({
+        ...snapshot,
+        lastEvents: [
+          { type: 'shoe-shuffled', message: 'A fresh six-deck shoe is ready.' },
+          { type: 'shoe-cut-reached', message: 'The shoe cut card has been reached.' },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(gameSnapshotSchema.safeParse({ ...snapshot, shoe: { ...snapshot.shoe, cutThresholdCardsDealt: 219 } }).success).toBe(false);
+    expect(beatTheHouseShoeSaveStateSchema.safeParse(savedShoe).success).toBe(true);
+    expect(beatTheHouseShoeSaveStateSchema.safeParse({ ...savedShoe, deck: [] }).success).toBe(false);
+    expect(beatTheHouseShoeSaveStateSchema.safeParse({ ...savedShoe, cutThresholdCardsDealt: 1 }).success).toBe(false);
   });
 
   it('preserves finite heartbeat timestamps without applying credit normalization', () => {

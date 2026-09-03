@@ -48,11 +48,12 @@ export class CasinoServerState {
 
   public sendDataState(peer: Peer): void {
     const snapshot = this.dataStore.snapshot();
+    const session = snapshot.session && peer.ownedProfileIds.has(snapshot.session.profileId) ? snapshot.session : undefined;
     this.send(peer, {
       type: 'data-state',
       database: snapshot.database,
       profileState: snapshot.profileState,
-      session: snapshot.session,
+      session,
     });
   }
 

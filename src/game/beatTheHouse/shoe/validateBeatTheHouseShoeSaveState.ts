@@ -7,7 +7,7 @@ export const validateBeatTheHouseShoeSaveState = (state: BeatTheHouseShoeSaveSta
     !state ||
     !Array.isArray(state.remainingCards) ||
     !Number.isSafeInteger(state.totalCards) ||
-    state.totalCards <= 0 ||
+    state.totalCards !== beatTheHouseRules.cardsPerShoe ||
     state.remainingCards.length > state.totalCards ||
     !Number.isSafeInteger(state.cutThresholdCardsDealt) ||
     state.cutThresholdCardsDealt <= 0 ||
@@ -21,10 +21,10 @@ export const validateBeatTheHouseShoeSaveState = (state: BeatTheHouseShoeSaveSta
   if (state.shufflePending !== cardsDealt >= state.cutThresholdCardsDealt) {
     throw new Error('Beat the House shoe cut state is inconsistent.');
   }
-  if (state.totalCards === beatTheHouseRules.cardsPerShoe && state.cutThresholdCardsDealt < beatTheHouseRules.cutThreshold.minimum) {
+  if (state.cutThresholdCardsDealt < beatTheHouseRules.cutThreshold.minimum) {
     throw new Error('Beat the House shoe threshold is below the production range.');
   }
-  if (state.totalCards === beatTheHouseRules.cardsPerShoe && state.cutThresholdCardsDealt > beatTheHouseRules.cutThreshold.maximum) {
+  if (state.cutThresholdCardsDealt > beatTheHouseRules.cutThreshold.maximum) {
     throw new Error('Beat the House shoe threshold is above the production range.');
   }
 
@@ -35,7 +35,7 @@ export const validateBeatTheHouseShoeSaveState = (state: BeatTheHouseShoeSaveSta
     }
     const key = `${card.rank}|${card.suit}`;
     const count = (physicalCounts.get(key) ?? 0) + 1;
-    if (state.totalCards === beatTheHouseRules.cardsPerShoe && count > beatTheHouseRules.deckCount) {
+    if (count > beatTheHouseRules.deckCount) {
       throw new Error('Beat the House shoe contains too many copies of a card.');
     }
     physicalCounts.set(key, count);
