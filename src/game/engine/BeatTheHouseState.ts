@@ -48,7 +48,7 @@ export abstract class BeatTheHouseState {
   protected dealerTips = BeatTheHouseState.emptyDealerTips();
   protected dealerTipRewards = BeatTheHouseState.emptyDealerTips();
   protected lastBets?: Bets | undefined;
-  protected shoe: BeatTheHouseShoe;
+  protected shoe: BeatTheHouseShoe | undefined;
   protected hands = BeatTheHouseState.emptyHands();
   protected dealer: DealerHand = { cards: [], holeRevealed: false, bust: false, blackAce: false };
   protected activeHand?: HandId | undefined;
@@ -62,7 +62,7 @@ export abstract class BeatTheHouseState {
     this.bankroll = options.initialBankroll ?? BeatTheHouseState.defaultInitialBankroll;
     this.rng = options.rng;
     this.randomInt = options.randomInt ?? secureRandomInt;
-    this.shoe = options.shoe ?? createBeatTheHouseShoe(this.rng);
+    this.shoe = options.shoe;
   }
 
   public snapshot(lastEvents: GameEvent[] = []): GameSnapshot {
@@ -75,7 +75,7 @@ export abstract class BeatTheHouseState {
       activeHand: this.activeHand,
       hands: BeatTheHouseState.cloneHands(this.hands),
       dealer: BeatTheHouseState.publicDealer(this.dealer),
-      shoe: this.shoe.snapshot(),
+      shoe: this.getShoe().snapshot(),
       sideStates: BeatTheHouseState.handRecord((handId) => ({ ...(this.sideStates[handId] ?? BeatTheHouseState.emptySideState()) })),
       summaries: [...this.summaries],
       lastEvents,
@@ -90,7 +90,7 @@ export abstract class BeatTheHouseState {
     return {
       ...snapshot,
       dealer: { ...this.dealer, cards: [...this.dealer.cards] },
-      shoe: this.shoe.saveState(),
+      shoe: this.getShoe().saveState(),
       ...(this.lastBets ? { lastBets: BeatTheHouseState.cloneBets(this.lastBets) } : {}),
     };
   }
@@ -122,16 +122,17 @@ export abstract class BeatTheHouseState {
   }
 
   protected draw(events: GameEvent[]): Card {
-    const cutCardReachedBeforeDraw = this.shoe.snapshot().cutCardReached;
-    const card = this.shoe.draw();
-    if (!cutCardReachedBeforeDraw && this.shoe.snapshot().cutCardReached) {
+    const shoe = this.getShoe();
+    const cutCardReachedBeforeDraw = shoe.snapshot().cutCardReached;
+    const card = shoe.draw();
+    if (!cutCardReachedBeforeDraw && shoe.snapshot().cutCardReached) {
       events.push({ type: 'shoe-cut-reached', message: 'The shoe cut card has been reached.' });
     }
     return card;
   }
 
   protected prepareShoeForDeal(): GameEvent[] {
-    if (!this.shoe.snapshot().cutCardReached) {
+    if (!this.getShoe().snapshot().cutCardReached) {
       return [];
     }
     this.shoe = createBeatTheHouseShoe(this.rng);
@@ -148,6 +149,13 @@ export abstract class BeatTheHouseState {
 
   protected debitBankroll(amount: number): void {
     this.bankroll -= amount;
+  }
+
+  private getShoe(): BeatTheHouseShoe {
+    if (!this.shoe) {
+      this.shoe = createBeatTheHouseShoe(this.rng);
+    }
+    return this.shoe;
   }
 
   protected static handRecord<Value>(valueFor: (handId: HandId) => Value): Record<HandId, Value> {

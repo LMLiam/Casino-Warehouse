@@ -193,7 +193,6 @@ describe('BeatTheHouseGame', () => {
       initialBankroll: 1,
       rng: restoreRng,
       randomInt: restoreRandomInt,
-      shoe: createShortShoe([card('A', 'clubs'), card('Q', 'diamonds')], 219, 217),
     });
 
     expect(saved.shoe.remainingCards.at(-1)).toEqual(card('K', 'spades'));
