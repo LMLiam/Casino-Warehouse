@@ -1,207 +1,268 @@
 # AGENTS.md
 
-This file is guidance for coding agents working in Casino Warehouse. It complements, but does not replace, `README.md`, `CONTRIBUTING.md`, `GOVERNANCE.md`, `docs/code-quality.md`, and `docs/supply-chain-security.md`.
+This file provides repository-level guidance for coding agents working on Casino Warehouse.
 
-Explicit user instructions take precedence over this file. If a future nested `AGENTS.md` exists, treat it as applying to its subtree and combine it with this root guidance.
+Explicit user instructions take precedence over this file. A nested `AGENTS.md` applies to its subtree and takes precedence over this file when instructions conflict.
 
-## Project Overview
+## Project
 
-Casino Warehouse is a source-available, noncommercial, fictional-money casino arcade for desktop and tablet browsers. It includes Beat the House, Blackjack, slots rooms, local multiplayer, a small Node realtime server, browser storage, and optional SQLite-backed server data.
+Casino Warehouse is a source-available, noncommercial, fictional-money casino arcade for desktop and tablet browsers.
 
-Credits have no cash value. Do not introduce deposits, withdrawals, payments, crypto, NFTs, cash-out flows, or commercial casino positioning.
+The application contains:
 
-Primary references:
+- Beat the House;
+- Blackjack;
+- slots;
+- local realtime multiplayer;
+- browser-side state;
+- a Node.js WebSocket/server runtime; and
+- optional SQLite-backed server persistence.
 
-- `README.md`: setup, runtime, public tunnel demo flows, local data, license, and project status.
-- `CONTRIBUTING.md`: PR rules, issue triage, local checks, and security/quality gates.
-- `GOVERNANCE.md`: maintainer decisions, milestone order, issue triage, and review expectations.
-- `docs/code-quality.md`: domain boundaries, architecture rules, and source file shape.
-- `docs/supply-chain-security.md`: workflow action pinning, Dependency Review, Scorecard, and SBOM notes.
+Credits have no cash value. Do not introduce deposits, withdrawals, payments, cryptocurrency, NFTs, cash-out flows, real-money gambling, or commercial-casino positioning.
+
+## Start Here
+
+Read the documentation relevant to the task before changing code:
+
+- `README.md` - setup, runtime, public tunnels, local data, and project scope.
+- `CONTRIBUTING.md` - contribution, pull request, testing, and repository workflow.
+- `GOVERNANCE.md` - maintainer decision-making and issue triage.
+- `docs/code-quality.md` - architecture, source-file structure, static checks, and domain boundaries.
+- `docs/supply-chain-security.md` - dependency and GitHub Actions security.
+- `docs/architecture-ui-state.md` - UI/application state architecture when working in those areas.
+
+Treat those files and executable checks as the source of truth. Do not duplicate or reinterpret their policies here.
 
 ## Environment
 
-- Use Node.js 26.x. The supported range is `>=26.0.0 <27`; read `.nvmrc` or `.node-version` when using a version manager.
-- Use npm, not another package manager.
-- Install dependencies with `npm install` for local development. CI uses `npm ci`.
-- Phone-sized screens are intentionally unsupported.
+Use:
 
-## Useful Commands
+- Node.js 26.x (`>=26.0.0 <27`);
+- npm; and
+- the versions committed in `package-lock.json`.
 
-- `npm run dev`: start the Vite client shell only.
-- `npm run build`: typecheck and build the browser app.
-- `npm run build:server`: build the realtime server bundle.
-- `npm run dev:server`: build the server and serve the built app at `http://127.0.0.1:8787` by default.
-- `npm run dev:full`: build the app and server, then start the realtime server.
-- `npm run dev:public`: run the ngrok-backed public demo flow.
-- `npm run dev:ngrok`: run the provider-specific ngrok public demo flow.
-- `npm run dev:localtunnel`: run the provider-specific localtunnel public demo flow.
-- `npm run dev:cloudflare`: run the provider-specific Cloudflare Tunnel quick-tunnel public demo flow.
-- `npm run dev:cloudflared`: alias for `npm run dev:cloudflare`.
-- `npm run format`: check editorconfig and Prettier formatting.
-- `npm run lint`: run ESLint, typecheck, architecture checks, and supply-chain checks.
-- `npm run test`: run the Vitest suite.
-- `npm run test:coverage`: run Vitest with coverage thresholds.
-- `npm run visual`: build and run Playwright browser tests.
-- `npm run visual:serial`: run Playwright with one worker for debugging shared-state issues.
-- `npm run check`: run lint, format, coverage, server build, and visual tests.
+Use `npm install` for normal local development. CI uses `npm ci`.
 
-Run the narrowest meaningful checks while iterating, then run the broader checks that cover the changed surface before opening or updating a pull request. For any `src/ui/` change, run `npm run visual:serial`. For other UI, browser workflow, multiplayer, or visual changes, include Playwright coverage with `npm run visual`. The `Project Checks` workflow displays those lanes as `Visual and E2E (Laptop Visual)`, `Visual and E2E (Tablet Visual)`, and `Visual and E2E (Laptop Multiplayer)` with the aggregate `Required Quality Gate` check; reproduce one lane locally with `npm run visual -- --project=laptop tests/e2e/casino-visual.spec.ts`.
+Phone-sized layouts are intentionally unsupported.
 
-## Repository Rules
+## Commands
 
-- Work through issues and pull requests. Do not commit directly to `main`.
-- Keep changes focused on the issue or user request.
-- Prioritize the complete, correct resolution for the requested issue over the smallest possible diff. Security, multiplayer, workflow, and policy issues often need coordinated code, tests, and documentation updates to be correct.
-- Use branches or worktrees so unrelated user work is not disturbed. If the user asks for a worktree, create a separate worktree for the branch.
-- Name agent-created branches by issue or purpose, for example `issue-71-agents-md`. Do not prefix branch names with `codex/` or other tool-ownership markers.
-- Preserve generated build output out of commits.
-- Follow conventional PR titles: `type(scope): summary`.
-- PRs need at least one `type:*` label and one `area:*` label.
-- Issues use `type(scope): summary` titles and need `type:*`, `area:*`, and `status:*` labels.
-- Ready issues need a milestone and clear next action or acceptance criteria.
-- Do not weaken CodeQL, Dependency Review, branch protection, action pinning, or other security controls.
-- External GitHub Actions must stay pinned to full 40-character commit SHAs with same-line version comments.
+Common commands:
 
-## Code Organization
+```bash
+npm run dev
+npm run dev:full
+npm run dev:server
+npm run build
+npm run build:server
+npm run typecheck
+npm run format
+npm run lint
+npm run test
+npm run test:coverage
+npm run visual
+npm run visual:serial
+npm run check
+```
 
-Use the narrowest domain owner for new modules:
+`npm run dev` starts only the Vite client. Use `npm run dev:server` or `npm run dev:full` when realtime/server behaviour is required.
 
-- `src/game/`: pure game engines, card/RNG primitives, payout and settlement rules, slot themes, and catalog data.
-- `src/multiplayer/`: realtime protocol, server entrypoint, room authority, heartbeat handling, and room/session coordination.
-- `src/state/`: server data persistence, persisted profile/session schemas, and flow state machines.
-- `src/schemas/`: Zod schemas for runtime boundaries and persisted envelopes.
-- `src/assets/`: asset manifest and asset path helpers.
-- `src/audio/`: audio settings and playback service.
-- `src/ui/`: rendering primitives, Pixi table, Radix chrome, layout data, and visual-only helpers.
-- `src/app/shell/`: browser application coordinator and DOM event binder.
-- `src/app/dom/`: shell template and typed element collection.
-- `src/app/views/`: DOM view renderers and view-local controllers.
-- `src/app/state/`: app snapshots and player construction for rendering server-owned data.
-- `src/app/input/`: DOM input parsing and table hit testing.
-- `src/app/format/`: display-only formatting and HTML list rendering.
-- `src/app/rooms/`: room defaults and room-specific app constants.
-- `tests/unit/<domain>/`: Vitest coverage grouped by source domain.
-- `tests/e2e/`: Playwright browser workflows.
+During implementation, run the narrowest useful test or check first. Before finishing, run the broader checks appropriate to the changed surface.
 
-Keep authoritative game, payout, bankroll, persistence, and realtime rules out of UI renderers. UI can display returned values and labels, but it must not recompute payouts, bankroll changes, or settlement outcomes.
+For changes under `src/ui/`, run `npm run visual:serial`.
 
-## Source File Shape
+For other browser workflow, multiplayer, or visual changes, run the relevant Playwright coverage through `npm run visual`.
 
-- Keep new source modules focused on one module-scope top-level element.
-- Classes, React components, functions, constants, variables, interfaces, types, enums, and schemas all count as top-level elements whether or not they are exported.
-- File-local implementation details must be nested inside the element they support or extracted into focused module files.
-- Avoid vague filenames such as `utils`, `helpers`, `misc`, and `manager`.
-- Do not add barrel files; import focused module files directly.
-- Hard ban: never use the TypeScript `unknown` or `object` types, `z.unknown()`, `as unknown`, or a chained assertion through `unknown` anywhere in source or tests. Use a named domain type, runtime type guard, schema, or type-safe construction instead.
-- Name non-neutral numeric values with the narrowest domain constant, class-private constant, config object, or test fixture. Use same-line `casino-magic-number-allow: <reason>` comments only for intentional inline exceptions.
-- Respect the architecture checker instead of bypassing it.
+Do not state that a command passed unless you ran it successfully. Report skipped or failing checks explicitly.
 
-## Runtime Data Boundaries
+## Repository Map
 
-- Keep JSON at transport and persistence boundaries. Convert JSON text with `parseJsonText`, then immediately parse it with the exact domain Zod schema.
-- Use strict schemas for persisted profile state, persisted session state, and WebSocket messages. Do not silently strip unrecognised fields.
-- Keep profile state, session state, browser storage keys, and WebSocket messages unversioned. Reject obsolete version fields. Do not add migration dispatch, legacy normalisers, or compatibility aliases for old saved data.
-- Delete invalid SQLite state rows and recover invalid browser state to the documented empty state. Do not convert obsolete records into the current format.
-- Validate every restored Beat the House, Blackjack, and slots snapshot with its complete schema before an engine receives it.
-- Do not use `z.json()`, a record check, a shallow type guard, `z.custom<T>()`, or a type assertion as proof of a domain type. These checks can establish a JSON boundary but cannot establish a profile, session, protocol message, room snapshot, or game snapshot.
+Place behaviour in the narrowest domain that owns it:
 
-## Testing Guidance
+- `src/game/` - pure game rules, engines, cards, RNG, payouts, settlement logic, slot themes, and game catalog data.
+- `src/multiplayer/` - realtime protocol, client/server transport, room authority, membership, settlement, and multiplayer lifecycle.
+- `src/state/` - persistence, persisted state, profiles, sessions, and state machines.
+- `src/schemas/` - Zod schemas and validated runtime boundaries.
+- `src/app/` - browser application coordination, DOM interaction, input, rendering state, room configuration, and views.
+- `src/ui/` - visual rendering primitives, Pixi rendering, React/Radix UI, layout, and visual-only behaviour.
+- `src/assets/` - asset manifest and asset-path behaviour.
+- `src/audio/` - audio configuration and playback.
+- `src/styles/` - application styling.
+- `src/shared/` - genuinely cross-domain leaf functionality with no narrower owner.
+- `tests/unit/<domain>/` - Vitest tests corresponding to source domains.
+- `tests/e2e/` - Playwright browser, visual, multiplayer, and public-tunnel workflows.
 
-- Add or update tests for behavior changes.
-- Use deterministic RNG, deck, reel, profile, and server fixtures when asserting game or multiplayer behavior.
-- Use unit tests for pure game/state/tooling logic.
-- Use server/client tests for realtime protocol, persistence, authorization, reconnection, and room lifecycle behavior.
-- Use Playwright for browser workflows, accessibility-visible behavior, visual regressions, and cross-browser/context multiplayer flows.
-- If a test is not needed for a docs-only or metadata-only change, say so clearly in the PR.
+Do not use `shared` as a dumping ground. Prefer the narrowest domain owner.
 
-## Security And Multiplayer Guidance
+## Architecture Invariants
 
-- Public tunnel sessions are trusted demos, not production hosting.
-- Server-created profiles use browser-local profile credentials. Do not treat a public `profileId` as permission to mutate or join as that profile.
-- Destructive admin actions require `CASINO_ADMIN_TOKEN`; do not leak admin tokens in docs, logs, or URLs.
-- Keep profile tokens and admin capability out of public `data-state`, room snapshots, room lists, and other broadcast messages.
-- Maintain the required CodeQL workflow status check and other required checks. Required pull request contexts are `Required Quality Gate`, `Analyze (javascript-typescript)`, `Validate Pull Request Metadata`, and `Review Dependency Changes`; GitHub displays the aggregate CI gate as `Project Checks / Required Quality Gate`. The native CodeQL `code_scanning` ruleset rule is currently disabled because GitHub left its generated `CodeQL` check queued after successful analyses; re-enable it only after a pull request proves that check completes reliably. GitHub Code Quality is documented as externally blocked for this personal-account repository until eligibility changes.
+Preserve the existing dependency direction.
 
-## Issue Completion Workflow
+In particular:
 
-When asked to complete, finish, fix, review, ready, update, or check an issue or pull request, follow the evidence requirements below.
+- Game code must remain independent of UI, application-shell, and multiplayer concerns.
+- Multiplayer and state code must not depend on UI or application-shell code.
+- UI code must not become authoritative for game or persistence behaviour.
+- Keep payout, settlement, bankroll, persistence, and multiplayer authority in their owning domains.
+- UI code may display authoritative values but must not independently recompute settlement or bankroll outcomes.
+- Keep realtime messages behind their protocol/schema boundary.
+- Keep persisted state behind the state/schema boundary.
+- Do not introduce circular source dependencies.
 
-Do not describe an issue or pull request as complete, ready, ready to merge, done, or finished unless the evidence checklist below is satisfied on the current PR head.
+Run `npm run architecture:check` rather than reasoning around these constraints manually.
 
-A self-review claim is invalid unless it includes evidence. The agent must name:
+Do not bypass an architecture check to make a change pass. Fix the design instead.
 
-- the target branch and target branch commit reviewed against
-- the current branch and HEAD commit
-- the changed files inspected
-- the commands run
-- the correctness, security, performance, architecture, maintainability, test, and documentation risks checked
-- any web/current-info verification used for version, deprecation, CVE, security-advisory, best-practice, or feature-availability claims
-- the PR review comments left, or the exact reason comments could not be left
-- the fixes made after review, if any
-- the CI/check status for the latest pushed commit
+## TypeScript And Module Rules
 
-Saying only "I performed a self-review and found no issues" is non-compliant.
+The repository deliberately applies stricter rules than normal TypeScript projects.
 
-After a pull request exists, every self-review finding must be recorded as a pull request review comment before it is fixed. Do not edit, commit, or push a fix for a self-review finding until the pull request review comment exists and the comment URL or ID is recorded, unless comment creation failed and the exact attempted tool or command plus exact failure has already been recorded. Final readiness evidence must list every self-review finding with its PR comment URL or ID, fix commit SHA if fixed, and resolution reply URL or ID when available.
+Do not use:
 
-If repository permissions prevent leaving PR review comments, the agent must still produce review findings in the final response using file paths and line-level references where possible. It must not silently skip the review-comment step.
+- `unknown`;
+- `object`;
+- `z.unknown()`;
+- assertions through `unknown`;
+- non-null assertions (`!`);
+- `typeof value === 'object'` as runtime validation;
+- `Math.random()` in `src/game/`;
+- vague modules such as `utils.ts`, `helpers.ts`, `misc.ts`, or `manager.ts`; or
+- barrel/re-export-only modules.
 
-After any new commit, rebase, merge from the target branch, force-push, PR body edit that reruns checks, or resolved-comment action, the pull request must be reviewed again before being called ready.
+Use named domain types, schemas, runtime guards, and type-safe construction instead.
 
-## Issue Creation Workflow
+Use branded domain identifiers such as `ProfileId` and `RoomId` where those concepts are required. Do not degrade them to plain strings.
 
-When asked to create, open, draft, file, or prepare a new GitHub issue from a user request: inspect relevant repository context, search existing open and closed issues and pull requests for duplicates or related work, choose repository-compliant title/labels/status/milestone, create the issue through GitHub, then verify the created issue number, URL, metadata, and body before reporting success.
+Keep new source modules focused on one module-scope top-level element. Extract additional module-scope declarations into focused files with domain-specific names.
 
-## Issue Triage Workflow
+Name meaningful numeric values in the narrowest owning domain. Use the repository's documented recovery behaviour rather than being silently coerced into current state.
 
-When asked to triage, groom, clarify, label, milestone, de-duplicate, decline, block, or ready an existing GitHub issue without implementing it: inspect the issue, search existing issues and pull requests for duplicates or related work, read relevant repository context, update labels/milestone/body/comments only when evidence supports the change, then verify and report the issue URL, labels/milestone before and after, duplicate-search terms, files inspected, and unresolved questions.
+## Game Logic
 
-## Issue Dependency Audit Workflow
+Game outcomes must be reproducible in tests.
 
-When asked to audit, map, review, clarify, update, or report dependency relationships between existing GitHub issues: review every open issue, group the backlog by milestone, label, and status, inspect issue bodies, comments, linked pull requests, and reverse references, distinguish evidence-backed blockers from preferred sequencing, update issue labels or canonical dependency notes only when evidence supports the change, avoid closing or re-scoping issues unless a maintainer explicitly asks, verify any updates, and report blocker relationships in both directions plus maintainer-clarification needs.
+Use the repository RNG abstractions and inject deterministic RNG, deck, or reel behaviour where appropriate. Never introduce `Math.random()` into game-domain code.
 
-## CI Failure Review Workflow
+Keep game rules and payout behaviour independent of rendering concerns.
 
-When asked to inspect, explain, diagnose, review, retry, or fix failing pull request checks: fetch current pull request metadata, head SHA, base branch, required check status, workflow runs, failing jobs, and relevant logs before diagnosing a failure. Distinguish required checks from informational or external checks, map visual/e2e failures to local reproduction commands where applicable, classify the failure cause, and ask before making fixes unless the user's active goal clearly asks to fix CI.
+When changing Beat the House rules, also consult the authoritative game-rule material under `docs/`.
 
-## Documentation Audit Workflow
+## Multiplayer And Security
 
-When asked to audit, verify, or report documentation drift without immediately implementing fixes: compare docs, wiki pages, workflow references, npm scripts, issue and pull request templates, launcher scripts, and local agent skills against source-of-truth files, commands, GitHub metadata, and wiki evidence. Report findings with location, evidence, severity, suggested remediation, skipped checks, and whether each finding is docs-only drift or implementation work.
+The server is authoritative for multiplayer state and settlement.
 
-## Security Review Workflow
+Preserve:
 
-When asked for a security pass, threat-model-style review, token or authorization audit, public tunnel audit, dependency security review, workflow security review, or other focused security assessment: inspect the requested target and related tests and controls before recommending changes, distinguish confirmed vulnerabilities from hardening suggestions and residual risks, verify current-info claims for advisories, CVEs, deprecations, versions, or best practices, and must not weaken CodeQL, Dependency Review, action pinning, branch protection, public-tunnel origin protections, admin-token controls, profile-token controls, or server authority.
+- profile ownership checks;
+- room authority;
+- WebSocket origin validation;
+- reconnect and heartbeat behaviour;
+- server-side settlement;
+- profile credential confidentiality; and
+- admin capability boundaries.
 
-## Multiplayer Regression Workflow
+`CASINO_ADMIN_TOKEN` is a secret. Do not place admin tokens or profile credentials in logs, URLs, public snapshots, rendered state, documentation examples containing real values, or broadcast protocol messages.
 
-When asked for a multiplayer regression pass, realtime flow review, public tunnel smoke assessment, room authority review, reconnect/reload check, or focused review of multiplayer behavior: inspect changed files and related protocol schemas, server authority, client realtime URL behavior, persistence boundaries, public tunnel scripts, and relevant tests when applicable. Map room lifecycle, host/join, seat claim, spectator, reconnect, heartbeat, WebSocket origin, public invite URL, profile ownership, admin permission, room snapshot, settlement, and persistence reconciliation risks to targeted checks, including unit tests and Playwright multiplayer or public tunnel smoke lanes where relevant.
+Public tunnels are trusted development/demo infrastructure, not production hosting. Do not weaken origin or authorization controls to make tunnel flows easier.
 
-## Architecture Cleanup Workflow
+For GitHub workflow changes, preserve the supply-chain controls documented in `docs/supply-chain-security.md`. External actions must remain pinned to full commit SHAs with the repository's request or the issue being addressed.
 
-When asked to split large files, fix source-file shape problems, reduce architecture-check failures, move modules between domain owners, or plan structural cleanup: inspect `docs/code-quality.md`, target files, imports, dependents, relevant tests, and architecture-check rules before proposing a split. Preserve behavior, direct imports, one module-scope top-level element per source file, domain ownership, circular-dependency safety, and game/multiplayer/state authority boundaries.
+Do not modify unrelated working-tree changes.
 
-## Pull Request Checklist
+Do not commit generated output such as:
 
-Before opening or updating a PR:
+- `dist/`;
+- `dist-server/`;
+- coverage output;
+- Playwright reports; or
+- test artifacts.
 
-- Read `CONTRIBUTING.md`.
-- Fill in every section of `.github/PULL_REQUEST_TEMPLATE.md`.
-- Select one PR type checkbox.
-- Check every required checkbox in the PR template.
-- Include a non-empty `Commands run` block in the Testing section.
-- Add the right `type:*` and `area:*` labels.
-- Link the issue being completed when applicable.
-- Run the relevant local checks and record the exact commands.
-- Confirm the pull request branch is up to date with the latest target branch, normally `main`, before marking the work complete.
-- Confirm the issue completion review loop has been run on the current PR head, including after any rebase or follow-up fix.
-- Confirm generated build output is not committed.
+Do not commit directly to `main`. Use a branch or worktree for implementation work.
 
-## Local Agent Skills
+Prefer complete fixes over artificially small diffs. If correctness requires coordinated code, tests, schemas, and documentation changes, update all affected surfaces.
 
-The repo-owned local skills previously hosted under `.agents/skills/` (and the `start-codex.sh` launcher) have been removed pending a redesign. Do not recreate them or reference them until the replacement setup lands; if older issues, pull requests, or docs point at those paths, treat the references as stale.
+Do not add speculative compatibility layers, abstractions, configuration, or dependencies without a concrete requirement.
 
-## Documentation Guidance
+Prefer existing repository patterns over introducing a second way to solve the same problem.
 
-- Keep agent-facing instructions in this file concise and operational.
-- Link to existing docs instead of duplicating long policy text.
-- Update this file when repository commands, checks, workflow gates, or agent expectations change.
+## Pull Requests And Issues
+
+When creating or updating GitHub issues or pull requests, follow `CONTRIBUTING.md`, `GOVERNANCE.md`, and the repository templates rather than duplicating their current rules here.
+
+Before presenting implementation work as complete:
+
+1. inspect the final diff;
+2. check for correctness, security, architecture, testing, and documentation regressions;
+3. run the checks appropriate to the changed surface;
+4. confirm no unrelated or generated files were included; and
+5. report what was changed, what was tested, and anything that remains uncertain.
+
+Never describe work as complete or ready merely because the code was written.
+
+## Keeping This File Useful
+
+Keep `AGENTS.md` short, stable, and repository-wide.
+
+Put detailed or frequently changing policy in the appropriate repository documentation and link to it from here.
+
+If one subsystem eventually needs substantial agent-specific guidance, add a nested `AGENTS.md` in that subsystem rather than expanding this root file indefinitely.
+
+<!-- BEGIN opencode-rag -->
+
+## Code Navigation
+
+Use OpenCodeRAG tools for code navigation when they provide useful context:
+
+- **Search first** — `search_semantic(query)` instead of grep/glob
+- **Skeleton before read** — `get_file_skeleton(filePath)` then read specific lines
+- **Usages before edit** — `find_usages(symbolName)` before modifying any symbol
+- **Images via describe** — `describe_image(filePath, systemPrompt?)` — never read raw bytes
+- **Recall quirks** — `recall_quirks(query)` when you hit a known pitfall
+- **Add quirks** — `add_quirk(content)` when you discover a non-obvious fact
+- **Fix quirks** — `update_quirk(id, ...)` / `delete_quirk(id)` when a stored quirk is outdated or wrong
+
+If no useful results are available, consider running `opencode-rag index`.
+
+### Decision tree — preferred order
+
+1. User mentions code behavior/architecture → `search_semantic(query)`
+2. User mentions a file path → `get_file_skeleton(filePath)` THEN `read` on specific lines
+3. User mentions a function/class/variable to edit → `find_usages(symbolName)` THEN `search_semantic` THEN `edit`
+4. User asks a code question → `search_semantic` to gather context before answering
+5. User asks about an image or visual asset → `describe_image(filePath)` (optionally pass `systemPrompt` to focus on specific features) to retrieve its generated description, then optionally `search_semantic` for related code
+6. You encounter an error or need to recall a known pitfall → `recall_quirks(query)`
+7. You discover a non-obvious fact or workaround → `add_quirk(content)` to persist it for future sessions
+8. A recalled quirk is outdated or wrong → `update_quirk(id, ...)` to fix it, or `delete_quirk(id)` if it no longer applies
+
+### Proactive triggers — prefer these tools when
+
+- User asks about code behavior, architecture, or implementation details
+- User asks to edit, refactor, or fix code — call `find_usages` first
+- User references files or functions you haven't read yet
+- User says "find", "search", "look up", "where is", "how does"
+- User refers to an image, screenshot, diagram, or visual asset
+- Before answering ANY code-related question, retrieve context first
+- Before reading ANY file, call `get_file_skeleton` to orient first
+
+### Anti-patterns — avoid these where practical
+
+- Reading full files without calling `get_file_skeleton` first (wastes tokens)
+- Editing a function without calling `find_usages` first (breaks call sites)
+- Answering code questions without calling `search_semantic` first (you guess at behavior)
+- Using `grep`/`glob` when `search_semantic` would find the answer faster
+- Treating image files as text — use `describe_image` instead of reading raw bytes
+- Using `npx opencode-rag quirk` shell commands instead of the built-in quirk tools (`add_quirk` / `recall_quirks` / `update_quirk` / `delete_quirk`) (the tools are faster, already loaded in-process, and go through the trust monitor)
+
+### Optional quirk capture rules — consider calling `add_quirk` when
+
+- A build, test, or type-check command fails and you resolve it
+- You discover an undocumented library constraint, peer dep, or workaround
+- You learn an environment-specific requirement (OS, tool version, etc.)
+- You make a design decision that future sessions should remember
+- You resolve a gotcha that cost more than one attempt
+
+### Optional quirk hygiene — use `update_quirk` or `delete_quirk` when
+
+- A stored quirk is outdated, wrong, or has been fixed — update it or delete it instead of adding a contradicting duplicate
+- Keep durable project knowledge in the project's supported memory store.
+<!-- END opencode-rag -->

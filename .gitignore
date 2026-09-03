@@ -9,5 +9,9 @@ tmp/
 .env
 .env.*
 .idea/
+.agents/
+.opencode/
+opencode-rag.json
+AGENTS.override.md
 .DS_Store
 *.log

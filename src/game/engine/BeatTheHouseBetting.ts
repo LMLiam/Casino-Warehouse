@@ -3,6 +3,7 @@ import type { HandId } from '../types/HandId';
 import type { BetType } from '../types/BetType';
 import { betTypeLabel } from './betTypeLabel';
 import { BeatTheHouseState } from './BeatTheHouseState';
+import { isSideBetWithinMainBet } from './isSideBetWithinMainBet';
 
 export abstract class BeatTheHouseBetting extends BeatTheHouseState {
   public placeDealerTip(handId: HandId, amount: number): GameSnapshot {
@@ -32,6 +33,13 @@ export abstract class BeatTheHouseBetting extends BeatTheHouseState {
 
     if (betType !== 'main' && this.bets[handId].main <= 0) {
       return this.emit([{ type: 'message', message: 'Side bets need a main bet on the same hand.' }], 'Side bets need a main bet on the same hand.');
+    }
+
+    if (betType !== 'main' && !isSideBetWithinMainBet(this.bets[handId].main, this.bets[handId][betType], amount)) {
+      return this.emit(
+        [{ type: 'message', message: 'Side bets cannot exceed the main bet on the same hand.' }],
+        'Side bets cannot exceed the main bet on the same hand.',
+      );
     }
 
     if (this.bankroll < amount) {
@@ -82,27 +90,29 @@ export abstract class BeatTheHouseBetting extends BeatTheHouseState {
   }
 
   public rebet(): GameSnapshot {
-    if (!this.lastBets) {
+    const savedBets = this.lastBets;
+    if (!savedBets || !BeatTheHouseState.hasValidSideBetCaps(savedBets)) {
       return this.emit([{ type: 'message', message: 'No previous bet saved.' }], 'No previous bet saved.');
     }
 
-    const requiredBankroll = BeatTheHouseState.totalBet(this.lastBets);
+    const requiredBankroll = BeatTheHouseState.totalBet(savedBets);
     if (this.bankroll < requiredBankroll) {
       return this.emit([{ type: 'message', message: `Need £${requiredBankroll} to rebet.` }], `Need £${requiredBankroll} to rebet.`);
     }
 
     this.clearBets();
-    this.bets = BeatTheHouseState.cloneBets(this.lastBets);
+    this.bets = BeatTheHouseState.cloneBets(savedBets);
     this.debitBankroll(requiredBankroll);
     return this.emit([{ type: 'message', message: `Rebet £${requiredBankroll} placed.` }], `Rebet £${requiredBankroll} placed. Press deal.`);
   }
 
   public rebetHand(handId: HandId): GameSnapshot {
-    if (!this.lastBets) {
+    const savedBets = this.lastBets;
+    if (!savedBets || !BeatTheHouseState.hasValidSideBetCaps(savedBets)) {
       return this.emit([{ type: 'message', message: 'No previous bet saved.' }], 'No previous bet saved.');
     }
 
-    const requiredBankroll = BeatTheHouseState.handStake(this.lastBets, handId);
+    const requiredBankroll = BeatTheHouseState.handStake(savedBets, handId);
     if (requiredBankroll <= 0) {
       return this.emit([{ type: 'message', message: 'No previous bet saved for this seat.' }], 'No previous bet saved for this seat.');
     }
@@ -112,22 +122,28 @@ export abstract class BeatTheHouseBetting extends BeatTheHouseState {
     }
 
     this.clearHandBets(handId);
-    this.bets[handId] = { ...this.lastBets[handId] };
+    this.bets[handId] = { ...savedBets[handId] };
     this.debitBankroll(requiredBankroll);
     return this.emit([{ type: 'message', message: `Rebet £${requiredBankroll} placed.` }], `Rebet £${requiredBankroll} placed. Press deal.`);
   }
 
   protected canRebet(): boolean {
+    const savedBets = this.lastBets;
     return (
       this.phase === 'betting' &&
-      Boolean(this.lastBets) &&
+      Boolean(savedBets) &&
+      BeatTheHouseState.hasValidSideBetCaps(savedBets ?? BeatTheHouseState.emptyBets()) &&
       BeatTheHouseState.totalBet(this.bets) === 0 &&
       BeatTheHouseState.totalDealerTips(this.dealerTips) === 0 &&
-      BeatTheHouseState.totalBet(this.lastBets ?? BeatTheHouseState.emptyBets()) <= this.bankroll
+      BeatTheHouseState.totalBet(savedBets ?? BeatTheHouseState.emptyBets()) <= this.bankroll
     );
   }
 
   protected rebetAmounts(): Record<HandId, number> {
-    return BeatTheHouseState.handRecord((handId) => (this.lastBets ? BeatTheHouseState.handStake(this.lastBets, handId) : 0));
+    const savedBets = this.lastBets;
+    if (!savedBets || !BeatTheHouseState.hasValidSideBetCaps(savedBets)) {
+      return BeatTheHouseState.handRecord(() => 0);
+    }
+    return BeatTheHouseState.handRecord((handId) => BeatTheHouseState.handStake(savedBets, handId));
   }
 }

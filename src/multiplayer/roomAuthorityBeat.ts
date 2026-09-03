@@ -1,6 +1,7 @@
 import { canRoomFlowTransition } from '../state/roomMachines/canRoomFlowTransition';
 import type { BetType } from '../game/types/BetType';
 import { betTypes } from '../game/types/betTypes';
+import { isSideBetWithinMainBet } from '../game/engine/isSideBetWithinMainBet';
 import type { GameSnapshot } from '../game/types/GameSnapshot';
 import type { HandId } from '../game/types/HandId';
 import { handIds } from '../game/types/handIds';
@@ -31,12 +32,15 @@ export abstract class RoomAuthorityBeat extends RoomAuthoritySlots {
     if (!player || player.bankroll < amount) {
       return this.error('Insufficient profile bankroll for that wager.');
     }
-    this.syncBeatBankroll(room);
     const before = room.model.game.snapshot();
-    const beforeAmount = before.bets[seatId][betType];
     if (betType !== 'main' && before.bets[seatId].main <= 0) {
       return this.error('Side bets need a main bet on the same hand.');
     }
+    if (betType !== 'main' && !isSideBetWithinMainBet(before.bets[seatId].main, before.bets[seatId][betType], amount)) {
+      return this.error('Side bets cannot exceed the main bet on the same hand.');
+    }
+    this.syncBeatBankroll(room);
+    const beforeAmount = room.model.game.snapshot().bets[seatId][betType];
     const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.placeBet(seatId, betType, amount));
     const debited = room.model.game.snapshot().bets[seatId][betType] - beforeAmount;
     if (debited > 0) {
@@ -118,7 +122,6 @@ export abstract class RoomAuthorityBeat extends RoomAuthoritySlots {
     if (!seatId) {
       return this.error('Claim a Beat the House seat before rebetting.');
     }
-    this.syncBeatBankroll(room);
     const before = room.model.game.snapshot();
     if (before.phase !== 'betting') {
       return this.error('Rebet is only available before the round starts.');
@@ -137,9 +140,11 @@ export abstract class RoomAuthorityBeat extends RoomAuthoritySlots {
     if (!player || player.bankroll < wager) {
       return this.error(`Need £${wager} to rebet.`);
     }
+    this.syncBeatBankroll(room);
+    const syncedBefore = room.model.game.snapshot();
     const result = this.ownerAction(room, () => room.model.kind === 'beat-the-house' && room.model.game.rebetHand(seatId));
     const after = room.model.game.snapshot();
-    const debited = totalBeatStake(after, seatId) - totalBeatStake(before, seatId);
+    const debited = totalBeatStake(after, seatId) - totalBeatStake(syncedBefore, seatId);
     if (debited > 0) {
       this.setPlayerBankroll(room, profileId, player.bankroll - debited);
     }

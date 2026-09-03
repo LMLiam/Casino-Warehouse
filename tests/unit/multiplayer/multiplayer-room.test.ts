@@ -324,6 +324,32 @@ describe('per-game room authority', () => {
     expect(beat(recreated).bankroll).toBe(0);
   });
 
+  it('rejects cumulative side wagers without changing profile bankroll, readiness, or room state', () => {
+    const authority = new RoomAuthority();
+    const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 1000))).roomId;
+    authority.handle('b', join('beat-the-house', roomId, 'bob', 1000));
+    authority.handle('a', claimSeat('left'));
+    authority.handle('b', claimSeat('centre'));
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 5 });
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'aceFlash', amount: 5 });
+    const ready = requireBroadcast(authority.handle('a', { type: 'start-round' }));
+    const before = requireDirect(authority.handle('a', { type: 'resync' }));
+
+    expect(ready.beat?.readyProfileIds).toEqual([testProfileId('alice')]);
+    const rejected = authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'aceFlash', amount: 1 });
+
+    expect(rejected.error).toBe('Side bets cannot exceed the main bet on the same hand.');
+    expect(rejected.broadcasts).toEqual([]);
+    expect(rejected.settlements).toEqual([]);
+    const after = requireDirect(authority.handle('a', { type: 'resync' }));
+    expect(beat(after).bets).toEqual(beat(before).bets);
+    expect(beat(after).bankroll).toBe(beat(before).bankroll);
+    expect(after.beat?.readyProfileIds).toEqual(before.beat?.readyProfileIds);
+    expect(after.players.find((player) => player.profileId === testProfileId('alice'))?.bankroll).toBe(
+      before.players.find((player) => player.profileId === testProfileId('alice'))?.bankroll,
+    );
+  });
+
   it('rejects racing seat claims and duplicate/stale Beat the House settlement attempts', () => {
     const authority = new RoomAuthority();
     const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 500))).roomId;
@@ -922,6 +948,42 @@ describe('per-game room authority', () => {
     const afterBobError = requireDirect(authority.handle('a', { type: 'resync' }));
     expect(beat(afterBobError).bets.left.main).toBe(25);
     expect(beat(afterBobError).bets.right.main).toBe(0);
+  });
+
+  it('does not advertise or execute an invalid saved side-bet rebet', () => {
+    const authority = new RoomAuthority();
+    const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 1000))).roomId;
+    authority.handle('a', claimSeat('left'));
+    const roomState = roomStateForTest(authority, roomId);
+    if (roomState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House room.');
+    }
+    const saved = roomState.model.game.saveState();
+    roomState.model.game.restoreState({
+      ...saved,
+      lastBets: {
+        ...saved.bets,
+        left: { ...saved.bets.left, main: 5, aceFlash: 6 },
+      },
+    });
+    roomState.lastBeatBetOwners = { left: testProfileId('alice') };
+    roomState.model.readyPhase = 'betting';
+    roomState.model.readyProfileIds.add(testProfileId('alice'));
+    const before = requireDirect(authority.handle('a', { type: 'resync' }));
+
+    expect(before.beat?.rebetSeatIds).toEqual([]);
+    const rejected = authority.handle('a', { type: 'rebet' });
+
+    expect(rejected.error).toBe('No previous bet saved for your seat.');
+    expect(rejected.broadcasts).toEqual([]);
+    expect(rejected.settlements).toEqual([]);
+    const after = requireDirect(authority.handle('a', { type: 'resync' }));
+    expect(beat(after).bets).toEqual(beat(before).bets);
+    expect(beat(after).bankroll).toBe(beat(before).bankroll);
+    expect(after.beat?.readyProfileIds).toEqual(before.beat?.readyProfileIds);
+    expect(after.players.find((player) => player.profileId === testProfileId('alice'))?.bankroll).toBe(
+      before.players.find((player) => player.profileId === testProfileId('alice'))?.bankroll,
+    );
   });
 
   it('covers Blackjack action branches, settlement, and reset behaviour', () => {
