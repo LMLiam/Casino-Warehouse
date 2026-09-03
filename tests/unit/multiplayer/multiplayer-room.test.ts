@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mainBeatRoomId, RoomAuthority as ProductionRoomAuthority } from '../../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
-import type { Card } from '../../../src/game/cards/Card';
-import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
 import { encodeMessage } from '../../../src/multiplayer/protocol/encodeMessage';
 import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
@@ -15,6 +13,7 @@ import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { BlackjackTableSnapshot } from '../../../src/game/blackjackTable/BlackjackTableSnapshot';
 import type { SlotSnapshot } from '../../../src/game/slots/SlotSnapshot';
+import { createDeterministicBeatTheHouseShoe } from '../game/createDeterministicBeatTheHouseShoe';
 import { testConnectionId, testProfileId, testRoomId, testRoomSeatId } from '../schemas/testIds';
 
 class RoomAuthority extends ProductionRoomAuthority {
@@ -89,15 +88,15 @@ const rigImmediateBeatRound = (authority: RoomAuthority, roomId: string): void =
   if (roomState.model.kind !== 'beat-the-house') {
     throw new Error('Expected a Beat the House test room.');
   }
-  const originalDeal = roomState.model.game.deal.bind(roomState.model.game);
-  vi.spyOn(roomState.model.game, 'deal').mockImplementation(() =>
-    originalDeal(
-      rigDeck([
+  roomState.model.game.restoreState({
+    ...roomState.model.game.saveState(),
+    shoe: createDeterministicBeatTheHouseShoe({
+      dealOrder: [
         { rank: 'A', suit: 'spades' },
         { rank: 'K', suit: 'hearts' },
-      ] satisfies Card[]),
-    ),
-  );
+      ],
+    }).saveState(),
+  });
 };
 
 describe('per-game multiplayer protocol', () => {
@@ -244,6 +243,12 @@ describe('per-game room authority', () => {
     expect(seated.seats.find((seat) => seat.seatId === 'left')?.profileId).toBe('alice');
 
     authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    authority.handle('a', { type: 'start-round' });
+    const consumedState = roomStateForTest(authority, mainBeatRoomId);
+    if (consumedState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House main room.');
+    }
+    expect(consumedState.model.game.saveState().shoe.remainingCards.length).toBeLessThan(312);
     const afterLeave = requireBroadcast(authority.handle('a', { type: 'leave-room' }));
 
     expect(afterLeave.roomId).toBe(mainBeatRoomId);
@@ -252,6 +257,12 @@ describe('per-game room authority', () => {
     expect(afterLeave.status).toBe('waiting');
     expect(afterLeave.seats.every((seat) => !seat.profileId)).toBe(true);
     expect(beat(afterLeave).bets.left.main).toBe(0);
+    const resetState = roomStateForTest(authority, mainBeatRoomId);
+    if (resetState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House main room.');
+    }
+    expect(resetState.model.game.saveState().shoe.remainingCards).toHaveLength(312);
+    expect(resetState.model.game.saveState().shoe.shufflePending).toBe(false);
     expect(authority.listRooms('beat-the-house').map((room) => room.roomId)).toContain(mainBeatRoomId);
 
     authority.handle('b', join('beat-the-house', mainBeatRoomId, 'bob', 500));
@@ -293,7 +304,12 @@ describe('per-game room authority', () => {
 
     expect(room.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(467);
     expect(beat(room).bankroll).toBe(467);
-    expect(Object.keys(beat(room))).not.toContain('deck');
+    expect(beat(room).shoe).toEqual({ cardsRemaining: 312, cardsDealt: 0, totalCards: 312, cutCardReached: false });
+    expect(Object.keys(beat(room).dealer)).not.toContain('holeCard');
+    expect(JSON.stringify(room)).not.toContain('remainingCards');
+    expect(JSON.stringify(room)).not.toContain('deck');
+    expect(JSON.stringify(room)).not.toContain('cutThresholdCardsDealt');
+    expect(JSON.stringify(room)).not.toContain('shufflePending');
 
     const wagered = requireBroadcast(authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 }));
     expect(wagered.players.find((player) => player.profileId === 'alice')?.bankroll).toBe(442);
@@ -639,6 +655,30 @@ describe('per-game room authority', () => {
     expect(requireBroadcast(authority.handle('host', { type: 'leave-room' })).status).toBe('waiting');
   });
 
+  it('creates a fresh Beat the House shoe on a host room reset', () => {
+    const authority = new RoomAuthority();
+    const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 500))).roomId;
+    authority.handle('a', claimSeat('left'));
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
+    authority.handle('a', { type: 'start-round' });
+
+    const consumedState = roomStateForTest(authority, roomId);
+    if (consumedState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House room.');
+    }
+    expect(consumedState.model.game.saveState().shoe.remainingCards.length).toBeLessThan(312);
+
+    const reset = requireBroadcast(authority.handle('a', { type: 'admin-debug', action: 'reset-room' }));
+    const resetState = roomStateForTest(authority, roomId);
+    if (resetState.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House room.');
+    }
+    expect(reset.phase).toBe('betting');
+    expect(beat(reset).shoe).toEqual({ cardsRemaining: 312, cardsDealt: 0, totalCards: 312, cutCardReached: false });
+    expect(resetState.model.game.saveState().shoe.remainingCards).toHaveLength(312);
+    expect(resetState.model.game.saveState().shoe.shufflePending).toBe(false);
+  });
+
   it('covers Beat the House clear, rebet, turn, next-round, and wrong-game action branches', () => {
     const authority = new RoomAuthority();
     authority.handle('a', create('beat-the-house', 'alice', 500));
@@ -732,15 +772,15 @@ describe('per-game room authority', () => {
     if (roomState.model.kind !== 'beat-the-house') {
       throw new Error('Expected a Beat the House test room.');
     }
-    const originalDeal = roomState.model.game.deal.bind(roomState.model.game);
-    vi.spyOn(roomState.model.game, 'deal').mockImplementation(() =>
-      originalDeal(
-        rigDeck([
+    roomState.model.game.restoreState({
+      ...roomState.model.game.saveState(),
+      shoe: createDeterministicBeatTheHouseShoe({
+        dealOrder: [
           { rank: 'A', suit: 'spades' },
           { rank: 'K', suit: 'hearts' },
-        ] satisfies Card[]),
-      ),
-    );
+        ],
+      }).saveState(),
+    });
 
     const started = authority.handle('a', { type: 'start-round' });
 
@@ -794,13 +834,17 @@ describe('per-game room authority', () => {
     if (beatState.model.kind !== 'beat-the-house') {
       throw new Error('Expected a Beat the House test room.');
     }
-    const deterministicRound = beatState.model.game.deal(
-      rigDeck([
-        { rank: '7', suit: 'spades' },
-        { rank: '9', suit: 'hearts' },
-        { rank: 'K', suit: 'clubs' },
-      ] satisfies Card[]),
-    );
+    beatState.model.game.restoreState({
+      ...beatState.model.game.saveState(),
+      shoe: createDeterministicBeatTheHouseShoe({
+        dealOrder: [
+          { rank: '7', suit: 'spades' },
+          { rank: '9', suit: 'hearts' },
+          { rank: 'K', suit: 'clubs' },
+        ],
+      }).saveState(),
+    });
+    const deterministicRound = beatState.model.game.deal();
     expect(deterministicRound.activeHand).toBe('left');
     expect(authority.handle('beat-watch', { type: 'player-action', action: 'hit' }).error).toBe('Spectators cannot act.');
     expect(requireBroadcast(authority.handle('beat-host', { type: 'player-action', action: 'hit' })).gameId).toBe('beat-the-house');

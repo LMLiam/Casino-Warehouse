@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { beatTheHouseRules } from '../../../src/game/beatTheHouse/beatTheHouseRules';
 import type { Card } from '../../../src/game/cards/Card';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import type { BetType } from '../../../src/game/types/BetType';
@@ -53,8 +54,10 @@ const JACK_VALUE = 11;
 const QUEEN_VALUE = 12;
 const KING_VALUE = 13;
 const ACE_VALUE = 14;
-const SINGLE_DECK_RANK_COUNT = 4;
-const ACE_COLOR_COUNT = 2;
+const CARDS_PER_RANK_PER_DECK = 4;
+const ACES_PER_COLOUR_PER_DECK = 2;
+const SIX_DECK_RANK_COUNT = CARDS_PER_RANK_PER_DECK * beatTheHouseRules.deckCount;
+const SIX_DECK_ACE_COLOR_COUNT = ACES_PER_COLOUR_PER_DECK * beatTheHouseRules.deckCount;
 const MAX_PLAYER_CARDS = 4;
 const MAX_DEALER_CARDS = 4;
 const MAIN_STAKE = 1;
@@ -103,20 +106,20 @@ const rankValues: Record<Card['rank'], number> = {
   A: ACE_VALUE,
 };
 const cardKinds = [
-  { label: '2', rank: '2', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: TWO_VALUE, blackAce: false },
-  { label: '3', rank: '3', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: THREE_VALUE, blackAce: false },
-  { label: '4', rank: '4', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: FOUR_VALUE, blackAce: false },
-  { label: '5', rank: '5', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: FIVE_VALUE, blackAce: false },
-  { label: '6', rank: '6', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: SIX_VALUE, blackAce: false },
-  { label: '7', rank: '7', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: SEVEN_VALUE, blackAce: false },
-  { label: '8', rank: '8', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: EIGHT_VALUE, blackAce: false },
-  { label: '9', rank: '9', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: NINE_VALUE, blackAce: false },
-  { label: '10', rank: '10', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: TEN_VALUE, blackAce: false },
-  { label: 'J', rank: 'J', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: JACK_VALUE, blackAce: false },
-  { label: 'Q', rank: 'Q', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: QUEEN_VALUE, blackAce: false },
-  { label: 'K', rank: 'K', suit: 'clubs', count: SINGLE_DECK_RANK_COUNT, value: KING_VALUE, blackAce: false },
-  { label: 'black A', rank: 'A', suit: 'spades', count: ACE_COLOR_COUNT, value: ACE_VALUE, blackAce: true },
-  { label: 'red A', rank: 'A', suit: 'hearts', count: ACE_COLOR_COUNT, value: ACE_VALUE, blackAce: false },
+  { label: '2', rank: '2', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: TWO_VALUE, blackAce: false },
+  { label: '3', rank: '3', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: THREE_VALUE, blackAce: false },
+  { label: '4', rank: '4', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: FOUR_VALUE, blackAce: false },
+  { label: '5', rank: '5', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: FIVE_VALUE, blackAce: false },
+  { label: '6', rank: '6', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: SIX_VALUE, blackAce: false },
+  { label: '7', rank: '7', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: SEVEN_VALUE, blackAce: false },
+  { label: '8', rank: '8', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: EIGHT_VALUE, blackAce: false },
+  { label: '9', rank: '9', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: NINE_VALUE, blackAce: false },
+  { label: '10', rank: '10', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: TEN_VALUE, blackAce: false },
+  { label: 'J', rank: 'J', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: JACK_VALUE, blackAce: false },
+  { label: 'Q', rank: 'Q', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: QUEEN_VALUE, blackAce: false },
+  { label: 'K', rank: 'K', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: KING_VALUE, blackAce: false },
+  { label: 'black A', rank: 'A', suit: 'spades', count: SIX_DECK_ACE_COLOR_COUNT, value: ACE_VALUE, blackAce: true },
+  { label: 'red A', rank: 'A', suit: 'hearts', count: SIX_DECK_ACE_COLOR_COUNT, value: ACE_VALUE, blackAce: false },
 ] as const satisfies readonly CardKind[];
 const initialCounts = cardKinds.map((kind) => kind.count);
 
@@ -133,27 +136,28 @@ const mainOnlyStrategy = { oneCardHitThrough: JACK_VALUE, twoCardHitThrough: JAC
 const matchPushStrategy = { oneCardHitThrough: TEN_VALUE, twoCardHitThrough: TEN_VALUE, threeCardHitThrough: TEN_VALUE } as const;
 
 // The per-round standard deviations are conservative envelopes for the fixed simulation scope.
+// Expected returns are exact six-deck values for the fixed strategy and current engine payouts.
 const wagerProfiles = [
-  profile('main-only', [], 0.990790126, 0.990790126, 1.5, mainOnlyStrategy),
-  profile('aceFlash', ['aceFlash'], 1.858814259, 0.92940713, 5.0, mainOnlyStrategy),
-  profile('dealerBust', ['dealerBust'], 1.85796161, 0.928980805, 3.0, mainOnlyStrategy),
-  profile('aceFlash+dealerBust', ['aceFlash', 'dealerBust'], 2.725985743, 0.908661914, 6.0, mainOnlyStrategy),
-  profile('matchPush', ['matchPush'], 1.883905586, 0.941952793, 4.0, matchPushStrategy),
-  profile('aceFlash+matchPush', ['aceFlash', 'matchPush'], 2.751929718, 0.917309906, 6.0, matchPushStrategy),
-  profile('dealerBust+matchPush', ['dealerBust', 'matchPush'], 2.75107707, 0.91702569, 5.0, matchPushStrategy),
-  profile('aceFlash+dealerBust+matchPush', ['aceFlash', 'dealerBust', 'matchPush'], 3.619101202, 0.904775301, 7.0, matchPushStrategy),
-  profile('dealerSevens', ['dealerSevens'], 1.881747124, 0.940873562, 20.0, mainOnlyStrategy),
-  profile('aceFlash+dealerSevens', ['aceFlash', 'dealerSevens'], 2.749771257, 0.916590419, 20.0, mainOnlyStrategy),
-  profile('dealerBust+dealerSevens', ['dealerBust', 'dealerSevens'], 2.748918608, 0.916306203, 20.0, mainOnlyStrategy),
-  profile('aceFlash+dealerBust+dealerSevens', ['aceFlash', 'dealerBust', 'dealerSevens'], 3.616942741, 0.904235685, 20.0, mainOnlyStrategy),
-  profile('matchPush+dealerSevens', ['matchPush', 'dealerSevens'], 2.774862584, 0.924954195, 20.0, matchPushStrategy),
-  profile('aceFlash+matchPush+dealerSevens', ['aceFlash', 'matchPush', 'dealerSevens'], 3.642886716, 0.910721679, 20.0, matchPushStrategy),
-  profile('dealerBust+matchPush+dealerSevens', ['dealerBust', 'matchPush', 'dealerSevens'], 3.642034068, 0.910508517, 20.0, matchPushStrategy),
+  profile('main-only', [], 0.976099349, 0.976099349, 1.5, mainOnlyStrategy),
+  profile('aceFlash', ['aceFlash'], 1.861704098, 0.930852049, 5.0, mainOnlyStrategy),
+  profile('dealerBust', ['dealerBust'], 1.834417295, 0.917208648, 3.0, mainOnlyStrategy),
+  profile('aceFlash+dealerBust', ['aceFlash', 'dealerBust'], 2.720022044, 0.906674015, 6.0, mainOnlyStrategy),
+  profile('matchPush', ['matchPush'], 2.063005562, 1.031502781, 4.0, matchPushStrategy),
+  profile('aceFlash+matchPush', ['aceFlash', 'matchPush'], 2.948610311, 0.982870104, 6.0, matchPushStrategy),
+  profile('dealerBust+matchPush', ['dealerBust', 'matchPush'], 2.921323508, 0.973774503, 5.0, matchPushStrategy),
+  profile('aceFlash+dealerBust+matchPush', ['aceFlash', 'dealerBust', 'matchPush'], 3.806928257, 0.951732064, 7.0, matchPushStrategy),
+  profile('dealerSevens', ['dealerSevens'], 2.003985852, 1.001992926, 20.0, mainOnlyStrategy),
+  profile('aceFlash+dealerSevens', ['aceFlash', 'dealerSevens'], 2.8895906, 0.963196867, 20.0, mainOnlyStrategy),
+  profile('dealerBust+dealerSevens', ['dealerBust', 'dealerSevens'], 2.862303797, 0.954101266, 20.0, mainOnlyStrategy),
+  profile('aceFlash+dealerBust+dealerSevens', ['aceFlash', 'dealerBust', 'dealerSevens'], 3.747908546, 0.936977137, 20.0, mainOnlyStrategy),
+  profile('matchPush+dealerSevens', ['matchPush', 'dealerSevens'], 3.090892065, 1.030297355, 20.0, matchPushStrategy),
+  profile('aceFlash+matchPush+dealerSevens', ['aceFlash', 'matchPush', 'dealerSevens'], 3.976496814, 0.994124203, 20.0, matchPushStrategy),
+  profile('dealerBust+matchPush+dealerSevens', ['dealerBust', 'matchPush', 'dealerSevens'], 3.949210011, 0.987302503, 20.0, matchPushStrategy),
   profile(
     'aceFlash+dealerBust+matchPush+dealerSevens',
     ['aceFlash', 'dealerBust', 'matchPush', 'dealerSevens'],
-    4.5100582,
-    0.90201164,
+    4.83481476,
+    0.966962952,
     20.0,
     matchPushStrategy,
   ),

@@ -119,7 +119,7 @@ export abstract class PixiTableDrawing extends PixiTableSettlement {
   }
 
   protected drawDealer(snapshot: GameSnapshot): void {
-    if (!snapshot.dealer.holeRevealed && snapshot.dealer.holeCard) {
+    if (!snapshot.dealer.holeRevealed && snapshot.phase !== 'betting') {
       const dealerHolePoint = dealerSlots[0];
       if (!dealerHolePoint) {
         return;

@@ -18,7 +18,6 @@ export const roundStartAnimationKey = (snapshot: GameSnapshot): string => {
       snapshot.hands[hand.id].done,
     ]),
     dealer: {
-      holeCard: snapshot.dealer.holeCard ? cardSignature(snapshot.dealer.holeCard) : '',
       cards: snapshot.dealer.cards.map(cardSignature),
       holeRevealed: snapshot.dealer.holeRevealed,
     },

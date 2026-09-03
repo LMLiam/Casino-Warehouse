@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
-import { cardSchema } from './cardSchema';
 import { betTypeSchema } from './betTypeSchema';
+import { cardSchema } from './cardSchema';
 import { gameEventTypeSchema } from './gameEventTypeSchema';
 import { finiteNumberSchema } from './finiteNumberSchema';
 import { handIdSchema } from './handIdSchema';
@@ -9,6 +9,7 @@ import { handResultSchema } from './handResultSchema';
 import { phaseSchema } from './phaseSchema';
 import { sideBetStateSchema } from './sideBetStateSchema';
 import { sideBetTypeSchema } from './sideBetTypeSchema';
+import { beatTheHouseShoeSnapshotSchema } from './beatTheHouseShoeSnapshotSchema';
 
 export const gameSnapshotSchema = (() => {
   const bets = z.record(handIdSchema, z.record(betTypeSchema, finiteNumberSchema));
@@ -37,7 +38,6 @@ export const gameSnapshotSchema = (() => {
   const dealerHand = z
     .object({
       cards: z.array(cardSchema),
-      holeCard: cardSchema.optional(),
       holeRevealed: z.boolean(),
       bust: z.boolean(),
       blackAce: z.boolean(),
@@ -70,6 +70,7 @@ export const gameSnapshotSchema = (() => {
       activeHand: handIdSchema.optional(),
       hands: z.record(handIdSchema, playerHand),
       dealer: dealerHand,
+      shoe: beatTheHouseShoeSnapshotSchema,
       sideStates: z.record(handIdSchema, z.record(sideBetTypeSchema, sideBetStateSchema)),
       summaries: z.array(roundSummary),
       lastEvents: z.array(gameEvent),

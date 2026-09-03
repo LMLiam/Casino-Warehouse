@@ -1,6 +1,4 @@
-import type { Card } from '../cards/Card';
 import { cardLabel } from '../cards/cardLabel';
-import { createDeck } from '../cards/createDeck';
 import { isBlackAce } from '../cards/isBlackAce';
 import { rankValue } from '../cards/rankValue';
 import type { GameEvent } from '../types/GameEvent';
@@ -11,7 +9,7 @@ import { BeatTheHouseBetting } from './BeatTheHouseBetting';
 import { BeatTheHouseState } from './BeatTheHouseState';
 
 export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
-  public deal(deckOverride?: Card[]): GameSnapshot {
+  public deal(): GameSnapshot {
     if (this.phase !== 'betting') {
       return this.snapshot();
     }
@@ -26,21 +24,22 @@ export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
       return this.emit([{ type: 'message', message: 'Side bets need a main bet on the same hand.' }], 'Side bets need a main bet on the same hand.');
     }
 
+    const shoeEvents = this.prepareShoeForDeal();
     this.phase = 'dealing';
     this.lastBets = BeatTheHouseState.cloneBets(this.bets);
     this.dealerTipRewards = BeatTheHouseState.emptyDealerTips();
-    this.deck = deckOverride ? [...deckOverride] : createDeck(this.rng);
     this.hands = BeatTheHouseState.emptyHands();
     this.dealer = { cards: [], holeRevealed: false, bust: false, blackAce: false };
     this.sideStates = BeatTheHouseState.emptySideStates();
     this.summaries = [];
 
     const events: GameEvent[] = [
+      ...shoeEvents,
       ...handIds.flatMap((handId): GameEvent[] => (this.dealerTips[handId] > 0 ? [{ type: 'dealer-tip-taken', handId, amount: this.dealerTips[handId] }] : [])),
       { type: 'round-started', message: 'Round started.' },
     ];
     for (const handId of active) {
-      const card = this.draw();
+      const card = this.draw(events);
       const current = this.hands[handId];
       const nextHand = { ...current, cards: [card], finalCard: card };
 
@@ -67,7 +66,7 @@ export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
       }
     }
 
-    this.dealer = { ...this.dealer, holeCard: this.draw(), holeRevealed: false };
+    this.dealer = { ...this.dealer, holeCard: this.draw(events), holeRevealed: false };
     events.push({ type: 'dealer-hole', message: 'Dealer receives one face-down card.' });
     this.activeHand = BeatTheHouseState.nextPlayableHand(this.bets, this.hands);
 
@@ -94,9 +93,10 @@ export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
 
     const handId = this.activeHand;
     const hand = this.hands[handId];
-    const card = this.draw();
+    const events: GameEvent[] = [];
+    const card = this.draw(events);
     const cards = [...hand.cards, card];
-    const events: GameEvent[] = [{ type: 'player-card', handId, card, cardIndex: cards.length - 1 }];
+    events.push({ type: 'player-card', handId, card, cardIndex: cards.length - 1 });
 
     if (card.rank === '2') {
       this.hands[handId] = { ...hand, cards, done: true, result: 'lose', finalCard: undefined };
@@ -169,7 +169,7 @@ export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
     this.phase = 'dealer';
     this.activeHand = undefined;
     const events = [...previousEvents];
-    const firstCard = this.dealer.holeCard ?? this.draw();
+    const firstCard = this.dealer.holeCard ?? this.draw(events);
     this.dealer = { ...this.dealer, cards: [firstCard], holeCard: undefined, holeRevealed: true, finalCard: firstCard };
     events.push({ type: 'dealer-card', card: firstCard, cardIndex: 0, message: `Dealer reveals ${cardLabel(firstCard)}.` });
 
@@ -190,7 +190,7 @@ export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
       rankValue(this.dealer.finalCard.rank) <= BeatTheHouseState.dealerDrawMaxRank &&
       this.dealer.cards.length < BeatTheHouseState.maxDealerCards
     ) {
-      const card = this.draw();
+      const card = this.draw(events);
       const cards = [...this.dealer.cards, card];
       this.dealer = { ...this.dealer, cards, finalCard: card };
       events.push({ type: 'dealer-card', card, cardIndex: cards.length - 1, message: `Dealer hits ${cardLabel(card)}.` });

@@ -4,6 +4,7 @@ import { beatTheHouseRules } from '../../../src/game/beatTheHouse/beatTheHouseRu
 import { BeatTheHouseShoe } from '../../../src/game/beatTheHouse/shoe/BeatTheHouseShoe';
 import type { BeatTheHouseShoeSaveState } from '../../../src/game/beatTheHouse/shoe/BeatTheHouseShoeSaveState';
 import { createBeatTheHouseShoe } from '../../../src/game/beatTheHouse/shoe/createBeatTheHouseShoe';
+import { createDeterministicBeatTheHouseShoe } from './createDeterministicBeatTheHouseShoe';
 
 const card = (rank: Card['rank'], suit: Card['suit']): Card => ({ rank, suit });
 const firstCard = card('A', 'spades');
@@ -45,28 +46,21 @@ describe('Beat the House six-deck shoe', () => {
   });
 
   it('draws in pop order, keeps drawing after the cut, and rejects exhaustion', () => {
-    const shoe = new BeatTheHouseShoe({
-      remainingCards: [firstCard, secondCard, thirdCard],
-      totalCards: 3,
-      cutThresholdCardsDealt: 2,
-      shufflePending: false,
-    });
+    const shoe = createDeterministicBeatTheHouseShoe({ dealOrder: [thirdCard, secondCard, firstCard], cardsDealt: 217, cutThresholdCardsDealt: 219 });
 
     expect(shoe.draw()).toEqual(thirdCard);
-    expect(shoe.snapshot()).toEqual({ cardsRemaining: 2, cardsDealt: 1, totalCards: 3, cutCardReached: false });
+    expect(shoe.snapshot()).toEqual({ cardsRemaining: 94, cardsDealt: 218, totalCards: 312, cutCardReached: false });
     expect(shoe.draw()).toEqual(secondCard);
     expect(shoe.snapshot().cutCardReached).toBe(true);
     expect(shoe.draw()).toEqual(firstCard);
+    while (shoe.snapshot().cardsRemaining > 0) {
+      shoe.draw();
+    }
     expect(() => shoe.draw()).toThrow('shoe exhausted');
   });
 
   it('restores the exact next card without consuming randomness', () => {
-    const shoe = new BeatTheHouseShoe({
-      remainingCards: [firstCard, secondCard, thirdCard],
-      totalCards: 3,
-      cutThresholdCardsDealt: 2,
-      shufflePending: false,
-    });
+    const shoe = createDeterministicBeatTheHouseShoe({ dealOrder: [thirdCard, secondCard, firstCard], cardsDealt: 217, cutThresholdCardsDealt: 219 });
     shoe.draw();
     const saved = shoe.saveState();
     const restored = BeatTheHouseShoe.fromSaveState(saved);
@@ -77,30 +71,26 @@ describe('Beat the House six-deck shoe', () => {
   });
 
   it('keeps private threshold and card order out of the public snapshot', () => {
-    const shoe = new BeatTheHouseShoe({
-      remainingCards: [firstCard, secondCard],
-      totalCards: 2,
-      cutThresholdCardsDealt: 1,
-      shufflePending: false,
-    });
+    const shoe = createDeterministicBeatTheHouseShoe({ dealOrder: [firstCard, secondCard], cardsDealt: 217, cutThresholdCardsDealt: 219 });
 
-    expect(shoe.snapshot()).toEqual({ cardsRemaining: 2, cardsDealt: 0, totalCards: 2, cutCardReached: false });
+    expect(shoe.snapshot()).toEqual({ cardsRemaining: 95, cardsDealt: 217, totalCards: 312, cutCardReached: false });
     expect(Object.keys(shoe.snapshot())).not.toEqual(expect.arrayContaining(['remainingCards', 'cutThresholdCardsDealt', 'shufflePending']));
   });
 
   it('rejects malformed, inconsistent, and over-represented save state', () => {
-    const valid: BeatTheHouseShoeSaveState = {
-      remainingCards: [firstCard],
-      totalCards: 3,
-      cutThresholdCardsDealt: 2,
-      shufflePending: true,
-    };
+    const valid: BeatTheHouseShoeSaveState = createDeterministicBeatTheHouseShoe({
+      dealOrder: [firstCard],
+      cardsDealt: 217,
+      cutThresholdCardsDealt: 219,
+    }).saveState();
 
     expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, totalCards: 0 })).toThrow();
-    expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, remainingCards: [firstCard, secondCard, thirdCard, firstCard] })).toThrow();
+    expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, remainingCards: Array.from({ length: 313 }, () => firstCard) })).toThrow();
     expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, cutThresholdCardsDealt: 0 })).toThrow();
-    expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, shufflePending: false })).toThrow('cut state');
-    expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, remainingCards: [{ rank: 'bad', suit: 'bad' }] as never })).toThrow('invalid card');
+    expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, shufflePending: true })).toThrow('cut state');
+    expect(() => BeatTheHouseShoe.fromSaveState({ ...valid, remainingCards: [{ rank: 'bad', suit: 'bad' }] as never, shufflePending: true })).toThrow(
+      'invalid card',
+    );
 
     const duplicateProductionCards = Array.from({ length: 7 }, () => firstCard);
     expect(() =>

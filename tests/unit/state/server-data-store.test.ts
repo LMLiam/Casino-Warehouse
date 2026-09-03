@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { createDefaultServerDataStore } from '../../../src/state/serverDataStore/createDefaultServerDataStore';
 import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
@@ -306,6 +307,42 @@ describe('server data store', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('server_state row "session"'), expect.any(Error));
     expect(readStateValue(dbPath, 'session')).toBeUndefined();
     expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({ name: 'SQLite Session Break' });
+    expect(reloaded.profileTokenHash(profile.id)).toBe(tokenHash);
+    expect(reloaded.snapshot().session).toBeUndefined();
+
+    warn.mockRestore();
+  });
+
+  it('deletes SQLite sessions with obsolete Beat deck data without dropping profiles or profile auth', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
+    tempDirs.push(dir);
+    const dbPath = join(dir, 'casino.sqlite');
+    const store = new SqliteServerDataStore(dbPath);
+    const profile = requireProfile(store.createProfile('SQLite Beat Break').profileState.profiles, 0);
+    const tokenHash = testProfileTokenHash('b'.repeat(64));
+    store.setProfileTokenHash(profile.id, tokenHash);
+    const beatTheHouse = new BeatTheHouseGame({ initialBankroll: profile.bankroll }).saveState();
+    const { shoe: _shoe, ...obsoleteBeatSave } = beatTheHouse;
+    writeStateValue(
+      dbPath,
+      'session',
+      JSON.stringify({
+        profileId: profile.id,
+        activeGame: 'beat-the-house',
+        showingGameLobby: false,
+        wagerLimit: 0,
+        wagered: 0,
+        gameSnapshot: { beatTheHouse: { ...obsoleteBeatSave, deck: [] } },
+        updatedAt: '2026-05-04T12:00:00.000Z',
+      }),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const reloaded = new SqliteServerDataStore(dbPath);
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('server_state row "session"'), expect.any(Error));
+    expect(readStateValue(dbPath, 'session')).toBeUndefined();
+    expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({ name: 'SQLite Beat Break' });
     expect(reloaded.profileTokenHash(profile.id)).toBe(tokenHash);
     expect(reloaded.snapshot().session).toBeUndefined();
 

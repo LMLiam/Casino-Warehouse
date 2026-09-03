@@ -1,7 +1,6 @@
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { AddressInfo } from 'node:net';
 import type { Card } from '../../src/game/cards/Card';
-import { rigDeck } from '../../src/game/cards/rigDeck';
 import type { JsonValue } from '../../src/schemas/casinoSchemas/JsonValue';
 import type { ProfileId } from '../../src/schemas/casinoSchemas/ProfileId';
 import { connectionIdSchema } from '../../src/schemas/casinoSchemas/connectionIdSchema';
@@ -15,6 +14,7 @@ import { createMemoryServerDataStore } from '../../src/state/serverDataStore/cre
 import type { ServerDataStore } from '../../src/state/serverDataStore/ServerDataStore';
 import { createSessionState } from '../../src/state/session/createSessionState';
 import { profileTokenAuth } from '../../src/state/serverDataStore/profileTokenAuth';
+import { createDeterministicBeatTheHouseShoe } from '../unit/game/createDeterministicBeatTheHouseShoe';
 
 // Every test owns a realtime server on an ephemeral port plus fresh browser contexts,
 // so tests are isolation-safe across parallel workers (#88).
@@ -846,7 +846,11 @@ class RiggedBeatRoundAuthority extends RoomAuthority {
       return super.handle(connectionId, message);
     }
     const before = room.model.game.snapshot();
-    const snapshot = room.model.game.deal(rigDeck([...this.dealOrder]));
+    room.model.game.restoreState({
+      ...room.model.game.saveState(),
+      shoe: createDeterministicBeatTheHouseShoe({ dealOrder: this.dealOrder }).saveState(),
+    });
+    const snapshot = room.model.game.deal();
     room.lastBeatEvents = snapshot.lastEvents;
     const settlements = snapshot.phase === 'roundOver' && before.phase !== 'roundOver' ? this.settleBeat(room, snapshot) : [];
     return this.broadcast(room, settlements);

@@ -6,6 +6,7 @@ import { rigDeck } from '../../../src/game/cards/rigDeck';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { SlotsGame } from '../../../src/game/slots/SlotsGame';
 import { createPlayerFromProfile } from '../../../src/app/state/casinoPlayer/createPlayerFromProfile';
+import { parseJsonText } from '../../../src/schemas/casinoSchemas/parseJsonText';
 import { createSessionState } from '../../../src/state/session/createSessionState';
 import { loadSessionState } from '../../../src/state/session/loadSessionState';
 import { parseSessionState } from '../../../src/state/session/parseSessionState';
@@ -97,6 +98,22 @@ describe('session store', () => {
     const player = createPlayerFromProfile(profile, { beatTheHouse: staleSnapshot });
 
     expect(player.beatTheHouse.snapshot().bankroll).toBe(467);
+  });
+
+  it('persists a complete unversioned Beat the House shoe save', () => {
+    const storage = new MemoryStorage();
+    const beatTheHouse = new BeatTheHouseGame({ initialBankroll: 500 });
+    const session = createSessionState(testProfileId('beat-session'), {
+      activeGame: 'beat-the-house',
+      showingGameLobby: false,
+      gameSnapshot: { beatTheHouse: beatTheHouse.saveState() },
+    });
+
+    saveSessionState(storage, session);
+    const loaded = loadSessionState(storage);
+
+    expect(loaded).toEqual({ session, recovered: false });
+    expect(loaded.session?.gameSnapshot?.beatTheHouse?.shoe).toEqual(beatTheHouse.saveState().shoe);
   });
 
   it('restores saved Blackjack and slot snapshots for a profile session', () => {
@@ -203,6 +220,53 @@ describe('session store', () => {
         updatedAt: '2026-05-04T12:00:00Z',
       }),
     ).toMatchObject({ ok: false, error: { message: expect.stringContaining('Session data is not valid') } });
+
+    const beatTheHouse = new BeatTheHouseGame({ initialBankroll: 100 }).saveState();
+    const partialShoeSession = parseJsonText(
+      JSON.stringify({
+        profileId: 'partial-shoe',
+        activeGame: 'beat-the-house',
+        showingGameLobby: true,
+        wagerLimit: 0,
+        wagered: 0,
+        gameSnapshot: {
+          beatTheHouse: {
+            ...beatTheHouse,
+            shoe: {
+              totalCards: beatTheHouse.shoe.totalCards,
+              cutThresholdCardsDealt: beatTheHouse.shoe.cutThresholdCardsDealt,
+              shufflePending: beatTheHouse.shoe.shufflePending,
+            },
+          },
+        },
+        updatedAt: '2026-05-04T12:00:00.000Z',
+      }),
+    );
+    expect(parseSessionState(partialShoeSession)).toMatchObject({ ok: false, error: { message: expect.stringContaining('Session data is not valid') } });
+  });
+
+  it('rejects obsolete Beat deck data and clears it through browser recovery', () => {
+    const storage = new MemoryStorage();
+    const beatTheHouse = new BeatTheHouseGame({ initialBankroll: 100 }).saveState();
+    const { shoe: _shoe, ...obsoleteBeatSave } = beatTheHouse;
+    storage.setItem(
+      'casino_warehouse_session',
+      JSON.stringify({
+        profileId: 'obsolete-beat',
+        activeGame: 'beat-the-house',
+        showingGameLobby: false,
+        wagerLimit: 0,
+        wagered: 0,
+        gameSnapshot: { beatTheHouse: { ...obsoleteBeatSave, deck: [] } },
+        updatedAt: '2026-05-04T12:00:00.000Z',
+      }),
+    );
+
+    const loaded = loadSessionState(storage);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.session).toBeUndefined();
+    expect(storage.getItem('casino_warehouse_session')).toBeNull();
   });
 
   it('rejects obsolete version fields instead of dispatching migrations', () => {
