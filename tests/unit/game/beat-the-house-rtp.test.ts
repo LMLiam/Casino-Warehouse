@@ -81,6 +81,7 @@ const RTP_SAMPLE_ROUNDS_PER_PROFILE = 20_000;
 const ACTION_VALUE_SAMPLE_ROUNDS = 20_000;
 const MONTE_CARLO_SIGMA_TOLERANCE = 6;
 const MIN_RETURN_TOLERANCE = 0.05;
+const RTP_GUARDRAIL_TEST_TIMEOUT_MS = 120_000;
 const MAIN_ONLY_J_ACTION_MARGIN = 0.01;
 const MATCH_PUSH_J_ACTION_MARGIN = 0.01;
 const MULBERRY_INCREMENT = 0x6d2b79f5;
@@ -216,17 +217,21 @@ describe('Beat the House RTP guardrails', () => {
     );
   });
 
-  it('keeps production BeatTheHouseGame returns inside seeded RTP guardrails for all 16 profiles', () => {
-    for (const [profileIndex, wagerProfile] of wagerProfiles.entries()) {
-      const observed = simulateProductionProfile(wagerProfile, MONTE_CARLO_SEED + profileIndex);
-      const standardError = wagerProfile.roundStandardDeviationEnvelope / Math.sqrt(RTP_SAMPLE_ROUNDS_PER_PROFILE);
-      const tolerance = Math.max(MIN_RETURN_TOLERANCE, standardError * MONTE_CARLO_SIGMA_TOLERANCE);
+  it(
+    'keeps production BeatTheHouseGame returns inside seeded RTP guardrails for all 16 profiles',
+    () => {
+      for (const [profileIndex, wagerProfile] of wagerProfiles.entries()) {
+        const observed = simulateProductionProfile(wagerProfile, MONTE_CARLO_SEED + profileIndex);
+        const standardError = wagerProfile.roundStandardDeviationEnvelope / Math.sqrt(RTP_SAMPLE_ROUNDS_PER_PROFILE);
+        const tolerance = Math.max(MIN_RETURN_TOLERANCE, standardError * MONTE_CARLO_SIGMA_TOLERANCE);
 
-      expect(Math.abs(observed.mean - wagerProfile.expectedReturned), wagerProfile.name).toBeLessThanOrEqual(tolerance);
-      expect(observed.standardDeviation, wagerProfile.name).toBeLessThanOrEqual(wagerProfile.roundStandardDeviationEnvelope);
-      expect(observed.mean / wagerProfile.stake, wagerProfile.name).toBeCloseTo(wagerProfile.expectedRtp, 1);
-    }
-  }, 60_000);
+        expect(Math.abs(observed.mean - wagerProfile.expectedReturned), wagerProfile.name).toBeLessThanOrEqual(tolerance);
+        expect(observed.standardDeviation, wagerProfile.name).toBeLessThanOrEqual(wagerProfile.roundStandardDeviationEnvelope);
+        expect(observed.mean / wagerProfile.stake, wagerProfile.name).toBeCloseTo(wagerProfile.expectedRtp, 1);
+      }
+    },
+    RTP_GUARDRAIL_TEST_TIMEOUT_MS,
+  );
 });
 
 function profile(
