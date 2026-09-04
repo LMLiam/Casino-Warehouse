@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import { createDefaultServerDataStore } from '../../../src/state/serverDataStore/createDefaultServerDataStore';
 import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
+import type { JsonValue } from '../../../src/schemas/casinoSchemas/JsonValue';
 import { SqliteServerDataStore } from '../../../src/state/serverDataStore/SqliteServerDataStore';
 import { createSessionState } from '../../../src/state/session/createSessionState';
 import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
@@ -241,6 +242,65 @@ describe('server data store', () => {
     expect(new SqliteServerDataStore(dbPath).snapshot()).toMatchObject({ profileState: { profiles: [] }, session: undefined });
   });
 
+  it('gives memory and SQLite profiles zero game credits', () => {
+    const memory = createMemoryServerDataStore();
+    expect(requireProfile(memory.createProfile('Memory Fresh').profileState.profiles, 0).gameCredits).toEqual({ beatTheHouseHalfChip: 0 });
+    expect(memory.ensureProfile(testProfileId('manual-fresh'), 'Manual Fresh', 100).gameCredits).toEqual({ beatTheHouseHalfChip: 0 });
+  });
+
+  it('preserves residual game credits in SQLite across restarts and unrelated mutations', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'casino-store-'));
+    tempDirs.push(dir);
+    const dbPath = join(dir, 'casino.sqlite');
+    const store = new SqliteServerDataStore(dbPath);
+    const profile = requireProfile(store.createProfile('Residual QA').profileState.profiles, 0);
+    seedResidualOne(dbPath, profile.id);
+
+    const reloaded = new SqliteServerDataStore(dbPath);
+    expect(reloaded.snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({
+      bankroll: 1000,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+    });
+
+    expect(reloaded.setProfileBankroll(profile.id, 0)).toMatchObject({ bankroll: 0, gameCredits: { beatTheHouseHalfChip: 1 } });
+    expect(reloaded.acceptHouseAdvance(profile.id)).toMatchObject({
+      bankroll: 100,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+      houseAdvance: { outstandingBalance: 100, activeCount: 1 },
+    });
+    expect(
+      reloaded.recordTransaction(profile.id, {
+        gameId: 'blackjack',
+        type: 'payout',
+        amount: 50,
+        description: 'Unrelated win',
+        metadata: {},
+      }),
+    ).toMatchObject({ bankroll: 150, gameCredits: { beatTheHouseHalfChip: 1 } });
+    expect(reloaded.renameProfile(profile.id, 'Residual Renamed').profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({
+      name: 'Residual Renamed',
+      gameCredits: { beatTheHouseHalfChip: 1 },
+    });
+
+    const settlement = reloaded.applyGameplaySettlement(profile.id, 60, 50, {
+      gameId: 'blackjack',
+      roomId: testRoomId('ROOM1'),
+      sessionId: testSessionId('SESSION1'),
+    });
+    expect(settlement).toMatchObject({ houseAdvanceRepayment: 5, profile: { bankroll: 205, gameCredits: { beatTheHouseHalfChip: 1 } } });
+
+    expect(new SqliteServerDataStore(dbPath).snapshot().profileState.profiles.find((candidate) => candidate.id === profile.id)).toMatchObject({
+      name: 'Residual Renamed',
+      bankroll: 205,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+      houseAdvance: { outstandingBalance: 95, activeCount: 1 },
+      transactions: expect.arrayContaining([
+        expect.objectContaining({ type: 'house_advance_repayment', amount: -5 }),
+        expect.objectContaining({ type: 'payout', amount: 50 }),
+      ]),
+    });
+  });
+
   it.each([
     ['profiles', 'profile rows'],
     ['profile_auth', 'profile auth rows'],
@@ -386,6 +446,20 @@ describe('server data store', () => {
     }
   });
 });
+
+const seedResidualOne = (dbPath: string, profileId: string): void => {
+  const raw = readStateValue(dbPath, 'profiles');
+  if (!raw) {
+    throw new Error('Missing profiles row.');
+  }
+  const state = JSON.parse(raw) as { profiles: { id: string; gameCredits?: JsonValue }[] };
+  const target = state.profiles.find((candidate) => candidate.id === profileId);
+  if (!target) {
+    throw new Error('Missing seeded profile.');
+  }
+  target.gameCredits = { beatTheHouseHalfChip: 1 };
+  writeStateValue(dbPath, 'profiles', JSON.stringify(state));
+};
 
 const restoreEnvValue = (key: string, value: string | undefined): void => {
   if (value === undefined) {

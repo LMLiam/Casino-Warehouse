@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { acceptHouseAdvance } from '../../../src/state/profiles/acceptHouseAdvance';
 import { createProfile } from '../../../src/state/profiles/createProfile';
 import { deleteProfile } from '../../../src/state/profiles/deleteProfile';
 import { houseAdvanceRepaymentForProfit } from '../../../src/state/profiles/houseAdvanceRepaymentForProfit';
@@ -9,6 +10,7 @@ import { recordTransaction } from '../../../src/state/profiles/recordTransaction
 import { renameProfile } from '../../../src/state/profiles/renameProfile';
 import { replaceProfile } from '../../../src/state/profiles/replaceProfile';
 import { saveProfileStore } from '../../../src/state/profiles/saveProfileStore';
+import type { JsonValue } from '../../../src/schemas/casinoSchemas/JsonValue';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
 import { createStateId } from '../../../src/state/profiles/createStateId';
 import type { CasinoProfile } from '../../../src/state/profiles/CasinoProfile';
@@ -356,6 +358,104 @@ describe('profile store', () => {
     };
 
     expect(() => saveProfileStore(storage, { profiles: [] })).toThrow('quota exceeded');
+  });
+
+  it('gives new profiles zero game credits', () => {
+    const state = createProfile({ profiles: [] }, 'Fresh', 1000, new Date('2026-05-04T12:00:00Z'));
+
+    expect(requireProfileAt(state.profiles, 0).gameCredits).toEqual({ beatTheHouseHalfChip: 0 });
+  });
+
+  it('defaults a missing gameCredits field to zero without recovery', () => {
+    const state = createProfile({ profiles: [] }, 'Legacy', 500, new Date('2026-05-04T12:00:00Z'));
+    const legacy = JSON.parse(JSON.stringify(state)) as { profiles: Record<string, JsonValue>[] };
+    const [legacyProfile] = legacy.profiles;
+    if (!legacyProfile) {
+      throw new Error('Missing legacy profile.');
+    }
+    delete legacyProfile.gameCredits;
+
+    const parsed = parseProfileStoreJson(JSON.stringify(legacy));
+
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) {
+      throw new Error('Legacy profile should parse.');
+    }
+    expect(requireProfileAt(parsed.value.profiles, 0).gameCredits).toEqual({ beatTheHouseHalfChip: 0 });
+
+    const storage = new MemoryStorage();
+    storage.setItem('casino_warehouse_profiles', JSON.stringify(legacy));
+    const loaded = loadProfileStore(storage);
+
+    expect(loaded.recovered).toBe(false);
+    expect(requireProfileAt(loaded.state.profiles, 0).gameCredits).toEqual({ beatTheHouseHalfChip: 0 });
+  });
+
+  it('round-trips residual game credits through profile JSON', () => {
+    const state = createProfile({ profiles: [] }, 'Residual', 500, new Date('2026-05-04T12:00:00Z'));
+    const seeded = {
+      profiles: state.profiles.map((profile) => ({ ...profile, gameCredits: { beatTheHouseHalfChip: 1 as const } })),
+    };
+
+    const parsed = parseProfileStoreJson(JSON.stringify(seeded));
+
+    expect(parsed).toEqual({ ok: true, value: seeded });
+
+    const storage = new MemoryStorage();
+    saveProfileStore(storage, seeded);
+    const loaded = loadProfileStore(storage);
+
+    expect(loaded.recovered).toBe(false);
+    expect(requireProfileAt(loaded.state.profiles, 0).gameCredits).toEqual({ beatTheHouseHalfChip: 1 });
+  });
+
+  it.each([-1, 0.5, 2, '1'])('rejects an invalid gameCredits value %s and recovers', (value) => {
+    const state = createProfile({ profiles: [] }, 'Tampered', 500, new Date('2026-05-04T12:00:00Z'));
+    const tampered = JSON.parse(JSON.stringify(state)) as { profiles: Record<string, JsonValue>[] };
+    const [tamperedProfile] = tampered.profiles;
+    if (!tamperedProfile) {
+      throw new Error('Missing tampered profile.');
+    }
+    tamperedProfile.gameCredits = { beatTheHouseHalfChip: value };
+
+    expect(parseProfileStoreJson(JSON.stringify(tampered)).ok).toBe(false);
+
+    const storage = new MemoryStorage();
+    storage.setItem('casino_warehouse_profiles', JSON.stringify(tampered));
+    const loaded = loadProfileStore(storage);
+
+    expect(loaded.recovered).toBe(true);
+    expect(loaded.state.profiles).toEqual([]);
+  });
+
+  it('preserves residual game credits through unrelated profile mutations', () => {
+    const now = new Date('2026-05-04T12:00:00Z');
+    let state = createProfile({ profiles: [] }, 'Residual', 0, now);
+    const seeded = { ...requireProfileAt(state.profiles, 0), gameCredits: { beatTheHouseHalfChip: 1 as const } };
+    state = replaceProfile(state, seeded);
+
+    const accepted = acceptHouseAdvance(requireProfileAt(state.profiles, 0), now);
+    if (!accepted) {
+      throw new Error('House Advance should be accepted at zero bankroll.');
+    }
+    state = replaceProfile(state, accepted);
+    expect(requireProfileAt(state.profiles, 0)).toMatchObject({ bankroll: 100, gameCredits: { beatTheHouseHalfChip: 1 } });
+
+    state = renameProfile(state, accepted.id, 'Renamed Residual', now);
+    let profile = recordTransaction(
+      requireProfileAt(state.profiles, 0),
+      { gameId: 'blackjack', type: 'payout', amount: 50, description: 'Unrelated win', metadata: {} },
+      now,
+    );
+    profile = recordTransaction(profile, { gameId: 'slots:thai-princess', type: 'wager', amount: -25, description: 'Unrelated wager', metadata: {} }, now);
+    state = replaceProfile(state, profile);
+
+    expect(requireProfileAt(state.profiles, 0)).toMatchObject({
+      name: 'Renamed Residual',
+      bankroll: 125,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+      houseAdvance: { outstandingBalance: 100, activeCount: 1 },
+    });
   });
 
   it('replaces one profile in a save state', () => {

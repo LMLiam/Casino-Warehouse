@@ -6,6 +6,7 @@ import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSav
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import { parseSessionState } from '../../../src/state/session/parseSessionState';
 import { clientMessageSchema } from '../../../src/schemas/protocol/clientMessageSchema';
+import type { JsonValue } from '../../../src/schemas/casinoSchemas/JsonValue';
 import {
   clientMessageContractFixtures,
   clientProtocolInvalidFixtures,
@@ -51,6 +52,20 @@ describe('schema contract fixtures', () => {
 
     const obsoleteVersion = parseCasinoSaveState(profileStoreContractFixtures.obsoleteVersion);
     expect(obsoleteVersion).toMatchObject({ ok: false, error: { message: expect.stringContaining('Unrecognized key: "version"') } });
+  });
+
+  it('defaults a missing gameCredits field while keeping the store contract strict', () => {
+    const [alice] = profileStoreContractFixtures.current.profiles;
+    if (!alice) {
+      throw new Error('Missing contract profile.');
+    }
+    const legacyProfile: Record<string, JsonValue> = { ...alice };
+    delete legacyProfile.gameCredits;
+
+    expect(parseProfileStoreJson(JSON.stringify({ profiles: [legacyProfile] }))).toEqual({
+      ok: true,
+      value: profileStoreContractFixtures.current,
+    });
   });
 
   it('accepts only the current unversioned session-state contract', () => {
