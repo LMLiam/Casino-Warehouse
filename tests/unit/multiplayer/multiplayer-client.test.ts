@@ -7,6 +7,7 @@ import type { MultiplayerClientEvents } from '../../../src/multiplayer/client/Mu
 import { profileTokensStorageKey } from '../../../src/multiplayer/client/profileTokensStorageKey';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
+import { profileStoreContractFixtures } from '../schemas/schema-contract-fixtures';
 import { testConnectionId, testProfileId, testProfileToken, testRoomId, testServerInstanceId, testSessionId, testSettlementId } from '../schemas/testIds';
 
 const aliceId = testProfileId('alice');
@@ -142,7 +143,11 @@ describe('multiplayer realtime client reconnect reloads', () => {
     expect(events.onConnectionState).toHaveBeenCalledWith('connected');
     expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toMatchObject({ type: 'request-data' });
 
-    const profileState = { profiles: [] };
+    const [profile] = profileStoreContractFixtures.current.profiles;
+    if (!profile) {
+      throw new Error('Missing profile fixture.');
+    }
+    const profileState = { profiles: [{ ...profile, gameCredits: { beatTheHouseHalfChip: 1 as const } }] };
     socket.serverMessage({ type: 'data-state', database: 'memory', profileState });
     expect(events.onDataState).toHaveBeenCalledWith({ database: 'memory', profileState, session: undefined });
 
@@ -167,14 +172,68 @@ describe('multiplayer realtime client reconnect reloads', () => {
       type: 'settlement',
       roomId: room.roomId,
       sessionId: room.sessionId,
-      settlements: [{ id: testSettlementId('s1'), profileId: aliceId, seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
+      settlements: [
+        {
+          id: testSettlementId('s1'),
+          kind: 'gameplay',
+          profileId: aliceId,
+          seatId: 'left',
+          wagered: 1,
+          returned: 2.5,
+          profit: 1.5,
+          beatTheHouse: {
+            returnedHalfUnits: 5,
+            profitHalfUnits: 3,
+            halfChipBefore: 1,
+            halfChipAfter: 0,
+            wholeCreditsReleased: 3,
+          },
+        },
+      ],
     });
-    expect(events.onSettlement).toHaveBeenCalledWith([{ id: 's1', profileId: aliceId, seatId: 'left', wagered: 25, returned: 50, profit: 25 }], {
-      roomId: room.roomId,
-      sessionId: room.sessionId,
-      settlements: [{ id: 's1', profileId: aliceId, seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
-      type: 'settlement',
-    });
+    expect(events.onSettlement).toHaveBeenCalledWith(
+      [
+        {
+          id: 's1',
+          kind: 'gameplay',
+          profileId: aliceId,
+          seatId: 'left',
+          wagered: 1,
+          returned: 2.5,
+          profit: 1.5,
+          beatTheHouse: {
+            returnedHalfUnits: 5,
+            profitHalfUnits: 3,
+            halfChipBefore: 1,
+            halfChipAfter: 0,
+            wholeCreditsReleased: 3,
+          },
+        },
+      ],
+      {
+        roomId: room.roomId,
+        sessionId: room.sessionId,
+        settlements: [
+          {
+            id: 's1',
+            kind: 'gameplay',
+            profileId: aliceId,
+            seatId: 'left',
+            wagered: 1,
+            returned: 2.5,
+            profit: 1.5,
+            beatTheHouse: {
+              returnedHalfUnits: 5,
+              profitHalfUnits: 3,
+              halfChipBefore: 1,
+              halfChipAfter: 0,
+              wholeCreditsReleased: 3,
+            },
+          },
+        ],
+        type: 'settlement',
+      },
+    );
 
     client.clearRoomState();
     expect(events.onRoomCleared).toHaveBeenCalledOnce();

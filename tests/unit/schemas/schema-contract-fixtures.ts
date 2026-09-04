@@ -42,6 +42,7 @@ const connectionSpectator = testConnectionId('connection-spectator');
 const profileAliceToken = testProfileToken('profile-token-alice');
 const serverContractId = testServerInstanceId('server-contract');
 const settlementContractId = testSettlementId('settlement-contract');
+const beatSettlementContractId = testSettlementId('settlement-beat-contract');
 
 const profileStoreCurrentV1Fixture = {
   profiles: [
@@ -342,6 +343,29 @@ export const serverMessageContractFixtures = [
         wagered: 25,
         returned: 50,
         profit: 25,
+      },
+    ],
+  },
+  {
+    type: 'settlement',
+    roomId: beat42Id,
+    sessionId: sessionBeatContractId,
+    settlements: [
+      {
+        id: beatSettlementContractId,
+        kind: 'gameplay',
+        profileId: profileAliceId,
+        seatId: 'left',
+        wagered: 1,
+        returned: 2.5,
+        profit: 1.5,
+        beatTheHouse: {
+          returnedHalfUnits: 5,
+          profitHalfUnits: 3,
+          halfChipBefore: 1,
+          halfChipAfter: 0,
+          wholeCreditsReleased: 3,
+        },
       },
     ],
   },

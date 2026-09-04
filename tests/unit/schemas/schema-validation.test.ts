@@ -9,6 +9,8 @@ import { casinoProfileSchema } from '../../../src/schemas/casinoSchemas/casinoPr
 import { beatTheHouseShoeSaveStateSchema } from '../../../src/schemas/casinoSchemas/beatTheHouseShoeSaveStateSchema';
 import { gameCatalogSchema } from '../../../src/schemas/casinoSchemas/gameCatalogSchema';
 import { gameSnapshotSchema } from '../../../src/schemas/casinoSchemas/gameSnapshotSchema';
+import { beatTheHouseSettlementDataSchema } from '../../../src/schemas/protocol/beatTheHouseSettlementDataSchema';
+import { serverMessageSchema } from '../../../src/schemas/protocol/serverMessageSchema';
 import { profileNameSchema } from '../../../src/schemas/casinoSchemas/profileNameSchema';
 import { roomNameSchema } from '../../../src/schemas/casinoSchemas/roomNameSchema';
 import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
@@ -178,6 +180,76 @@ describe('Zod-backed runtime validation', () => {
     expect(beatTheHouseShoeSaveStateSchema.safeParse(savedShoe).success).toBe(true);
     expect(beatTheHouseShoeSaveStateSchema.safeParse({ ...savedShoe, deck: [] }).success).toBe(false);
     expect(beatTheHouseShoeSaveStateSchema.safeParse({ ...savedShoe, cutThresholdCardsDealt: 1 }).success).toBe(false);
+  });
+
+  it('validates exact Beat the House settlement metadata and conservation', () => {
+    const exact = {
+      returnedHalfUnits: 5,
+      profitHalfUnits: 3,
+      halfChipBefore: 1,
+      halfChipAfter: 0,
+      wholeCreditsReleased: 3,
+    };
+    const settlement = {
+      type: 'settlement',
+      roomId: 'ROOM1',
+      sessionId: 'SESSION1',
+      settlements: [
+        {
+          id: 'settlement-1',
+          kind: 'gameplay',
+          profileId: 'profile-receipt',
+          seatId: 'left',
+          wagered: 1,
+          returned: 2.5,
+          profit: 1.5,
+          beatTheHouse: exact,
+        },
+      ],
+    };
+
+    expect(beatTheHouseSettlementDataSchema.safeParse(exact).success).toBe(true);
+    expect(serverMessageSchema.safeParse(settlement).success).toBe(true);
+    expect(decodeServerMessage(JSON.stringify(settlement))).toEqual(settlement);
+
+    const invalidExactValues = [
+      { ...exact, returnedHalfUnits: -1 },
+      { ...exact, returnedHalfUnits: 0.5 },
+      { ...exact, profitHalfUnits: Number.MAX_SAFE_INTEGER + 1 },
+      { ...exact, halfChipBefore: 2 },
+      { ...exact, wholeCreditsReleased: -1 },
+      { ...exact, extra: true },
+    ];
+    for (const value of invalidExactValues) {
+      expect(beatTheHouseSettlementDataSchema.safeParse(value).success).toBe(false);
+    }
+
+    const invalidSettlements = [
+      { ...settlement, settlements: [{ ...settlement.settlements[0], kind: 'dealer-thanks' }] },
+      { ...settlement, settlements: [{ ...settlement.settlements[0], wagered: 1.5 }] },
+      { ...settlement, settlements: [{ ...settlement.settlements[0], returned: 2 }] },
+      { ...settlement, settlements: [{ ...settlement.settlements[0], profit: 2 }] },
+      { ...settlement, settlements: [{ ...settlement.settlements[0], beatTheHouse: { ...exact, returnedHalfUnits: 4 } }] },
+      { ...settlement, settlements: [{ ...settlement.settlements[0], beatTheHouse: { ...exact, halfChipAfter: 1 } }] },
+      { ...settlement, settlements: [{ ...settlement.settlements[0], beatTheHouse: { ...exact, wholeCreditsReleased: 2 } }] },
+    ];
+    for (const value of invalidSettlements) {
+      expect(serverMessageSchema.safeParse(value).success).toBe(false);
+      expect(decodeServerMessage(JSON.stringify(value))).toBeUndefined();
+    }
+
+    expect(
+      serverMessageSchema.safeParse({
+        ...settlement,
+        settlements: [{ ...settlement.settlements[0], beatTheHouse: undefined }],
+      }).success,
+    ).toBe(true);
+    expect(
+      serverMessageSchema.safeParse({
+        ...settlement,
+        settlements: [{ ...settlement.settlements[0], kind: undefined, beatTheHouse: undefined, wagered: 25, returned: 50, profit: 25 }],
+      }).success,
+    ).toBe(true);
   });
 
   it('defaults missing game credits and rejects invalid residuals at the profile boundary', () => {
