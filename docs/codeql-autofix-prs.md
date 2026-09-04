@@ -38,7 +38,14 @@ Useful inputs:
 
 - `min-severity`: `critical`, `high`, `medium`, or `low`.
 - `max-alerts`: maximum number of candidate alerts processed in one run.
+- `poll-attempts`: number of status requests after the initial Autofix request; the default is `18`.
+- `poll-seconds`: delay between status requests; the default is `10` seconds.
 - `allow-rules`: optional comma-separated CodeQL rule IDs, for example `js/insecure-randomness`.
+
+The default branch, repository token, and workflow inputs are passed to
+`scripts/codeql-autofix-prs.mjs`. The script uses the `security/autofix` branch
+prefix and labels created pull requests with `type:maintenance`,
+`area:tooling`, and `security`.
 
 ## Disable Quickly
 

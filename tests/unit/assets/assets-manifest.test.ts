@@ -203,7 +203,7 @@ const readTextFiles = (paths: readonly string[]): string =>
     .join('\n');
 
 const sourceFiles = listFiles(join(workspaceRoot, 'src')).filter((path) => /\.(ts|css)$/.test(path));
-const docsAndReadme = [join(workspaceRoot, 'README.md'), join(workspaceRoot, 'docs', 'assets-needed.md'), join(workspaceRoot, 'docs', 'completion-audit.md')];
+const docsAndReadme = [join(workspaceRoot, 'README.md'), join(workspaceRoot, 'docs', 'assets.md')];
 
 const assetFiles = listFiles(join(workspaceRoot, 'public', 'assets'));
 

@@ -1,77 +1,90 @@
-# Code Quality and Domain Boundaries
+# Code Quality And Domain Boundaries
 
-The app is organised by domain first. New modules should go into the narrowest folder that owns the behaviour:
+Keep code in the narrowest domain that owns the behaviour. `eslint.config.js`,
+`tsconfig.json`, `scripts/architecture-check.mjs`, and the scripts imported by
+that checker are the source of truth for these rules.
 
-- `src/game/`: pure game engines, card/RNG primitives, payout and settlement rules, slot themes, and catalog data.
-- `src/multiplayer/`: realtime protocol, server entrypoint, room authority, heartbeat handling, and room/session coordination.
-- `src/state/`: server data persistence, persisted profile/session schemas, and flow state machines.
-- `src/schemas/`: Zod schemas for runtime boundaries and persisted envelopes.
-- `src/assets/`: asset manifest and asset path helpers.
-- `src/audio/`: audio settings and playback service.
-- `src/ui/`: rendering primitives, Pixi table, Radix chrome, layout data, and visual-only helpers.
-- `src/app/shell/`: the browser application coordinator and DOM event binder.
-- `src/app/dom/`: shell template and typed element collection.
-- `src/app/views/`: DOM view renderers and view-local controllers.
-- `src/app/state/`: app snapshots and player construction for rendering server-owned data.
-- `src/app/input/`: DOM input parsing and table hit testing.
-- `src/app/format/`: display-only formatting and HTML list rendering.
+## Domain Map
+
+- `src/game/`: pure game engines, cards, random number interfaces, payouts, settlements, slot themes, and catalog data.
+- `src/multiplayer/`: protocol types, WebSocket client/server code, room authority, room models, room limits, and heartbeat handling.
+- `src/state/`: profiles, bankroll transactions, browser/server sessions, persistence, and XState room-flow machines.
+- `src/schemas/`: Zod schemas for JSON, protocol, persisted state, identifiers, credits, timestamps, and other runtime boundaries.
+- `src/assets/`: asset metadata and focused asset path accessors.
+- `src/audio/`: audio settings and playback.
+- `src/ui/`: Pixi rendering, layout, visual effects, chips, cards, and React/Radix chrome.
+- `src/app/shell/`: browser application coordination and event binding.
+- `src/app/dom/`: HTML template and typed element collection.
+- `src/app/views/`: display-only DOM views and view-local controllers.
+- `src/app/state/`: display snapshots and player construction.
+- `src/app/input/`: browser input parsing and table hit testing.
+- `src/app/format/`: display formatting and HTML list rendering.
 - `src/app/rooms/`: room defaults and room-specific app constants.
-- `tests/unit/<domain>/`: Vitest coverage grouped by the source domain it exercises.
+- `tests/unit/<domain>/`: Vitest tests grouped by source domain.
 - `tests/e2e/`: Playwright browser workflows.
 
-## Static Checks
+## Import Boundaries
 
-`npm run lint` runs static ESLint and TypeScript checks, the architecture check, and supply-chain checks. The architecture check also runs Knip for unused files, exports, types, and dependencies, then runs depcheck for unused npm dependencies.
+The architecture checker enforces these boundaries:
 
-`eslint.config.js` enforces syntax-level bans with `no-restricted-syntax`:
+- `src/game/` must not import `src/ui/`, `src/app/`, or `src/multiplayer/`.
+- `src/multiplayer/` and `src/state/` must not import `src/ui/` or `src/app/`.
+- `src/ui/` must not import `src/app/`.
+- Source modules must not form circular dependencies.
 
-- No `unknown` or `object` types, no `z.unknown()`, no `as unknown` casts — use named domain types, runtime type guards, or schemas.
-- No non-null assertions (`!`) — use a guard or fallback.
-- No `typeof x === 'object'` — use a Zod schema (`cardSchema.safeParse`) or a strict `in` guard (`'bets' in snapshot`), see `src/multiplayer/roomAuthorityModel/timeoutWithUnrefSchema.ts:4`.
-- No `Math.random()` inside `src/game/` — use `src/game/rng.ts` and inject deterministic RNG in tests.
-- No literal throws. State loader modules under `src/state/**/load*.ts` must return recovery results instead of throwing on invalid saved data.
-- Zod schemas must avoid unsafe or deprecated patterns, including `z.any()`, `z.coerce.boolean()`, deprecated number checks, duplicate checks, and throwing from refinement callbacks.
-- `src/game/` cannot import `src/ui/`; the ESLint strict-dependencies rule checks relative and root-based imports.
+Keep game rules, settlement, bankroll, persistence, and realtime authority out
+of rendering modules. UI code may display values returned by an owner. It must
+not recompute payouts, bankroll changes, or settlement outcomes.
 
-`scripts/architecture-check.mjs` enforces domain and structural rules:
+## Module Shape
 
-- Game modules cannot import UI, app, or multiplayer modules.
-- Multiplayer and state modules cannot import UI or app modules.
-- UI modules cannot import the app shell.
-- No circular dependencies between source modules.
-- No direct bankroll property mutation outside `src/game/engine.ts`, `src/multiplayer/roomAuthority.ts`, and `src/state/profiles.ts`.
-- No obvious payout or settlement logic duplicated in `src/ui/`.
-- One module-scope top-level element per file.
-- No vague `utils`, `helpers`, `misc`, or `manager` filenames.
-- Files over 400 lines must either be split or listed with a documented exception.
-- App modules must live in an approved `src/app/<role>/` folder instead of directly under `src/app/`.
-- Tests must live under `tests/unit/<domain>/` or `tests/e2e/`.
-- No unexplained magic numbers in checked TypeScript, TSX, or repository tooling scripts.
-- Knip and depcheck must report no unused source declarations or npm dependencies. The depcheck command ignores packages used through npm hook configuration or Tailwind configuration where static dependency detection cannot see the usage.
+- Keep one primary module-scope element in each source file. Classes, functions, constants, variables, interfaces, types, enums, schemas, and React components all count.
+- Keep file-local details inside their owner or extract them into a focused module.
+- Do not add re-export-only barrel files. Import the focused module directly.
+- Do not use vague source filenames such as `utils`, `helpers`, `misc`, or `manager`.
+- Split source files that exceed 400 lines. The checker applies this limit to `src/**/*.{ts,tsx}` and has no documented size exception.
+- Keep app modules under an approved `src/app/<role>/` directory.
+- Keep tests under `tests/unit/<domain>/` or `tests/e2e/`.
 
-## Magic Numbers
+## TypeScript And Runtime Rules
 
-Numeric values that define game rules, payout multipliers, room limits, timing thresholds, layout offsets, binary protocol bytes, schema bounds, or test helper behaviour must be named where they are owned. Prefer domain constants, class-private constants, focused config objects, or test fixture constants near the behaviour they explain.
+The ESLint rules and architecture scripts enforce the following rules:
 
-The architecture checker scans `src/**/*.{ts,tsx}`, `tests/**/*.ts`, and `scripts/**/*.mjs`. Inline numeric literals are allowed only when they are:
+- TypeScript uses `strict`, `noImplicitAny`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noUnusedLocals`, and `noUnusedParameters`.
+- Do not use the TypeScript `unknown` or `object` types, `z.unknown()`, or non-null assertions. Use a named domain type, a strict guard, a Zod schema, or a fallback.
+- Do not use `typeof value === 'object'` as a domain check. Use a schema or a strict property guard.
+- Use branded `ProfileId`, `RoomId`, and related identifier types in protocol, profile, and session data.
+- Parse JSON text with `parseJsonText()` and then parse the exact domain schema. A generic JSON value, record check, shallow guard, `z.custom()`, or type assertion does not establish a domain type.
+- Use strict Zod objects. `z.record()` must define both a key schema and a value schema.
+- Do not use unsafe Zod patterns such as `z.any()`, coercive booleans, deprecated number checks, duplicate checks, or throwing refinement callbacks.
+- Throw `Error` instances rather than strings or other literal values. Do not use `eval()` or `new Function()`.
+- Use the shared `finiteNumberSchema` instead of calling `z.number().finite()` directly.
+- State loaders under `src/state/**/load*.ts` must return recovery results. They must not throw when stored data is invalid.
 
-- neutral values such as `-1`, `0`, `0.5`, `1`, or `2` used for arithmetic, indexes, or simple binary choices;
-- values in named `const` declarations, readonly/static class properties, enum members, object config properties, type literals, or default parameters;
-- literal test-case data inside `it`/`test`/`describe` callbacks, where the test title and matcher explain the example;
-- an intentional local exception on the same line with `casino-magic-number-allow: <reason>`.
+## Game And Money Rules
 
-Do not create broad `constants.ts` buckets. Keep constants in the narrowest domain owner, such as game rule modules, renderer config objects, multiplayer protocol helpers, state/schema boundaries, or focused test fixtures.
+- Do not call `Math.random()` in `src/game/`. Use the `Rng` interface or the secure random helpers and inject deterministic values in tests.
+- Keep bankroll mutation in the authorised game or room/data-store owners. The checker permits direct bankroll property mutation only in `src/game/engine/BeatTheHouseGame.ts`, `src/game/engine/BeatTheHouseState.ts`, and `src/multiplayer/roomAuthority.ts`.
+- Route multiplayer settlement through `RoomAuthoritySettlement` and `ServerDataStore`.
+- Keep persistence behind `src/state/` modules, assets behind the manifest, audio behind `CasinoAudio`, and realtime messages behind protocol schemas.
 
-## File Responsibility
+## Numeric Values
 
-Prefer one primary class, component, service, state machine, schema group, renderer, config object, or engine per file. Keep tightly coupled small types next to the owner when separating them would make the callsite harder to read.
+Name values that define game rules, payouts, room limits, timing, layout,
+protocol bytes, schema bounds, or reusable test behaviour in the narrowest
+owner. Do not create broad constants buckets.
 
-Current size exceptions:
+The magic-number checker permits neutral inline values such as `-1`, `0`,
+`0.5`, `1`, and `2`, named declaration initialisers, type values, enum
+initialisers, object property values, default parameters, and literal test
+data inside test callbacks. Add a same-line
+`casino-magic-number-allow: <reason>` comment only for an intentional inline
+exception.
 
-- `src/multiplayer/roomAuthority.ts`: authoritative multiplayer room coordinator. Future cleanup should split game-specific room handlers while keeping settlement authority server-side.
+## Checks
 
-## Adding Modules
-
-Keep authoritative rules in game, multiplayer authority, or server data-store modules, not in renderers. UI can display returned values and labels but must not recompute payouts, bankroll changes, or settlement outcomes.
-
-Keep persistence behind state modules, assets behind the manifest, audio behind `CasinoAudio`, and realtime messages behind the protocol schema. Tests should use deterministic RNG/deck/reel fixtures when asserting game outcomes.
+- `npm run lint:static` runs ESLint and TypeScript type checking.
+- `npm run architecture:check` runs the custom architecture checks, Knip, and depcheck.
+- `npm run supply-chain:check` runs the repository supply-chain validator.
+- `npm run lint` runs all three lint groups.
+- `npm run format` checks EditorConfig and Prettier for source, tests, scripts, workflows, and maintained Markdown.
