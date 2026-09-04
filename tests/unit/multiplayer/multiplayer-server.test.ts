@@ -578,6 +578,8 @@ describe('multiplayer WebSocket server', () => {
       throw new Error('Expected Alice to receive her saved session.');
     }
     expect(aliceData.session.profileId).toBe(aliceProfile.id);
+    expect(JSON.stringify(aliceData)).toContain('remainingCards');
+    expect(JSON.stringify(aliceData)).toContain('cutThresholdCardsDealt');
 
     const bobCheckpoint = bob.checkpoint();
     bob.send({ type: 'request-data' });
@@ -588,6 +590,7 @@ describe('multiplayer WebSocket server', () => {
     expect(bobData.session).toBeUndefined();
     expect(JSON.stringify(bobData)).not.toContain('remainingCards');
     expect(JSON.stringify(bobData)).not.toContain('cutThresholdCardsDealt');
+    expect(JSON.stringify(bobData)).not.toContain('shufflePending');
   });
 
   it('rejects second-socket profile impersonation and locks admin-only data actions', async () => {
@@ -1180,7 +1183,24 @@ describe('multiplayer WebSocket server', () => {
         const room = createRoomSnapshot(connectionId);
         return {
           broadcasts: [room],
-          settlements: [{ id: testSettlementId('settlement-1'), profileId: aliceId, seatId: 'left', wagered: 25, returned: 50, profit: 25 }],
+          settlements: [
+            {
+              id: testSettlementId('settlement-1'),
+              kind: 'gameplay',
+              profileId: aliceId,
+              seatId: 'left',
+              wagered: 1,
+              returned: 2.5,
+              profit: 1.5,
+              beatTheHouse: {
+                returnedHalfUnits: 5,
+                profitHalfUnits: 3,
+                halfChipBefore: 1,
+                halfChipAfter: 0,
+                wholeCreditsReleased: 3,
+              },
+            },
+          ],
         };
       },
       disconnect: () => ({ broadcasts: [], settlements: [] }),
@@ -1202,7 +1222,18 @@ describe('multiplayer WebSocket server', () => {
     if (!settlementEntry) {
       throw new Error('Missing settlement.');
     }
-    expect(settlementEntry.profit).toBe(25);
+    expect(settlementEntry).toMatchObject({
+      kind: 'gameplay',
+      returned: 2.5,
+      profit: 1.5,
+      beatTheHouse: {
+        returnedHalfUnits: 5,
+        profitHalfUnits: 3,
+        halfChipBefore: 1,
+        halfChipAfter: 0,
+        wholeCreditsReleased: 3,
+      },
+    });
   });
 });
 

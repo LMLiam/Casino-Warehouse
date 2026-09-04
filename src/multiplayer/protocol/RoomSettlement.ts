@@ -1,4 +1,5 @@
 import type { SettlementId } from '../../schemas/casinoSchemas/SettlementId';
+import type { BeatTheHouseSettlementData } from './BeatTheHouseSettlementData';
 import type { RoomSeatId } from './RoomSeatId';
 import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 
@@ -13,4 +14,5 @@ export interface RoomSettlement {
   readonly dealerTip?: number | undefined;
   readonly dealerThanks?: number | undefined;
   readonly houseAdvanceRepayment?: number | undefined;
+  readonly beatTheHouse?: BeatTheHouseSettlementData | undefined;
 }

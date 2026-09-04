@@ -188,6 +188,11 @@ describe('per-game multiplayer protocol', () => {
     });
     expect(decodeServerMessage('{"type":"room-closed","roomId":"ROOM42","gameId":"missing","reason":"profile-deleted"}')).toBeUndefined();
     expect(decodeServerMessage(JSON.stringify({ type: 'room-state', room }))?.type).toBe('room-state');
+    expect(JSON.stringify(room)).toContain('cardsRemaining');
+    expect(JSON.stringify(room)).not.toContain('remainingCards');
+    expect(JSON.stringify(room)).not.toContain('cutThresholdCardsDealt');
+    expect(JSON.stringify(room)).not.toContain('shufflePending');
+    expect(JSON.stringify(room)).not.toContain('holeCard');
     expect(decodeServerMessage('{"type":"room-state"}')).toBeUndefined();
     expect(decodeServerMessage('{"version":2,"type":"room-state"}')).toBeUndefined();
     expect(serverMessageSchema.safeParse({ type: 'room-state', room: { ...room, beat: { rebetSeatIds: ['seat-1'] } } }).success).toBe(false);

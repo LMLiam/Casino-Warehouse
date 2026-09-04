@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { blackjackSnapshotSchema } from '../casinoSchemas/blackjackSnapshotSchema';
 import { blackjackTableSnapshotSchema } from '../casinoSchemas/blackjackTableSnapshotSchema';
+import { beatTheHouseSettlementDataSchema } from './beatTheHouseSettlementDataSchema';
 import { casinoSaveStateSchema } from '../casinoSchemas/casinoSaveStateSchema';
 import { connectionIdSchema } from '../casinoSchemas/connectionIdSchema';
 import { finiteNumberSchema } from '../casinoSchemas/finiteNumberSchema';
@@ -122,8 +123,41 @@ export const serverMessageSchema = (() => {
       dealerTip: finiteNumberSchema.optional(),
       dealerThanks: finiteNumberSchema.optional(),
       houseAdvanceRepayment: finiteNumberSchema.optional(),
+      beatTheHouse: beatTheHouseSettlementDataSchema.optional(),
     })
-    .strict();
+    .strict()
+    .superRefine((settlement, context) => {
+      const beatTheHouse = settlement.beatTheHouse;
+      if (!beatTheHouse) {
+        return;
+      }
+      if (settlement.kind === 'dealer-thanks') {
+        context.addIssue({ code: 'custom', path: ['kind'], message: 'Beat the House metadata requires a gameplay settlement.' });
+      }
+      if (!Number.isSafeInteger(settlement.wagered) || settlement.wagered < 0) {
+        context.addIssue({ code: 'custom', path: ['wagered'], message: 'Beat the House wager must be a non-negative safe integer.' });
+      }
+      const stakeHalfUnits = settlement.wagered * 2;
+      const expectedReturnedHalfUnits = stakeHalfUnits + beatTheHouse.profitHalfUnits;
+      if (
+        !Number.isSafeInteger(stakeHalfUnits) ||
+        !Number.isSafeInteger(expectedReturnedHalfUnits) ||
+        beatTheHouse.returnedHalfUnits !== expectedReturnedHalfUnits
+      ) {
+        context.addIssue({ code: 'custom', path: ['beatTheHouse'], message: 'Beat the House return and profit are inconsistent with the wager.' });
+      }
+      if (settlement.returned !== beatTheHouse.returnedHalfUnits / 2) {
+        context.addIssue({ code: 'custom', path: ['returned'], message: 'Returned value does not match Beat the House half-units.' });
+      }
+      if (settlement.profit !== beatTheHouse.profitHalfUnits / 2) {
+        context.addIssue({ code: 'custom', path: ['profit'], message: 'Profit value does not match Beat the House half-units.' });
+      }
+      const totalHalfUnits = beatTheHouse.halfChipBefore + beatTheHouse.returnedHalfUnits;
+      const releasedHalfUnits = beatTheHouse.wholeCreditsReleased * 2 + beatTheHouse.halfChipAfter;
+      if (!Number.isSafeInteger(totalHalfUnits) || !Number.isSafeInteger(releasedHalfUnits) || totalHalfUnits !== releasedHalfUnits) {
+        context.addIssue({ code: 'custom', path: ['beatTheHouse'], message: 'Beat the House residual arithmetic is inconsistent.' });
+      }
+    });
 
   return z.discriminatedUnion('type', [
     baseServerMessageSchema.extend({ type: z.literal('server-hello'), serverInstanceId: serverInstanceIdSchema }),
