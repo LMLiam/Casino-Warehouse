@@ -3,6 +3,7 @@ import { ZodError } from 'zod';
 import { sanitizeAudioSettings } from '../../../src/audio/casinoAudio/sanitizeAudioSettings';
 import { gameCatalog } from '../../../src/game/catalog/gameCatalog';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { beatTheHouseSettlementReceiptSchema } from '../../../src/schemas/casinoSchemas/beatTheHouseSettlementReceiptSchema';
 import { bankrollTransactionSchema } from '../../../src/schemas/casinoSchemas/bankrollTransactionSchema';
 import { casinoProfileSchema } from '../../../src/schemas/casinoSchemas/casinoProfileSchema';
 import { beatTheHouseShoeSaveStateSchema } from '../../../src/schemas/casinoSchemas/beatTheHouseShoeSaveStateSchema';
@@ -201,6 +202,32 @@ describe('Zod-backed runtime validation', () => {
     for (const value of [-1, 0.5, 2, '1']) {
       expect(parseCasinoSaveState({ profiles: [{ ...alice, gameCredits: { beatTheHouseHalfChip: value } }] }).ok).toBe(false);
     }
+  });
+
+  it('validates exact Beat the House receipt values and conservation', () => {
+    const receipt = {
+      settlementKey: 'receipt-1',
+      profileId: 'profile-receipt',
+      profileCreatedAt: '2026-05-04T12:00:00.000Z',
+      gameId: 'beat-the-house',
+      roomId: 'ROOM1',
+      sessionId: 'SESSION1',
+      returnedHalfUnits: 5,
+      profitHalfUnits: 3,
+      halfChipBefore: 1,
+      halfChipAfter: 0,
+      wholeCreditsReleased: 3,
+      houseAdvanceRepayment: 1,
+      bankrollAfter: 52,
+      houseAdvanceAfter: { outstandingBalance: 99, activeCount: 1 },
+    };
+
+    expect(beatTheHouseSettlementReceiptSchema.safeParse(receipt).success).toBe(true);
+    expect(beatTheHouseSettlementReceiptSchema.safeParse({ ...receipt, extra: true }).success).toBe(false);
+    expect(beatTheHouseSettlementReceiptSchema.safeParse({ ...receipt, returnedHalfUnits: 0.5 }).success).toBe(false);
+    expect(beatTheHouseSettlementReceiptSchema.safeParse({ ...receipt, halfChipAfter: 2 }).success).toBe(false);
+    expect(beatTheHouseSettlementReceiptSchema.safeParse({ ...receipt, wholeCreditsReleased: 2 }).success).toBe(false);
+    expect(beatTheHouseSettlementReceiptSchema.safeParse({ ...receipt, houseAdvanceRepayment: 4 }).success).toBe(false);
   });
 
   it('carries residual game credits only inside data-state profile state', () => {

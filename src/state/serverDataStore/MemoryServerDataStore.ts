@@ -1,5 +1,7 @@
 import type { BankrollTransaction } from '../profiles/BankrollTransaction';
 import { z } from 'zod';
+import { asHalfUnits } from '../../game/beatTheHouse/asHalfUnits';
+import type { HalfUnits } from '../../game/beatTheHouse/HalfUnits';
 import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { ProfileTokenHash } from '../../schemas/casinoSchemas/ProfileTokenHash';
 import { createIsoTimestamp } from '../../schemas/casinoSchemas/createIsoTimestamp';
@@ -24,17 +26,24 @@ import { renameProfile } from '../profiles/renameProfile';
 import { replaceProfile } from '../profiles/replaceProfile';
 import type { CasinoSessionState } from '../session/CasinoSessionState';
 import { parseSessionState } from '../session/parseSessionState';
+import type { BeatTheHouseSettlementContext } from './BeatTheHouseSettlementContext';
+import type { BeatTheHouseSettlementReceipt } from './BeatTheHouseSettlementReceipt';
+import type { BeatTheHouseSettlementResult } from './BeatTheHouseSettlementResult';
+import type { BeatTheHouseSettlementTransition } from './BeatTheHouseSettlementTransition';
 import type { GameplaySettlementContext } from './GameplaySettlementContext';
 import type { GameplaySettlementResult } from './GameplaySettlementResult';
+import { prepareBeatTheHouseSettlement } from './prepareBeatTheHouseSettlement';
 import type { ServerDatabaseChoice } from './ServerDatabaseChoice';
 import type { ServerDataSnapshot } from './ServerDataSnapshot';
 import type { ServerDataStore } from './ServerDataStore';
+import { validateBeatTheHouseSettlement } from './validateBeatTheHouseSettlement';
 
 export class MemoryServerDataStore implements ServerDataStore {
   public readonly database: ServerDatabaseChoice = 'memory';
   private profileState: CasinoSaveState = emptySaveState();
   private session: CasinoSessionState | undefined;
   private profileTokenHashes = new Map<ProfileId, ProfileTokenHash>();
+  private beatTheHouseSettlementReceipts = new Map<string, BeatTheHouseSettlementReceipt>();
 
   public snapshot(): ServerDataSnapshot {
     return { database: this.database, profileState: this.profileState, session: this.session };
@@ -83,7 +92,8 @@ export class MemoryServerDataStore implements ServerDataStore {
   public clear(): ServerDataSnapshot {
     this.profileState = emptySaveState();
     this.session = undefined;
-    this.clearProfileTokenHashes();
+    this.profileTokenHashes.clear();
+    this.beatTheHouseSettlementReceipts.clear();
     return this.snapshot();
   }
 
@@ -205,6 +215,29 @@ export class MemoryServerDataStore implements ServerDataStore {
     return { profile: updated, houseAdvanceRepayment: repayment };
   }
 
+  public applyBeatTheHouseSettlement(
+    profileId: ProfileId,
+    returnedHalfUnits: HalfUnits,
+    profitHalfUnits: HalfUnits,
+    context: BeatTheHouseSettlementContext,
+  ): BeatTheHouseSettlementResult | undefined {
+    validateBeatTheHouseSettlement(returnedHalfUnits, profitHalfUnits, context);
+    const profile = this.findProfile(profileId);
+    if (!profile) {
+      return undefined;
+    }
+
+    const existingReceipt = this.beatTheHouseSettlementReceipts.get(context.settlementKey);
+    if (existingReceipt) {
+      this.assertMatchingBeatTheHouseSettlementReceipt(profile, returnedHalfUnits, profitHalfUnits, context, existingReceipt);
+      return this.beatTheHouseSettlementResult(profile, existingReceipt, true);
+    }
+
+    const transition = prepareBeatTheHouseSettlement(profile, returnedHalfUnits, profitHalfUnits, context);
+    this.commitBeatTheHouseSettlement(transition);
+    return this.beatTheHouseSettlementResult(transition.profile, transition.receipt, false);
+  }
+
   public recordTransaction(
     profileId: ProfileId,
     transaction: Omit<BankrollTransaction, 'id' | 'profileId' | 'at' | 'balanceBefore' | 'balanceAfter'>,
@@ -218,8 +251,67 @@ export class MemoryServerDataStore implements ServerDataStore {
     return updated;
   }
 
-  private findProfile(profileId: ProfileId): CasinoProfile | undefined {
+  protected findProfile(profileId: ProfileId): CasinoProfile | undefined {
     return this.profileState.profiles.find((profile) => profile.id === profileId);
+  }
+
+  protected beatTheHouseSettlementReceipt(settlementKey: string): BeatTheHouseSettlementReceipt | undefined {
+    return this.beatTheHouseSettlementReceipts.get(settlementKey);
+  }
+
+  protected beatTheHouseSettlementReceiptEntries(): readonly (readonly [string, BeatTheHouseSettlementReceipt])[] {
+    return [...this.beatTheHouseSettlementReceipts.entries()];
+  }
+
+  protected loadBeatTheHouseSettlementReceipts(receipts: Readonly<Record<string, BeatTheHouseSettlementReceipt>>): void {
+    this.beatTheHouseSettlementReceipts = new Map(Object.entries(receipts));
+  }
+
+  protected clearBeatTheHouseSettlementReceipts(): void {
+    this.beatTheHouseSettlementReceipts.clear();
+  }
+
+  protected commitBeatTheHouseSettlement(transition: BeatTheHouseSettlementTransition): void {
+    this.profileState = replaceProfile(this.profileState, transition.profile);
+    this.beatTheHouseSettlementReceipts.set(transition.receipt.settlementKey, transition.receipt);
+  }
+
+  protected beatTheHouseSettlementResult(
+    profile: CasinoProfile,
+    receipt: BeatTheHouseSettlementReceipt,
+    alreadyApplied: boolean,
+  ): BeatTheHouseSettlementResult {
+    return {
+      profile,
+      returnedHalfUnits: asHalfUnits(receipt.returnedHalfUnits),
+      profitHalfUnits: asHalfUnits(receipt.profitHalfUnits),
+      halfChipBefore: receipt.halfChipBefore,
+      halfChipAfter: receipt.halfChipAfter,
+      wholeCreditsReleased: receipt.wholeCreditsReleased,
+      houseAdvanceRepayment: receipt.houseAdvanceRepayment,
+      alreadyApplied,
+    };
+  }
+
+  protected assertMatchingBeatTheHouseSettlementReceipt(
+    profile: CasinoProfile,
+    returnedHalfUnits: HalfUnits,
+    profitHalfUnits: HalfUnits,
+    context: BeatTheHouseSettlementContext,
+    receipt: BeatTheHouseSettlementReceipt,
+  ): void {
+    if (
+      receipt.settlementKey !== context.settlementKey ||
+      receipt.profileId !== profile.id ||
+      receipt.profileCreatedAt !== profile.createdAt ||
+      receipt.gameId !== context.gameId ||
+      receipt.roomId !== context.roomId ||
+      receipt.sessionId !== context.sessionId ||
+      receipt.returnedHalfUnits !== returnedHalfUnits ||
+      receipt.profitHalfUnits !== profitHalfUnits
+    ) {
+      throw new Error('Beat the House settlement key was reused with different details.');
+    }
   }
 
   private static safeMoney(value: number): number {
