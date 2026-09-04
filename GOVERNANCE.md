@@ -6,7 +6,7 @@ Casino Warehouse is a public, source-available, noncommercial demo project. This
 
 Casino Warehouse is maintained by the repository owner and any collaborators with maintainer access. Maintainers are responsible for repository settings, issue triage, pull request review, release direction, and final merge decisions.
 
-Decisions are made in the open when practical, using issues and pull requests as the working record. Maintainers prioritize changes that keep the demo reliable, noncommercial, secure, accessible, maintainable, and aligned with the current milestone sequence. Larger feature, policy, or architecture changes should start as an issue before implementation so maintainers can confirm the direction and scope.
+Decisions are made in the open when practical, using issues and pull requests as the working record. Maintainers prioritize changes that keep the demo reliable, noncommercial, secure, accessible, and maintainable. Larger feature, policy, or architecture changes should start as an issue before implementation so maintainers can confirm the direction and scope.
 
 Maintainers may decline or defer work that is out of scope, commercially oriented, too broad for the current roadmap, insufficiently specified, duplicative, unsafe, or inconsistent with the license and project goals. When that happens, maintainers should leave a short explanation and use the appropriate issue state or labels.
 
@@ -20,16 +20,10 @@ Issues should use the bug report or feature request templates when they apply. M
 - `priority:high` is reserved for work that blocks the next milestone, fixes a high-risk defect, or protects security or release confidence.
 - Maintainers may close issues that are duplicates, completed, stale after follow-up, not planned, outside the noncommercial demo scope, or no longer accurate after newer work.
 
-Milestones communicate delivery order. The current sequence is:
-
-1. `01 - CI hardening`
-2. `02 - Testing expansion`
-3. `03 - Security hardening`
-4. `04 - Multiplayer hardening`
-5. `05 - Architecture cleanup`
-6. `06 - Repository/community health`
-
-Maintainers may reorder work when a dependency, security concern, or contributor availability makes a different path safer.
+Maintainers use the live GitHub milestones, issues, and project views to
+communicate delivery order. Do not copy the current backlog or milestone order
+into this file. Maintainers may reorder work when a dependency, security
+concern, or contributor availability makes a different path safer.
 
 ## Pull Request Review
 
