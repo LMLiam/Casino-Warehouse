@@ -11,6 +11,7 @@ import { acceptHouseAdvance } from '../profiles/acceptHouseAdvance';
 import type { CasinoProfile } from '../profiles/CasinoProfile';
 import type { CasinoSaveState } from '../profiles/CasinoSaveState';
 import { createProfile as createProfileRecord } from '../profiles/createProfile';
+import { defaultGameCredits } from '../profiles/defaultGameCredits';
 import { defaultHouseAdvanceState } from '../profiles/defaultHouseAdvanceState';
 import { deleteProfile } from '../profiles/deleteProfile';
 import { emptySaveState } from '../profiles/emptySaveState';
@@ -97,6 +98,7 @@ export class MemoryServerDataStore implements ServerDataStore {
       name: profileName.trim().replace(/\s+/g, ' ').slice(0, 32) || 'Player',
       color: hexColourSchema.parse('#7dd3fc'),
       bankroll: MemoryServerDataStore.safeMoney(bankroll),
+      gameCredits: defaultGameCredits,
       houseAdvance: defaultHouseAdvanceState,
       stats: emptyStats(),
       transactions: [],

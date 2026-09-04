@@ -13,13 +13,16 @@ import { roomNameSchema } from '../../../src/schemas/casinoSchemas/roomNameSchem
 import { slotThemeSchema } from '../../../src/schemas/casinoSchemas/slotThemeSchema';
 import { transactionTypeSchema } from '../../../src/schemas/casinoSchemas/transactionTypeSchema';
 import { audioSettingsSchema } from '../../../src/schemas/casinoSchemas/audioSettingsSchema';
+import type { JsonValue } from '../../../src/schemas/casinoSchemas/JsonValue';
 import { zodErrorSummary } from '../../../src/schemas/casinoSchemas/zodErrorSummary';
 import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSaveState';
 import { loadProfileStore } from '../../../src/state/profiles/loadProfileStore';
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import type { StorageLike } from '../../../src/state/profiles/StorageLike';
+import { decodeServerMessage } from '../../../src/multiplayer/protocol/decodeServerMessage';
 import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClientMessage';
 import { parseSessionState } from '../../../src/state/session/parseSessionState';
+import { profileStoreContractFixtures, serverMessageContractFixtures } from './schema-contract-fixtures';
 
 class MemoryStorage implements StorageLike {
   private readonly values = new Map<string, string>();
@@ -174,6 +177,62 @@ describe('Zod-backed runtime validation', () => {
     expect(beatTheHouseShoeSaveStateSchema.safeParse(savedShoe).success).toBe(true);
     expect(beatTheHouseShoeSaveStateSchema.safeParse({ ...savedShoe, deck: [] }).success).toBe(false);
     expect(beatTheHouseShoeSaveStateSchema.safeParse({ ...savedShoe, cutThresholdCardsDealt: 1 }).success).toBe(false);
+  });
+
+  it('defaults missing game credits and rejects invalid residuals at the profile boundary', () => {
+    const [alice] = profileStoreContractFixtures.current.profiles;
+    if (!alice) {
+      throw new Error('Missing contract profile.');
+    }
+    const legacyProfile: Record<string, JsonValue> = { ...alice };
+    delete legacyProfile.gameCredits;
+
+    const legacy = parseCasinoSaveState({ profiles: [legacyProfile] });
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) {
+      throw new Error('Legacy profile should parse.');
+    }
+    const [legacyParsed] = legacy.value.profiles;
+    if (!legacyParsed) {
+      throw new Error('Missing parsed profile.');
+    }
+    expect(legacyParsed.gameCredits).toEqual({ beatTheHouseHalfChip: 0 });
+
+    for (const value of [-1, 0.5, 2, '1']) {
+      expect(parseCasinoSaveState({ profiles: [{ ...alice, gameCredits: { beatTheHouseHalfChip: value } }] }).ok).toBe(false);
+    }
+  });
+
+  it('carries residual game credits only inside data-state profile state', () => {
+    const [alice] = profileStoreContractFixtures.current.profiles;
+    if (!alice) {
+      throw new Error('Missing contract profile.');
+    }
+    const profileState = { profiles: [{ ...alice, gameCredits: { beatTheHouseHalfChip: 1 } }] };
+    const message = decodeServerMessage(JSON.stringify({ type: 'data-state', database: 'memory', profileState }));
+    if (!message || message.type !== 'data-state') {
+      throw new Error('Expected a data-state message.');
+    }
+    const [profile] = message.profileState.profiles;
+    if (!profile) {
+      throw new Error('Missing data-state profile.');
+    }
+    expect(profile.gameCredits).toEqual({ beatTheHouseHalfChip: 1 });
+
+    const roomStateFixture = serverMessageContractFixtures.find((fixture) => fixture.type === 'room-state');
+    if (!roomStateFixture) {
+      throw new Error('Missing room-state fixture.');
+    }
+    const tamperedRoom = JSON.parse(JSON.stringify(roomStateFixture)) as { room: { players: Record<string, JsonValue>[] } };
+    const [firstPlayer] = tamperedRoom.room.players;
+    if (!firstPlayer) {
+      throw new Error('Missing room player.');
+    }
+    firstPlayer.gameCredits = { beatTheHouseHalfChip: 1 };
+    expect(decodeServerMessage(JSON.stringify(tamperedRoom))).toBeUndefined();
+
+    const snapshot = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
+    expect(gameSnapshotSchema.safeParse({ ...snapshot, gameCredits: { beatTheHouseHalfChip: 1 } }).success).toBe(false);
   });
 
   it('preserves finite heartbeat timestamps without applying credit normalization', () => {

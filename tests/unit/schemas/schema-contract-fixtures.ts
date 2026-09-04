@@ -50,6 +50,7 @@ const profileStoreCurrentV1Fixture = {
       name: 'Alice',
       color: testHexColour('#6ee7b7'),
       bankroll: 1200,
+      gameCredits: { beatTheHouseHalfChip: 0 },
       houseAdvance: {
         outstandingBalance: 0,
         activeCount: 0,

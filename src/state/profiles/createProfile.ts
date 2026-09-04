@@ -3,6 +3,7 @@ import type { CasinoSaveState } from './CasinoSaveState';
 import { createIsoTimestamp } from '../../schemas/casinoSchemas/createIsoTimestamp';
 import { profileIdSchema } from '../../schemas/casinoSchemas/profileIdSchema';
 import { createStateId } from './createStateId';
+import { defaultGameCredits } from './defaultGameCredits';
 import { defaultHouseAdvanceState } from './defaultHouseAdvanceState';
 import { emptyStats } from './emptyStats';
 import { normalizeProfileName } from './normalizeProfileName';
@@ -23,6 +24,7 @@ export const createProfile = (
     name: profileName,
     color: profileColorFromName(profileName),
     bankroll: Math.max(0, Math.floor(bankroll)),
+    gameCredits: defaultGameCredits,
     houseAdvance: defaultHouseAdvanceState,
     stats: emptyStats(),
     transactions: [],
