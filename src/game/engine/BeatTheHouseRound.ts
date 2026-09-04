@@ -24,6 +24,13 @@ export abstract class BeatTheHouseRound extends BeatTheHouseBetting {
       return this.emit([{ type: 'message', message: 'Side bets need a main bet on the same hand.' }], 'Side bets need a main bet on the same hand.');
     }
 
+    if (!BeatTheHouseState.hasValidSideBetCaps(this.bets)) {
+      return this.emit(
+        [{ type: 'message', message: 'Side bets cannot exceed the main bet on the same hand.' }],
+        'Side bets cannot exceed the main bet on the same hand.',
+      );
+    }
+
     const shoeEvents = this.prepareShoeForDeal();
     this.phase = 'dealing';
     this.lastBets = BeatTheHouseState.cloneBets(this.bets);

@@ -38,6 +38,11 @@ Side bets are placed before cards are revealed. Each side bet is settled from
 the relevant first cards, final cards, or dealer result. A payout ratio is the
 profit paid in addition to the returned stake.
 
+For each hand, the stake for each side-bet type cannot exceed the main-bet
+stake. Each side-bet type is checked independently, so all four side-bet types
+can each equal the main bet. A side bet requires a positive main bet on the
+same hand.
+
 | Side bet      | Winning condition                             | Profit |
 | ------------- | --------------------------------------------- | -----: |
 | Ace Flash     | Exactly one first card is a black Ace         |   12:1 |

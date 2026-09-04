@@ -18,8 +18,10 @@ import type { RoundSummary } from '../types/RoundSummary';
 import type { SideBetState } from '../types/SideBetState';
 import type { SideBetType } from '../types/SideBetType';
 import type { SideStates } from '../types/SideStates';
+import { sideBetTypes } from '../types/sideBetTypes';
 import type { BeatTheHouseSaveState } from './BeatTheHouseSaveState';
 import type { GameOptions } from './GameOptions';
+import { isSideBetWithinMainBet } from './isSideBetWithinMainBet';
 
 export abstract class BeatTheHouseState {
   protected static readonly defaultInitialBankroll = 100;
@@ -232,6 +234,10 @@ export abstract class BeatTheHouseState {
 
   protected static handStake(bets: Bets, handId: HandId): number {
     return betTypes.reduce((total, betType) => total + bets[handId][betType], 0);
+  }
+
+  protected static hasValidSideBetCaps(bets: Bets): boolean {
+    return handIds.every((handId) => sideBetTypes.every((betType) => isSideBetWithinMainBet(bets[handId].main, bets[handId][betType], 0)));
   }
 
   protected static playableHands(bets: Bets): HandId[] {

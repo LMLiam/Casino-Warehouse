@@ -32,7 +32,7 @@ detect an accidental replacement without storing image data in source:
 
 | Path                               | SHA-256                                                            |
 | ---------------------------------- | ------------------------------------------------------------------ |
-| `/assets/beat-the-house/table.png` | `783ea6fbb963e9dabf6f43831f8f30faf37a92c8d95ea4e5040bdec15c13f1e2` |
+| `/assets/beat-the-house/table.png` | `6136093061108c995b70c28bb2fbf9e130cb55992389471ae99cc410f4e34a2c` |
 | `/assets/common/chips-sheet.png`   | `a89ba4ff5aa402885a79180ebf464fdb3a3920555eea1993b4f24e24a64d8ae7` |
 
 ## Access Patterns

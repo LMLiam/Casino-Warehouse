@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Card } from '../../../src/game/cards/Card';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
+import { sideBetTypes } from '../../../src/game/types/sideBetTypes';
 import { createDeterministicBeatTheHouseShoe } from './createDeterministicBeatTheHouseShoe';
 
 const requireSummary = <T>(snapshot: { readonly summaries: readonly T[] }): T => {
@@ -296,6 +297,27 @@ describe('BeatTheHouseGame', () => {
     expect(game.snapshot().canRebet).toBe(false);
   });
 
+  it('caps each side bet independently at the main bet and raises every allowance with the main bet', () => {
+    const game = createGame(1000, [card('K', 'hearts'), card('Q', 'spades')]);
+    game.placeBet('left', 'main', 5);
+
+    for (const betType of sideBetTypes) {
+      expect(game.placeBet('left', betType, 5).bets.left[betType]).toBe(5);
+    }
+
+    const beforeRejectedBet = game.snapshot();
+    const rejected = game.placeBet('left', 'aceFlash', 1);
+
+    expect(rejected.status).toBe('Side bets cannot exceed the main bet on the same hand.');
+    expect(rejected.bets).toEqual(beforeRejectedBet.bets);
+    expect(rejected.bankroll).toBe(beforeRejectedBet.bankroll);
+
+    game.placeBet('left', 'main', 1);
+    for (const betType of sideBetTypes) {
+      expect(game.placeBet('left', betType, 1).bets.left[betType]).toBe(6);
+    }
+  });
+
   it('manages dealer tips as pending table credits before the round starts', () => {
     const game = createGame(50, [card('2', 'diamonds'), card('K', 'spades')]);
 
@@ -448,6 +470,62 @@ describe('BeatTheHouseGame', () => {
     });
 
     expect(game.deal().status).toBe('Side bets need a main bet on the same hand.');
+  });
+
+  it('does not advertise or place invalid saved side bets', () => {
+    const source = createGame(100, [card('2', 'clubs'), card('K', 'spades')]);
+    source.placeBet('left', 'main', 5);
+    source.placeBet('left', 'aceFlash', 5);
+    source.deal();
+    source.nextRound();
+    const saved = source.saveState();
+    const lastBets = saved.lastBets;
+    if (!lastBets) {
+      throw new Error('Missing saved bets.');
+    }
+
+    const invalidLastBets = {
+      ...lastBets,
+      left: { ...lastBets.left, aceFlash: 6 },
+    };
+    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    game.restoreState({
+      ...saved,
+      bets: {
+        ...saved.bets,
+        left: { ...saved.bets.left, main: 2 },
+      },
+      lastBets: invalidLastBets,
+    });
+    const before = game.snapshot();
+
+    expect(before.canRebet).toBe(false);
+    expect(before.rebetAmounts).toEqual({ left: 0, centre: 0, right: 0 });
+    expect(game.rebet()).toMatchObject({ bets: before.bets, bankroll: before.bankroll });
+    expect(game.rebetHand('left')).toMatchObject({ bets: before.bets, bankroll: before.bankroll });
+    expect(game.snapshot().rebetAmounts).toEqual({ left: 0, centre: 0, right: 0 });
+    expect(game.saveState().lastBets).toEqual(invalidLastBets);
+  });
+
+  it('rejects restored side bets above the main bet before deal mutates round state', () => {
+    const game = new BeatTheHouseGame({ initialBankroll: 100 });
+    const saved = game.saveState();
+    game.restoreState({
+      ...saved,
+      bets: {
+        ...saved.bets,
+        left: { ...saved.bets.left, main: 5, aceFlash: 6 },
+      },
+    });
+    const before = game.snapshot();
+
+    const rejected = game.deal();
+
+    expect(rejected.status).toBe('Side bets cannot exceed the main bet on the same hand.');
+    expect(rejected.phase).toBe(before.phase);
+    expect(rejected.bankroll).toBe(before.bankroll);
+    expect(rejected.bets).toEqual(before.bets);
+    expect(rejected.shoe).toEqual(before.shoe);
   });
 
   it('covers player hit bust, four-card auto-stand, and dealer black-Ace settlement', () => {

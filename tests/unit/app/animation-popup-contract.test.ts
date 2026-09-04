@@ -326,15 +326,15 @@ describe('Beat the House popup and animation behaviour', () => {
     const { table, host, tagRenderer } = createInitializedTable();
     const game = new BeatTheHouseGame({ initialBankroll: 500, randomInt: () => 0 });
     game.placeBet('left', 'main', 5);
-    game.placeBet('left', 'dealerBust', 10);
+    game.placeBet('left', 'dealerBust', 5);
     game.placeBet('centre', 'main', 25);
 
     table.render(game.snapshot());
 
     const wagerAmounts = JSON.parse(host.dataset.wagerAmounts ?? '[]');
-    expect(wagerAmounts).toEqual(['left:main:5', 'left:dealerBust:10', 'centre:main:25']);
+    expect(wagerAmounts).toEqual(['left:main:5', 'left:dealerBust:5', 'centre:main:25']);
+    expect(tagRenderer.drawMarker).toHaveBeenCalledTimes(3);
     expect(tagRenderer.drawMarker).toHaveBeenCalledWith('£5', expect.any(Number), expect.any(Number));
-    expect(tagRenderer.drawMarker).toHaveBeenCalledWith('£10', expect.any(Number), expect.any(Number));
     expect(tagRenderer.drawMarker).toHaveBeenCalledWith('£25', expect.any(Number), expect.any(Number));
   });
 
