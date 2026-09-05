@@ -145,6 +145,7 @@ export class RoomAuthority extends RoomAuthorityBeat {
       settledSessionIds: new Set(),
       lastBeatEvents: [],
       lastBeatBetOwners: {},
+      beatHandOwners: {},
     };
     this.rooms.set(room.roomId, room);
     this.addMember(room, connectionId, 'spectator', message.profileId, message.profileName, bankroll);
@@ -207,7 +208,12 @@ export class RoomAuthority extends RoomAuthorityBeat {
       return { broadcasts: [], settlements: [] };
     }
     if (room.players.size === 0 && room.spectators.size === 0 && room.serverManaged) {
-      this.resetServerManagedRoom(room);
+      const resetResult = this.resetServerManagedRoom(room);
+      if (resetResult?.error) {
+        return resetResult;
+      }
+      this.syncBeatBankroll(room);
+      return this.broadcast(room, resetResult?.settlements ?? []);
     }
     this.syncBeatBankroll(room);
     return this.broadcast(room);

@@ -70,9 +70,11 @@ describe('Beat the House popup and animation behaviour', () => {
     }
 
     expect(summary.mainResult).toBe('win');
-    expect(summary.sideWins).toEqual([{ betType: 'dealerSevens', label: 'Dealer Sevens (1)', profit: 6, returned: 8 }]);
+    expect(summary.sideWins).toEqual([
+      { betType: 'dealerSevens', label: 'Dealer Sevens (1)', profitHalfUnits: 16, returnedHalfUnits: 20, profit: 8, returned: 10 },
+    ]);
     expect(settled.sideStates.left).toMatchObject({ dealerSevens: 'win', dealerBust: 'lose' });
-    expect(settled.lastEvents.at(-1)).toMatchObject({ type: 'round-settled', totalProfit: 14 });
+    expect(settled.lastEvents.at(-1)).toMatchObject({ type: 'round-settled', totalProfitHalfUnits: 32, totalProfit: 16 });
   });
 
   it('next round clears cards, side states, summaries, and active hand state', () => {
@@ -170,11 +172,11 @@ describe('Beat the House popup and animation behaviour', () => {
 
     expect(host.dataset.settlementVisible).toBe('true');
     expect(host.dataset.settlementHandCount).toBe('1');
-    expect(JSON.parse(host.dataset.sideBetLabels ?? '[]')).toEqual(['Dealer Bust LOSE -£2', 'Dealer Sevens (1) WIN +£6']);
+    expect(JSON.parse(host.dataset.sideBetLabels ?? '[]')).toEqual(['Dealer Bust LOSE -£2', 'Dealer Sevens (1) WIN +£8']);
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
       'Main WIN +£10',
-      'Side bets WIN +£4',
-      ['Total WIN +£14'],
+      'Side bets WIN +£6',
+      ['Total WIN +£16'],
       expect.any(Number),
       expect.any(Number),
       'win',
@@ -202,11 +204,11 @@ describe('Beat the House popup and animation behaviour', () => {
       expect.objectContaining({ key: 'loss-left-dealerBust-2', to: toPixels(dealerChipBank) }),
     );
     expect(chipRenderer.drawStack).toHaveBeenCalledWith(
-      6,
+      8,
       expect.any(Number),
       expect.any(Number),
       expect.any(Number),
-      expect.objectContaining({ key: 'payout-left-dealerSevens-6', from: toPixels(dealerChipBank) }),
+      expect.objectContaining({ key: 'payout-left-dealerSevens-8', from: toPixels(dealerChipBank) }),
     );
   });
 
@@ -230,8 +232,8 @@ describe('Beat the House popup and animation behaviour', () => {
 
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
       'Main WIN +£10',
-      'Side bets WIN +£4',
-      ['Gross WIN +£14', 'House Advance payment -£2', 'Net WIN +£12'],
+      'Side bets WIN +£6',
+      ['Gross WIN +£16', 'House Advance payment -£2', 'Net WIN +£14'],
       expect.any(Number),
       expect.any(Number),
       'win',
@@ -256,9 +258,9 @@ describe('Beat the House popup and animation behaviour', () => {
     table.render(game.stick(), [{ handId: 'left', houseAdvanceRepayment: 0 }]);
 
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
-      'Main WIN +£10',
+      'Main WIN +£15',
       'Side bets NONE +£0',
-      ['Total WIN +£10'],
+      ['Total WIN +£15'],
       expect.any(Number),
       expect.any(Number),
       'win',
@@ -266,6 +268,40 @@ describe('Beat the House popup and animation behaviour', () => {
     );
     const popupText = vi.mocked(tagRenderer.drawResultPopup).mock.calls[0]?.slice(0, 3).flat().join('\n') ?? '';
     expect(popupText).not.toContain('House Advance payment');
+  });
+
+  it('shows the exact fractional main payout in the popup and animation tag', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const { table, chipRenderer, tagRenderer } = createInitializedTable();
+    const game = createGame(500, [card('A', 'spades'), card('K', 'hearts')]);
+    game.placeBet('left', 'main', 1);
+
+    table.render(game.deal());
+
+    expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
+      'Main WIN +£1.5',
+      'Side bets NONE +£0',
+      ['Total WIN +£1.5'],
+      expect.any(Number),
+      expect.any(Number),
+      'win',
+      false,
+    );
+    expect(chipRenderer.drawStack).toHaveBeenCalledWith(
+      1.5,
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.objectContaining({ key: 'payout-left-main-1.5', from: toPixels(dealerChipBank) }),
+    );
+    expect(tagRenderer.drawPayoutTag).toHaveBeenCalledWith('PAID +£1.5', expect.any(Number), expect.any(Number), 'win');
   });
 
   it('draws dealer tip chips while betting and includes Dealer Thanks in the net breakdown', () => {
@@ -422,9 +458,9 @@ describe('Beat the House popup and animation behaviour', () => {
     revealSettlement?.();
 
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
-      'Main WIN +£10',
+      'Main WIN +£15',
       'Side bets NONE +£0',
-      ['Gross WIN +£10', 'House Advance payment -£1', 'Net WIN +£9'],
+      ['Gross WIN +£15', 'House Advance payment -£1', 'Net WIN +£14'],
       expect.any(Number),
       expect.any(Number),
       'win',

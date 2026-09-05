@@ -1,15 +1,17 @@
-import { rankValue } from '../cards/rankValue';
 import type { DealerTips } from '../types/DealerTips';
 import type { GameEvent } from '../types/GameEvent';
 import type { GameSnapshot } from '../types/GameSnapshot';
 import type { RoundSummary } from '../types/RoundSummary';
-import { resolveSideBets } from './beatTheHouseSideBetResolver';
+import { sideBetTypes } from '../types/sideBetTypes';
+import { asHalfUnits } from '../beatTheHouse/asHalfUnits';
+import { settleBeatTheHouseMain } from '../beatTheHouse/settlement/settleBeatTheHouseMain';
+import { settleBeatTheHouseSideBets } from '../beatTheHouse/settlement/settleBeatTheHouseSideBets';
 import { BeatTheHouseRound } from './BeatTheHouseRound';
 import { BeatTheHouseState } from './BeatTheHouseState';
 
 export abstract class BeatTheHouseSettlement extends BeatTheHouseRound {
   protected settle(previousEvents: GameEvent[]): GameSnapshot {
-    let returned = 0;
+    let returnedHalfUnits = 0;
     const summaries: RoundSummary[] = [];
     const sideStates = BeatTheHouseState.emptySideStates();
     const dealerTipRewards = this.resolveDealerThanks();
@@ -17,63 +19,86 @@ export abstract class BeatTheHouseSettlement extends BeatTheHouseRound {
     for (const handId of BeatTheHouseState.playableHands(this.bets)) {
       const hand = this.hands[handId];
       const bets = this.bets[handId];
-      let handReturned = 0;
-      let mainResult: RoundSummary['mainResult'] = 'lose';
-
-      if (hand.result === 'lose') {
-        mainResult = 'lose';
-      } else if (hand.automaticWin) {
-        mainResult = 'win';
-        handReturned += BeatTheHouseState.wholeChipPayout(bets.main, 1).returned;
-      } else if (this.dealer.blackAce) {
-        mainResult = 'lose';
-      } else if (this.dealer.bust) {
-        mainResult = 'win';
-        handReturned += BeatTheHouseState.wholeChipPayout(bets.main, 1).returned;
-      } else {
-        const playerFinalCard = hand.finalCard;
-        const dealerFinalCard = this.dealer.finalCard;
-        if (!playerFinalCard || !dealerFinalCard) {
-          mainResult = 'push';
-          handReturned += Math.floor(bets.main);
-        } else {
-          const playerValue = rankValue(playerFinalCard.rank);
-          const dealerValue = rankValue(dealerFinalCard.rank);
-          if (playerValue > dealerValue) {
-            mainResult = 'win';
-            handReturned += BeatTheHouseState.wholeChipPayout(bets.main, 1).returned;
-          } else if (playerValue === dealerValue) {
-            mainResult = 'push';
-            handReturned += Math.floor(bets.main);
-          }
-        }
+      const playerFirstCard = hand.cards[0];
+      const dealerFirstCard = this.dealer.cards[0];
+      if (!playerFirstCard || !dealerFirstCard) {
+        throw new Error('A settled Beat the House hand requires first cards.');
       }
 
-      this.hands[handId] = { ...hand, result: mainResult };
-      const sideResult = resolveSideBets(this.bets[handId], hand, this.dealer, mainResult, BeatTheHouseState.sideBetMultipliers);
-      handReturned += sideResult.returned;
-      returned += handReturned;
-      sideStates[handId] = sideResult.states;
+      const main = settleBeatTheHouseMain({
+        mainStake: bets.main,
+        playerFirstCard,
+        playerMode: hand.result === 'lose' ? 'immediateLoss' : hand.automaticWin ? 'automaticWin' : 'compare',
+        playerFinalCard: hand.finalCard,
+        dealerFirstCard,
+        dealerBust: this.dealer.bust,
+        dealerFinalCard: this.dealer.finalCard,
+      });
+      const side = settleBeatTheHouseSideBets({
+        sideBets: {
+          aceFlash: bets.aceFlash,
+          dealerBust: bets.dealerBust,
+          matchPush: bets.matchPush,
+          dealerSevens: bets.dealerSevens,
+        },
+        mainResult: main.result,
+        playerFirstCard,
+        playerFinalCard: hand.finalCard,
+        dealer: this.dealer,
+      });
+      const handReturnedHalfUnits = asHalfUnits(main.returnedHalfUnits + side.returnedHalfUnits);
+      const handProfitHalfUnits = asHalfUnits(main.profitHalfUnits + side.profitHalfUnits);
+      const handSideStates = BeatTheHouseState.emptySideState();
+      for (const betType of sideBetTypes) {
+        if (bets[betType] > 0) {
+          handSideStates[betType] = 'lose';
+        }
+      }
+      const sideWins = side.wins.map((win) => {
+        handSideStates[win.betType] = 'win';
+        const label =
+          win.betType === 'dealerSevens'
+            ? `Dealer Sevens (${this.dealer.cards.filter((card) => card.rank === '7').length})`
+            : win.betType === 'aceFlash'
+              ? 'Ace Flash'
+              : win.betType === 'dealerBust'
+                ? 'Dealer Bust'
+                : 'Match Push';
+        return {
+          betType: win.betType,
+          label,
+          returnedHalfUnits: win.returnedHalfUnits,
+          profitHalfUnits: win.profitHalfUnits,
+          returned: win.returnedHalfUnits / 2,
+          profit: win.profitHalfUnits / 2,
+        };
+      });
 
+      this.hands[handId] = { ...hand, result: main.result };
+      returnedHalfUnits += handReturnedHalfUnits;
+      sideStates[handId] = handSideStates;
       const stake = BeatTheHouseState.handStake(this.bets, handId);
       summaries.push({
         handId,
-        mainResult,
+        mainResult: main.result,
         stake,
-        returned: handReturned,
-        profit: handReturned - stake,
-        sideWins: sideResult.wins,
+        returnedHalfUnits: handReturnedHalfUnits,
+        profitHalfUnits: handProfitHalfUnits,
+        returned: handReturnedHalfUnits / 2,
+        profit: handProfitHalfUnits / 2,
+        sideWins,
       });
     }
 
     const dealerThanksTotal = BeatTheHouseState.totalDealerTips(dealerTipRewards);
-    this.creditBankroll(returned + dealerThanksTotal);
+    this.creditBankroll(returnedHalfUnits / 2 + dealerThanksTotal);
     this.summaries = summaries;
     this.sideStates = sideStates;
     this.dealerTipRewards = dealerTipRewards;
     this.phase = 'roundOver';
-    const totalProfit = summaries.reduce((total, summary) => total + summary.profit, 0);
-    const events: GameEvent[] = [...previousEvents, { type: 'round-settled', summaries, totalProfit, dealerThanksTotal }];
+    const totalProfitHalfUnits = asHalfUnits(summaries.reduce((total, summary) => total + summary.profitHalfUnits, 0));
+    const totalProfit = totalProfitHalfUnits / 2;
+    const events: GameEvent[] = [...previousEvents, { type: 'round-settled', summaries, totalProfitHalfUnits, totalProfit, dealerThanksTotal }];
     const thanksStatus = dealerThanksTotal > 0 ? ` Dealer's Thanks ${BeatTheHouseState.formatMoneyDelta(dealerThanksTotal)}.` : '';
     return this.emit(events, `Round complete. Total ${BeatTheHouseState.formatMoneyDelta(totalProfit)}.${thanksStatus}`);
   }

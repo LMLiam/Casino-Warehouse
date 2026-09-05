@@ -26,17 +26,11 @@ import { isSideBetWithinMainBet } from './isSideBetWithinMainBet';
 export abstract class BeatTheHouseState {
   protected static readonly defaultInitialBankroll = 100;
   protected static readonly maxPlayerCards = 4;
-  protected static readonly dealerDrawMaxRank = 10;
+  protected static readonly dealerDrawMaxRank = 9;
   protected static readonly maxDealerCards = 4;
   protected static readonly dealerThanksChanceDenominator = 10;
   protected static readonly dealerThanksWinningRoll = 0;
   protected static readonly dealerThanksMultiplier = 2;
-  protected static readonly sideBetMultipliers = {
-    aceFlashBoth: 50,
-    aceFlashSingle: 10,
-    dealerBust: 4,
-    matchPush: 9,
-  } as const;
 
   protected static readonly handName: Record<HandId, string> = {
     left: 'Left',
@@ -264,15 +258,6 @@ export abstract class BeatTheHouseState {
   private static publicDealer(dealer: DealerHand): PublicDealerHand {
     const { holeCard: _holeCard, ...publicDealer } = dealer;
     return { ...publicDealer, cards: [...dealer.cards] };
-  }
-
-  protected static wholeChipPayout(stake: number, multiplier: number): { readonly profit: number; readonly returned: number } {
-    const wholeStake = Math.floor(stake);
-    const profit = Math.floor(wholeStake * multiplier);
-    return {
-      profit,
-      returned: wholeStake + profit,
-    };
   }
 
   protected static formatMoneyDelta(amount: number): string {

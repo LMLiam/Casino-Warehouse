@@ -275,6 +275,27 @@ describe('per-game room authority', () => {
     expect(rejoined.seats.find((seat) => seat.seatId === 'left')?.profileId).toBe('bob');
   });
 
+  it('does not clear a server-managed room before unresolved settlement recovery succeeds', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    authority.handle('a', join('beat-the-house', mainBeatRoomId, 'alice', 100));
+    authority.handle('a', claimSeat('left'));
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 1 });
+    rigImmediateBeatRound(authority, mainBeatRoomId);
+
+    vi.spyOn(store, 'applyBeatTheHouseSettlement').mockImplementation(() => {
+      throw new Error('Transient exact settlement failure.');
+    });
+
+    const failedStart = authority.handle('a', { type: 'start-round' });
+    const failedReset = authority.clearRooms('test-reset');
+
+    expect(failedStart.error).toBe('Beat the House settlement is pending. Try again.');
+    expect(failedReset.error).toBe('Beat the House settlement is pending. Try again.');
+    expect(requireBroadcast(failedReset).players.map((player) => player.profileId)).toEqual([testProfileId('alice')]);
+    expect(beat(requireBroadcast(failedReset)).phase).toBe('roundOver');
+  });
+
   it('keeps Beat the House rooms at three seats with ownership, spectator, leave, and settlement protections', () => {
     const authority = new RoomAuthority();
     const created = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 500, 99)));
@@ -816,7 +837,16 @@ describe('per-game room authority', () => {
     const started = authority.handle('a', { type: 'start-round' });
 
     expect(beat(requireBroadcast(started)).phase).toBe('roundOver');
-    expect(started.settlements).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'gameplay', returned: 50, profit: 25 })]));
+    expect(started.settlements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'gameplay',
+          returned: 62.5,
+          profit: 37.5,
+          beatTheHouse: { returnedHalfUnits: 125, profitHalfUnits: 75, halfChipBefore: 0, halfChipAfter: 1, wholeCreditsReleased: 62 },
+        }),
+      ]),
+    );
     const transactions = store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.transactions ?? [];
     expect(transactions).toContainEqual(
       expect.objectContaining({
@@ -828,6 +858,143 @@ describe('per-game room authority', () => {
       }),
     );
     expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')?.bankroll).toBeGreaterThanOrEqual(115);
+  });
+
+  it('keeps odd exact returns and residuals isolated by profile', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 100))).roomId;
+    authority.handle('b', join('beat-the-house', roomId, 'bob', 100));
+    authority.handle('a', claimSeat('left'));
+    authority.handle('b', claimSeat('centre'));
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 1 });
+    authority.handle('b', { type: 'place-chip', seatId: 'centre', betType: 'main', amount: 1 });
+    const state = roomStateForTest(authority, roomId);
+    if (state.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House test room.');
+    }
+    state.model.game.restoreState({
+      ...state.model.game.saveState(),
+      shoe: createDeterministicBeatTheHouseShoe({
+        dealOrder: [
+          { rank: 'A', suit: 'spades' },
+          { rank: 'A', suit: 'clubs' },
+          { rank: 'K', suit: 'hearts' },
+        ],
+      }).saveState(),
+    });
+
+    authority.handle('a', { type: 'start-round' });
+    const settled = authority.handle('b', { type: 'start-round' });
+    const profiles = new Map(store.snapshot().profileState.profiles.map((profile) => [profile.id, profile]));
+
+    expect(settled.settlements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ profileId: 'alice', returned: 2.5, profit: 1.5, beatTheHouse: expect.objectContaining({ halfChipAfter: 1 }) }),
+        expect.objectContaining({ profileId: 'bob', returned: 2.5, profit: 1.5, beatTheHouse: expect.objectContaining({ halfChipAfter: 1 }) }),
+      ]),
+    );
+    expect(profiles.get(testProfileId('alice'))).toMatchObject({ bankroll: 101, gameCredits: { beatTheHouseHalfChip: 1 } });
+    expect(profiles.get(testProfileId('bob'))).toMatchObject({ bankroll: 101, gameCredits: { beatTheHouseHalfChip: 1 } });
+    expect(beat(requireBroadcast(settled)).bankroll).toBe(202);
+  });
+
+  it('settles a disconnected hand against its frozen owner after the seat changes', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 100))).roomId;
+    authority.handle('watch', join('beat-the-house', roomId, 'charlie', 100, 'spectator'));
+    authority.handle('a', claimSeat('left'));
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 1 });
+    const state = roomStateForTest(authority, roomId);
+    if (state.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House test room.');
+    }
+    state.model.game.restoreState({
+      ...state.model.game.saveState(),
+      shoe: createDeterministicBeatTheHouseShoe({
+        dealOrder: [
+          { rank: 'K', suit: 'hearts' },
+          { rank: 'Q', suit: 'spades' },
+        ],
+      }).saveState(),
+    });
+
+    expect(beat(requireBroadcast(authority.handle('a', { type: 'start-round' }))).phase).toBe('playing');
+    authority.handle('a', { type: 'leave-room' });
+    authority.handle('watch', claimSeat('left'));
+    const settled = authority.handle('watch', { type: 'player-action', action: 'stick' });
+
+    expect(settled.settlements).toEqual(expect.arrayContaining([expect.objectContaining({ profileId: 'alice', seatId: 'left', returned: 2, profit: 1 })]));
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')).toMatchObject({ bankroll: 101 });
+    expect(requireBroadcast(settled).players.find((player) => player.profileId === 'charlie')?.bankroll).toBe(100);
+    expect(beat(requireBroadcast(settled)).bankroll).toBe(100);
+  });
+
+  it('keeps a partial exact settlement unresolved and completes it once on retry', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = requireDirect(authority.handle('a', create('beat-the-house', 'alice', 100))).roomId;
+    authority.handle('b', join('beat-the-house', roomId, 'bob', 100));
+    authority.handle('a', claimSeat('left'));
+    authority.handle('b', claimSeat('centre'));
+    authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 1 });
+    authority.handle('b', { type: 'place-chip', seatId: 'centre', betType: 'main', amount: 1 });
+    const state = roomStateForTest(authority, roomId);
+    if (state.model.kind !== 'beat-the-house') {
+      throw new Error('Expected a Beat the House test room.');
+    }
+    state.model.game.restoreState({
+      ...state.model.game.saveState(),
+      shoe: createDeterministicBeatTheHouseShoe({
+        dealOrder: [
+          { rank: 'A', suit: 'spades' },
+          { rank: 'A', suit: 'clubs' },
+          { rank: 'K', suit: 'hearts' },
+        ],
+      }).saveState(),
+    });
+    const applySettlement = store.applyBeatTheHouseSettlement.bind(store);
+    let exactCalls = 0;
+    const failure = vi.spyOn(store, 'applyBeatTheHouseSettlement').mockImplementation((profileId, returnedHalfUnits, profitHalfUnits, context) => {
+      exactCalls += 1;
+      if (exactCalls === 2) {
+        throw new Error('Transient exact settlement failure.');
+      }
+      return applySettlement(profileId, returnedHalfUnits, profitHalfUnits, context);
+    });
+
+    authority.handle('a', { type: 'start-round' });
+    const failed = authority.handle('b', { type: 'start-round' });
+
+    expect(failed.error).toBe('Beat the House settlement is pending. Try again.');
+    expect(failed.settlements).toEqual([]);
+    expect(beat(requireBroadcast(failed)).phase).toBe('roundOver');
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')).toMatchObject({
+      bankroll: 101,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+    });
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'bob')).toMatchObject({
+      bankroll: 99,
+      gameCredits: { beatTheHouseHalfChip: 0 },
+    });
+    expect(beat(requireBroadcast(authority.handle('a', { type: 'next-round' }))).phase).toBe('roundOver');
+
+    const recovered = authority.handle('b', { type: 'next-round' });
+    failure.mockRestore();
+
+    expect(recovered.error).toBeUndefined();
+    expect(beat(requireBroadcast(recovered)).phase).toBe('roundOver');
+    expect(recovered.settlements).toHaveLength(2);
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'alice')).toMatchObject({
+      bankroll: 101,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+    });
+    expect(store.snapshot().profileState.profiles.find((profile) => profile.id === 'bob')).toMatchObject({
+      bankroll: 101,
+      gameCredits: { beatTheHouseHalfChip: 1 },
+    });
+    expect(beat(requireBroadcast(recovered)).bankroll).toBe(202);
   });
 
   it('covers additional room authority validation edges without trusting malformed client state', () => {

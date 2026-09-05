@@ -7,6 +7,7 @@ import { createSessionState } from '../../state/session/createSessionState';
 import { profileTokenAuth } from '../../state/serverDataStore/profileTokenAuth';
 import type { ClientMessage } from '../protocol/ClientMessage';
 import { parseClientMessage } from '../protocol/parseClientMessage';
+import type { AuthorityResult } from '../roomAuthorityModel/AuthorityResult';
 import type { CasinoRoomAuthority } from './CasinoRoomAuthority';
 import type { Peer } from './Peer';
 import { CasinoServerState } from './CasinoServerState';
@@ -51,7 +52,13 @@ export class CasinoServerMessageHandler {
       return;
     }
 
-    const result = this.authority.handle(peer.id, serverOwnedMessage);
+    let result: AuthorityResult;
+    try {
+      result = this.authority.handle(peer.id, serverOwnedMessage);
+    } catch {
+      this.state.send(peer, { type: 'error', code: 'rejected', message: 'Server could not complete the room action. Try again.' });
+      return;
+    }
     if (serverOwnedMessage.type === 'list-rooms') {
       peer.browsingGameId = serverOwnedMessage.gameId;
     }
@@ -114,15 +121,21 @@ export class CasinoServerMessageHandler {
           this.resetAllBankrolls();
           this.state.emitAuthorityResult(peer, this.authority.reconcileProfiles('bankroll-reset'), { forceDataState: true });
           return true;
-        case 'clear-server-data':
+        case 'clear-server-data': {
           this.requireAdmin(peer);
+          const clearedRooms = this.authority.clearRooms('server-data-cleared');
+          if (clearedRooms.error) {
+            this.state.emitAuthorityResult(peer, clearedRooms);
+            return true;
+          }
           this.dataStore.clear();
           for (const candidate of this.state.peers.values()) {
             candidate.ownedProfileIds.clear();
             this.state.sendProfileAccess(candidate);
           }
-          this.state.emitAuthorityResult(peer, this.authority.clearRooms('server-data-cleared'), { forceDataState: true });
+          this.state.emitAuthorityResult(peer, clearedRooms, { forceDataState: true });
           return true;
+        }
         default:
           return false;
       }

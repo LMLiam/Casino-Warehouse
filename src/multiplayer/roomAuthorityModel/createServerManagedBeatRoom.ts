@@ -30,5 +30,6 @@ export const createServerManagedBeatRoom = (): RoomState => {
     settledSessionIds: new Set(),
     lastBeatEvents: [],
     lastBeatBetOwners: {},
+    beatHandOwners: {},
   };
 };

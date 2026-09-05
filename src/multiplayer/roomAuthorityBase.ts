@@ -27,12 +27,17 @@ import { RoomAuthorityMembership } from './roomAuthorityMembership';
 
 export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
   protected resetRoom(room: RoomState): AuthorityResult {
+    const recovery = this.retryUnsettledBeatSettlement(room);
+    if (recovery) {
+      return recovery;
+    }
     room.sessionId = createSessionId();
     room.settledSessionIds.clear();
     if (room.model.kind === 'beat-the-house') {
       this.clearBeatReadiness(room);
       room.model.game.restoreState(new BeatTheHouseGame({ initialBankroll: 0 }).saveState());
       room.lastBeatBetOwners = {};
+      room.beatHandOwners = {};
       this.syncBeatBankroll(room);
     } else if (room.model.kind === 'blackjack') {
       room.model.table.reset(this.blackjackOccupants(room));
@@ -54,7 +59,9 @@ export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
     }
     if (after.phase === 'roundOver' && before.phase !== 'roundOver') {
       this.clearBeatReadyVotes(room);
-      this.scheduleBeatNextRoundDeadline(room);
+      if (room.settledSessionIds.has(room.sessionId)) {
+        this.scheduleBeatNextRoundDeadline(room);
+      }
       return;
     }
     if (before.phase === 'roundOver' && after.phase !== 'roundOver') {
@@ -128,11 +135,25 @@ export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
     };
   }
 
-  protected resetServerManagedRoom(room: RoomState): void {
+  protected resetServerManagedRoom(room: RoomState): AuthorityResult | undefined {
+    const recovery = this.retryUnsettledBeatSettlement(room);
+    if (recovery) {
+      if (recovery.error) {
+        return recovery;
+      }
+      this.resetServerManagedRoomState(room);
+      return { broadcasts: [], settlements: recovery.settlements };
+    }
+    this.resetServerManagedRoomState(room);
+    return undefined;
+  }
+
+  private resetServerManagedRoomState(room: RoomState): void {
     room.seats.clear();
     room.settledSessionIds.clear();
     room.lastBeatEvents = [];
     room.lastBeatBetOwners = {};
+    room.beatHandOwners = {};
     room.sessionId = createSessionId();
     if (room.model.kind === 'beat-the-house') {
       this.clearBeatReadiness(room);
@@ -190,6 +211,10 @@ export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
   }
 
   protected advanceReadyBeatNextRound(room: RoomState): AuthorityResult {
+    const recovery = this.retryUnsettledBeatSettlement(room);
+    if (recovery) {
+      return recovery;
+    }
     room.sessionId = createSessionId();
     this.clearBeatReadiness(room);
     this.syncBeatBankroll(room);
@@ -223,6 +248,22 @@ export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
       timer.unref();
     }
     room.model.nextRoundTimer = timer;
+  }
+
+  private retryUnsettledBeatSettlement(room: RoomState): AuthorityResult | undefined {
+    if (room.model.kind !== 'beat-the-house' || room.model.game.snapshot().phase !== 'roundOver' || room.settledSessionIds.has(room.sessionId)) {
+      return undefined;
+    }
+    try {
+      const settlements = this.settleBeat(room, room.model.game.snapshot([...room.lastBeatEvents]));
+      this.clearBeatReadyVotes(room);
+      this.clearBeatNextRoundDeadline(room);
+      this.scheduleBeatNextRoundDeadline(room);
+      return this.broadcast(room, settlements);
+    } catch {
+      this.syncBeatBankroll(room);
+      return { ...this.broadcast(room), error: 'Beat the House settlement is pending. Try again.' };
+    }
   }
 
   protected seatIds(room: RoomState): readonly RoomSeatId[] {

@@ -8,6 +8,7 @@ import type { ProfileId } from '../schemas/casinoSchemas/ProfileId';
 import type { RoomId } from '../schemas/casinoSchemas/RoomId';
 import { createMemoryServerDataStore } from '../state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../state/serverDataStore/ServerDataStore';
+import type { CasinoProfile } from '../state/profiles/CasinoProfile';
 import type { RoomSettlement } from './protocol/RoomSettlement';
 import type { RoomSeatId } from './protocol/RoomSeatId';
 import type { RoomSnapshot } from './protocol/RoomSnapshot';
@@ -42,16 +43,30 @@ export abstract class RoomAuthoritySettlement {
 
   protected abstract afterBeatSnapshotChange(room: RoomState, before: GameSnapshot, after: GameSnapshot): void;
 
+  protected abstract syncBeatBankroll(room: RoomState): void;
+
   protected ownerAction(room: RoomState, action: () => GameSnapshot | BlackjackSnapshot | SlotSnapshot | false | undefined): AuthorityResult {
     const before = room.model.kind === 'beat-the-house' ? room.model.game.snapshot() : undefined;
     const snapshot = action();
     if (room.model.kind === 'beat-the-house' && snapshot && 'lastEvents' in snapshot) {
       room.lastBeatEvents = snapshot.lastEvents;
     }
-    const settlements =
-      room.model.kind === 'beat-the-house' && snapshot && before && 'summaries' in snapshot && snapshot.phase === 'roundOver' && before.phase !== 'roundOver'
-        ? this.settleBeat(room, snapshot)
-        : [];
+    let settlements: readonly RoomSettlement[] = [];
+    if (
+      room.model.kind === 'beat-the-house' &&
+      snapshot &&
+      before &&
+      'summaries' in snapshot &&
+      snapshot.phase === 'roundOver' &&
+      before.phase !== 'roundOver'
+    ) {
+      try {
+        settlements = this.settleBeat(room, snapshot);
+      } catch {
+        this.afterBeatSnapshotChange(room, before, snapshot);
+        return { ...this.broadcast(room), error: 'Beat the House settlement is pending. Try again.' };
+      }
+    }
     if (room.model.kind === 'beat-the-house' && snapshot && before && 'summaries' in snapshot) {
       this.afterBeatSnapshotChange(room, before, snapshot);
     }
@@ -62,65 +77,126 @@ export abstract class RoomAuthoritySettlement {
     if (room.settledSessionIds.has(room.sessionId)) {
       return [];
     }
-    room.settledSessionIds.add(room.sessionId);
-    const gameplaySettlements = snapshot.summaries.flatMap((summary) => {
-      const profileId = room.seats.get(summary.handId);
-      if (!profileId) {
-        return [];
-      }
-      const wagered = totalBeatStake(snapshot, summary.handId);
-      const returned = wagered + summary.profit;
-      const player = room.players.get(profileId);
-      const houseAdvanceRepayment = player && returned > 0 ? this.applyPlayerSettlement(room, profileId, returned, summary.profit) : 0;
-      return [
-        {
+    try {
+      const gameplaySettlements = snapshot.summaries.map((summary): RoomSettlement => {
+        const profileId = room.beatHandOwners[summary.handId];
+        if (!profileId) {
+          throw new Error(`Beat the House hand ${summary.handId} has no frozen owner.`);
+        }
+        const result = this.dataStore.applyBeatTheHouseSettlement(profileId, summary.returnedHalfUnits, summary.profitHalfUnits, {
+          gameId: room.gameId,
+          roomId: room.roomId,
+          sessionId: room.sessionId,
+          settlementKey: `${room.roomId}:${room.sessionId}:${summary.handId}`,
+        });
+        if (!result) {
+          throw new Error(`Beat the House profile ${profileId} is unavailable for settlement.`);
+        }
+        this.updateBeatPlayerBankroll(room, profileId, result.profile);
+        return {
           id: createSettlementId(),
-          kind: 'gameplay' as const,
+          kind: 'gameplay',
           profileId,
           seatId: summary.handId,
-          wagered,
-          returned,
-          profit: summary.profit,
-          houseAdvanceRepayment,
-        },
-      ];
-    });
-    const dealerThanksSettlements = handIds.flatMap((handId): RoomSettlement[] => {
-      const dealerThanks = snapshot.dealerTipRewards[handId];
-      const profileId = room.seats.get(handId);
-      if (!profileId || dealerThanks <= 0) {
-        return [];
-      }
-      const player = room.players.get(profileId);
-      const dealerTip = snapshot.dealerTips[handId];
-      const updated = this.dataStore.recordTransaction(profileId, {
-        gameId: room.gameId,
-        roomId: room.roomId,
-        sessionId: room.sessionId,
-        type: 'dealer_thanks',
-        amount: dealerThanks,
-        description: "Dealer's Thanks reward.",
-        metadata: { handId, dealerTip, dealerThanks },
+          wagered: totalBeatStake(snapshot, summary.handId),
+          returned: result.returnedHalfUnits / 2,
+          profit: result.profitHalfUnits / 2,
+          houseAdvanceRepayment: result.houseAdvanceRepayment,
+          beatTheHouse: {
+            returnedHalfUnits: result.returnedHalfUnits,
+            profitHalfUnits: result.profitHalfUnits,
+            halfChipBefore: result.halfChipBefore,
+            halfChipAfter: result.halfChipAfter,
+            wholeCreditsReleased: result.wholeCreditsReleased,
+          },
+        };
       });
-      if (player && updated) {
-        room.players.set(profileId, { ...player, bankroll: updated.bankroll });
+      const dealerThanksSettlements = handIds.flatMap((handId): RoomSettlement[] => {
+        const dealerThanks = snapshot.dealerTipRewards[handId];
+        if (dealerThanks <= 0) {
+          return [];
+        }
+        const profileId = room.beatHandOwners[handId];
+        if (!profileId) {
+          throw new Error(`Dealer's Thanks hand ${handId} has no frozen owner.`);
+        }
+        const dealerTip = snapshot.dealerTips[handId];
+        const profile = this.applyBeatDealerThanks(room, profileId, handId, dealerTip, dealerThanks);
+        this.updateBeatPlayerBankroll(room, profileId, profile);
+        return [
+          {
+            id: createSettlementId(),
+            kind: 'dealer-thanks',
+            profileId,
+            seatId: handId,
+            wagered: 0,
+            returned: dealerThanks,
+            profit: 0,
+            dealerTip,
+            dealerThanks,
+            houseAdvanceRepayment: 0,
+          },
+        ];
+      });
+      room.settledSessionIds.add(room.sessionId);
+      room.beatHandOwners = {};
+      this.syncBeatBankroll(room);
+      return [...gameplaySettlements, ...dealerThanksSettlements];
+    } catch (error) {
+      this.syncBeatBankroll(room);
+      throw error;
+    }
+  }
+
+  private updateBeatPlayerBankroll(room: RoomState, profileId: ProfileId, profile: CasinoProfile): void {
+    const player = room.players.get(profileId);
+    if (player) {
+      room.players.set(profileId, { ...player, bankroll: profile.bankroll });
+    }
+  }
+
+  private applyBeatDealerThanks(
+    room: RoomState,
+    profileId: ProfileId,
+    handId: (typeof handIds)[number],
+    dealerTip: number,
+    dealerThanks: number,
+  ): CasinoProfile {
+    const profile = this.dataStore.snapshot().profileState.profiles.find((candidate) => candidate.id === profileId);
+    if (!profile) {
+      throw new Error(`Beat the House profile ${profileId} is unavailable for Dealer's Thanks.`);
+    }
+    const dealerThanksKey = `${room.roomId}:${room.sessionId}:${handId}:${profileId}`;
+    const existing = profile.transactions.find((transaction) => transaction.metadata.dealerThanksKey === dealerThanksKey);
+    if (existing) {
+      if (
+        existing.type !== 'dealer_thanks' ||
+        existing.amount !== dealerThanks ||
+        existing.gameId !== room.gameId ||
+        existing.roomId !== room.roomId ||
+        existing.sessionId !== room.sessionId ||
+        existing.metadata.handId !== handId ||
+        existing.metadata.profileId !== profileId ||
+        existing.metadata.dealerTip !== dealerTip ||
+        existing.metadata.dealerThanks !== dealerThanks
+      ) {
+        throw new Error("Dealer's Thanks identity conflicts with an existing transaction.");
       }
-      return [
-        {
-          id: createSettlementId(),
-          kind: 'dealer-thanks',
-          profileId,
-          seatId: handId,
-          wagered: 0,
-          returned: dealerThanks,
-          profit: 0,
-          dealerTip,
-          dealerThanks,
-          houseAdvanceRepayment: 0,
-        },
-      ];
+      return profile;
+    }
+    const updated = this.dataStore.recordTransaction(profileId, {
+      gameId: room.gameId,
+      roomId: room.roomId,
+      sessionId: room.sessionId,
+      type: 'dealer_thanks',
+      amount: dealerThanks,
+      description: "Dealer's Thanks reward.",
+      metadata: { dealerThanksKey, handId, profileId, dealerTip, dealerThanks },
     });
-    return [...gameplaySettlements, ...dealerThanksSettlements];
+    if (!updated) {
+      throw new Error(`Beat the House profile ${profileId} is unavailable for Dealer's Thanks.`);
+    }
+    return updated;
   }
 
   protected applyBlackjackSettlements(room: RoomState, result: BlackjackTableActionResult): readonly RoomSettlement[] {

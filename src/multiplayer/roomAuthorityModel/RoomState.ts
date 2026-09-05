@@ -31,4 +31,5 @@ export interface RoomState {
   settledSessionIds: Set<SessionId>;
   lastBeatEvents: GameSnapshot['lastEvents'];
   lastBeatBetOwners: Partial<Record<HandId, ProfileId>>;
+  beatHandOwners: Partial<Record<HandId, ProfileId>>;
 }

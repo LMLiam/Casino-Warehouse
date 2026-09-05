@@ -184,12 +184,19 @@ export abstract class RoomAuthorityBeat extends RoomAuthoritySlots {
     const after = room.seats.size > 0 && room.players.size > 0 ? model.game.deal() : model.game.snapshot();
     room.lastBeatEvents = after.lastEvents;
     let settlements: readonly import('./protocol/RoomSettlement').RoomSettlement[] = [];
-    if (before.phase === 'betting' && after.phase !== 'betting') {
-      this.recordBeatBetOwners(room, before);
-      this.recordBeatDealerTips(room, before);
-    }
-    if (after.phase === 'roundOver' && before.phase !== 'roundOver') {
-      settlements = this.settleBeat(room, after);
+    try {
+      if (before.phase === 'betting' && after.phase !== 'betting') {
+        this.recordBeatHandOwners(room, before);
+        this.recordBeatBetOwners(room, before);
+        this.recordBeatDealerTips(room, before);
+      }
+      if (after.phase === 'roundOver' && before.phase !== 'roundOver') {
+        settlements = this.settleBeat(room, after);
+      }
+    } catch {
+      this.clearBeatReadyVotes(room);
+      this.afterBeatSnapshotChange(room, before, after);
+      return { ...this.broadcast(room), error: 'Beat the House settlement is pending. Try again.' };
     }
     this.clearBeatReadyVotes(room);
     this.afterBeatSnapshotChange(room, before, after);
@@ -207,10 +214,21 @@ export abstract class RoomAuthorityBeat extends RoomAuthoritySlots {
     room.lastBeatBetOwners = owners;
   }
 
+  private recordBeatHandOwners(room: RoomState, snapshot: GameSnapshot): void {
+    const owners: Partial<Record<HandId, ProfileId>> = {};
+    for (const handId of handIds) {
+      const ownerProfileId = room.seats.get(handId);
+      if (ownerProfileId && this.totalBeatTableCredits(snapshot, handId) > 0) {
+        owners[handId] = ownerProfileId;
+      }
+    }
+    room.beatHandOwners = owners;
+  }
+
   private recordBeatDealerTips(room: RoomState, snapshot: GameSnapshot): void {
     for (const handId of handIds) {
       const tip = snapshot.dealerTips[handId];
-      const profileId = room.seats.get(handId);
+      const profileId = room.beatHandOwners[handId];
       if (!profileId || tip <= 0) {
         continue;
       }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BlackjackTable } from '../../../src/game/blackjackTable/BlackjackTable';
+import { asHalfUnits } from '../../../src/game/beatTheHouse/asHalfUnits';
 import type { BlackjackTableActionResult } from '../../../src/game/blackjackTable/BlackjackTableActionResult';
 import { findSlotTheme } from '../../../src/game/catalog/findSlotTheme';
 import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
@@ -158,19 +159,30 @@ describe('room authority model helpers', () => {
     expect(target.spectators.has(testProfileId('alice'))).toBe(false);
   });
 
-  it('skips beat settlements that are already settled or have no claimed seat', () => {
+  it('skips settled Beat rounds and rejects summaries without frozen owners', () => {
     const harness = new AuthorityHarness();
     const target = room();
     const snapshot: GameSnapshot = {
       ...new BeatTheHouseGame({ initialBankroll: 100 }).snapshot(),
-      summaries: [{ handId: 'left', mainResult: 'win', stake: 10, returned: 20, profit: 10, sideWins: [] }],
+      summaries: [
+        {
+          handId: 'left',
+          mainResult: 'win',
+          stake: 10,
+          returnedHalfUnits: asHalfUnits(40),
+          profitHalfUnits: asHalfUnits(20),
+          returned: 20,
+          profit: 10,
+          sideWins: [],
+        },
+      ],
     };
 
     target.settledSessionIds.add(target.sessionId);
     expect(harness.settleBeatFor(target, snapshot)).toEqual([]);
 
     target.settledSessionIds.clear();
-    expect(harness.settleBeatFor(target, snapshot)).toEqual([]);
+    expect(() => harness.settleBeatFor(target, snapshot)).toThrow('has no frozen owner');
   });
 
   it('skips blackjack settlements for wrong rooms and unclaimed seats', () => {
@@ -233,6 +245,7 @@ describe('room authority model helpers', () => {
     const target = room({
       players: new Map([[profile.id, { ...player(profile.id), bankroll: 80 }]]),
       seats: new Map([['left', profile.id]]),
+      beatHandOwners: { left: profile.id },
     });
     const base = new BeatTheHouseGame({ initialBankroll: 80 }).snapshot();
     const snapshot: GameSnapshot = {
@@ -241,7 +254,18 @@ describe('room authority model helpers', () => {
       bets: { ...base.bets, left: { ...base.bets.left, main: 10 } },
       dealerTips: { ...base.dealerTips, left: 5 },
       dealerTipRewards: { ...base.dealerTipRewards, left: 10 },
-      summaries: [{ handId: 'left', mainResult: 'lose', stake: 10, returned: 0, profit: -10, sideWins: [] }],
+      summaries: [
+        {
+          handId: 'left',
+          mainResult: 'lose',
+          stake: 10,
+          returnedHalfUnits: asHalfUnits(0),
+          profitHalfUnits: asHalfUnits(-20),
+          returned: 0,
+          profit: -10,
+          sideWins: [],
+        },
+      ],
     };
 
     const settlements = harness.settleBeatFor(target, snapshot);
@@ -270,5 +294,84 @@ describe('room authority model helpers', () => {
       false,
     );
     expect(harness.settleBeatFor(target, snapshot)).toEqual([]);
+  });
+
+  it('does not repeat an earlier Dealer Thanks reward after a later reward fails', () => {
+    const store = createMemoryServerDataStore();
+    const first = requireProfile(store.createProfile('First Thanks', 100).profileState.profiles, 0);
+    const second = requireProfile(store.createProfile('Second Thanks', 100).profileState.profiles, 1);
+    const harness = new AuthorityHarness(store);
+    const target = room({
+      players: new Map([
+        [first.id, { ...player(first.id), bankroll: 100 }],
+        [second.id, { ...player(second.id), bankroll: 100 }],
+      ]),
+      seats: new Map([
+        ['left', first.id],
+        ['centre', second.id],
+      ]),
+      beatHandOwners: { left: first.id, centre: second.id },
+    });
+    const base = new BeatTheHouseGame({ initialBankroll: 200 }).snapshot();
+    const snapshot: GameSnapshot = {
+      ...base,
+      phase: 'roundOver',
+      bets: {
+        ...base.bets,
+        left: { ...base.bets.left, main: 1 },
+        centre: { ...base.bets.centre, main: 1 },
+      },
+      dealerTips: { ...base.dealerTips, left: 5, centre: 5 },
+      dealerTipRewards: { ...base.dealerTipRewards, left: 10, centre: 10 },
+      summaries: [
+        {
+          handId: 'left',
+          mainResult: 'lose',
+          stake: 1,
+          returnedHalfUnits: asHalfUnits(0),
+          profitHalfUnits: asHalfUnits(-2),
+          returned: 0,
+          profit: -1,
+          sideWins: [],
+        },
+        {
+          handId: 'centre',
+          mainResult: 'lose',
+          stake: 1,
+          returnedHalfUnits: asHalfUnits(0),
+          profitHalfUnits: asHalfUnits(-2),
+          returned: 0,
+          profit: -1,
+          sideWins: [],
+        },
+      ],
+    };
+    const recordTransaction = store.recordTransaction.bind(store);
+    let failCentreThanks = true;
+    const failure = vi.spyOn(store, 'recordTransaction').mockImplementation((profileId, transaction) => {
+      if (failCentreThanks && transaction.type === 'dealer_thanks' && transaction.metadata.handId === 'centre') {
+        failCentreThanks = false;
+        throw new Error('Transient Dealer Thanks failure.');
+      }
+      return recordTransaction(profileId, transaction);
+    });
+
+    expect(() => harness.settleBeatFor(target, snapshot)).toThrow('Transient Dealer Thanks failure.');
+    expect(target.settledSessionIds.has(target.sessionId)).toBe(false);
+    expect(requireProfile(store.snapshot().profileState.profiles, 0).bankroll).toBe(110);
+    expect(requireProfile(store.snapshot().profileState.profiles, 1).bankroll).toBe(100);
+
+    const recovered = harness.settleBeatFor(target, snapshot);
+    failure.mockRestore();
+
+    expect(recovered).toHaveLength(4);
+    expect(requireProfile(store.snapshot().profileState.profiles, 0).bankroll).toBe(110);
+    expect(requireProfile(store.snapshot().profileState.profiles, 1).bankroll).toBe(110);
+    expect(requireProfile(store.snapshot().profileState.profiles, 0).transactions.filter((transaction) => transaction.type === 'dealer_thanks')).toHaveLength(
+      1,
+    );
+    expect(requireProfile(store.snapshot().profileState.profiles, 1).transactions.filter((transaction) => transaction.type === 'dealer_thanks')).toHaveLength(
+      1,
+    );
   });
 });
