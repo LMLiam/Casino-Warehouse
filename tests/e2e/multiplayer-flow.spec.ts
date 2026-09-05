@@ -346,6 +346,8 @@ for (const scenario of beatActionDockSeatScenarios) {
 
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
+  const previousNextRoundTimeout = process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS;
+  process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS = '120000';
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Beat QA']);
   const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Beat QA'));
   try {
@@ -451,6 +453,11 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
     await expect.poll(async () => (await parsedDataset(page, 'sideBetLabels')).some((label) => String(label).includes('Dealer Sevens'))).toBe(true);
   } finally {
     await context.close().catch(() => undefined);
+    if (previousNextRoundTimeout === undefined) {
+      delete process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS;
+    } else {
+      process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS = previousNextRoundTimeout;
+    }
   }
 });
 
