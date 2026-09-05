@@ -110,6 +110,8 @@ export abstract class GameAppProfileActions extends GameAppRoomActions {
       return;
     }
     this.player = undefined;
+    this.walletView.clear();
+    this.elements.beatSettlementAnnouncement.textContent = '';
     this.profileState = { profiles: [] };
     this.pendingRoomRestore = undefined;
     this.clearClientSession();
@@ -126,6 +128,8 @@ export abstract class GameAppProfileActions extends GameAppRoomActions {
     ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));
     if (this.player && !this.ownedProfileIds.has(this.player.profileId)) {
       this.player = undefined;
+      this.walletView.clear();
+      this.elements.beatSettlementAnnouncement.textContent = '';
     }
     if (!this.player) {
       const clientSession = this.loadClientSession();

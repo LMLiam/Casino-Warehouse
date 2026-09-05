@@ -191,18 +191,35 @@ h1 {
   background: var(--panel);
 }
 
-.money-pill {
+.wallet-stack {
   position: absolute;
   left: 16px;
   bottom: 16px;
   z-index: 7;
   display: grid;
-  gap: 2px;
+  gap: 8px;
   width: clamp(156px, 19vw, 240px);
+}
+
+.money-pill {
+  display: grid;
+  gap: 2px;
   padding: 9px 12px;
   border-radius: 8px;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(10px);
+}
+
+.beat-half-chip-indicator {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 213, 107, 0.52);
+  border-radius: 8px;
+  background: rgba(20, 14, 7, 0.9);
+  color: #f2e8c8;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
 }
 
 .money-pill span,

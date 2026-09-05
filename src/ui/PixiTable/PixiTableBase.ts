@@ -25,6 +25,7 @@ export abstract class PixiTableBase {
   protected cardAnimationQueue = new Map<string, number>();
   protected processedRoundStartKey = '';
   protected settlementKey = '';
+  protected announcedSettlementKey = '';
   protected celebratedSettlementKey = '';
   protected settlementMetadata: readonly PixiTableSettlementMetadata[] = [];
   protected settlementVisible = false;

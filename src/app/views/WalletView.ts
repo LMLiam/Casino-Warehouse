@@ -18,12 +18,25 @@ export class WalletView {
     this.previousBankroll = undefined;
   }
 
-  public render(snapshot: GameSnapshot, profile: CasinoProfile | undefined, bankrollOverride?: number): void {
+  public clear(): void {
+    window.clearTimeout(this.bankrollDeltaTimer);
+    this.previousBankroll = undefined;
+    this.elements.beatHalfChipIndicator.textContent = '';
+    this.elements.beatHalfChipIndicator.classList.add('hidden');
+    this.elements.bankrollDelta.textContent = '';
+    this.elements.bankrollDelta.className = '';
+    this.elements.bankroll.classList.remove('gain-flash', 'loss-flash');
+  }
+
+  public render(snapshot: GameSnapshot, profile: CasinoProfile | undefined, bankrollOverride?: number, showBeatHalfChip = false): void {
     const bankroll = bankrollOverride ?? profile?.bankroll ?? snapshot.bankroll;
     const bankrollDelta = this.previousBankroll === undefined ? 0 : bankroll - this.previousBankroll;
     this.elements.bankroll.textContent = money(bankroll);
     this.animateDelta(bankrollDelta);
     this.previousBankroll = bankroll;
+    const hasBeatHalfChip = showBeatHalfChip && profile?.gameCredits.beatTheHouseHalfChip === 1;
+    this.elements.beatHalfChipIndicator.textContent = hasBeatHalfChip ? 'Half chip: one half' : '';
+    this.elements.beatHalfChipIndicator.classList.toggle('hidden', !hasBeatHalfChip);
     if (profile) {
       const houseAdvance =
         profile.houseAdvance.outstandingBalance > 0

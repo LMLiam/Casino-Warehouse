@@ -58,6 +58,7 @@ export const renderTemplate = (): string => `
       <div id="tableHost" class="table-host">
         <div id="beatSeatStatus" class="seat-status-overlay" aria-label="Beat the House seat status"></div>
       </div>
+      <div id="beatSettlementAnnouncement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
       <div id="blackjackView" class="blackjack-table-view hidden">
         <div class="blackjack-table-felt">
           <div class="blackjack-rail">Blackjack pays 3:2 • Dealer stands on soft 17</div>
@@ -166,13 +167,18 @@ export const renderTemplate = (): string => `
           </details>
         </div>
       </div>
-      <div id="moneyPill" class="money-pill" aria-label="Player balance">
-        <span>Balance</span>
-        <div class="bankroll-line">
-          <strong id="bankroll">£1,000</strong>
-          <em id="bankrollDelta" aria-live="polite"></em>
+      <div class="wallet-stack">
+        <div id="moneyPill" class="money-pill" aria-label="Player balance">
+          <span>Balance</span>
+          <div class="bankroll-line">
+            <strong id="bankroll">£1,000</strong>
+            <em id="bankrollDelta" aria-live="polite"></em>
+          </div>
+          <small id="houseAdvancePill" class="hidden"></small>
         </div>
-        <small id="houseAdvancePill" class="hidden"></small>
+        <div id="beatHalfChipIndicator" class="beat-half-chip-indicator hidden" role="status" aria-live="polite" aria-label="Beat the House half-chip balance">
+          Half chip: one half
+        </div>
       </div>
       <div id="actionDock" class="action-dock" aria-label="Game actions">
         <div id="beatControls" class="game-controls">

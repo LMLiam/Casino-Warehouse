@@ -1,6 +1,7 @@
 import { Graphics } from 'pixi.js';
 import type { BetType } from '../../game/types/BetType';
 import { betTypes } from '../../game/types/betTypes';
+import { formatHalfUnits } from '../../shared/formatHalfUnitMoney';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { HandId } from '../../game/types/HandId';
 import { dealerChipBank } from '../layout/dealerChipBank';
@@ -276,9 +277,16 @@ export abstract class PixiTableDrawing extends PixiTableSettlement {
 
       this.chipRenderer.drawStack(amount, x + BET_RENDERING.mainWagerOffsetX, y, BET_RENDERING.mainChipRadius);
       if (summary.mainResult === 'win') {
-        const mainProfit = PixiTableSettlement.mainProfitForSummary(snapshot, summary);
-        this.drawDealerPayout(mainProfit, x + BET_RENDERING.mainPayoutOffsetX, y, BET_RENDERING.mainChipRadius, `payout-${handId}-main-${mainProfit}`);
-        this.tagRenderer.drawPayoutTag(`PAID +£${mainProfit}`, x + BET_RENDERING.mainPayoutOffsetX, y + BET_RENDERING.sideLabelOffsetY, 'win');
+        if (summary.mainProfitHalfUnits % 2 === 0) {
+          const mainProfit = summary.mainProfitHalfUnits / 2;
+          this.drawDealerPayout(mainProfit, x + BET_RENDERING.mainPayoutOffsetX, y, BET_RENDERING.mainChipRadius, `payout-${handId}-main-${mainProfit}`);
+        }
+        this.tagRenderer.drawPayoutTag(
+          `PAID ${formatHalfUnits(summary.mainProfitHalfUnits, true)}`,
+          x + BET_RENDERING.mainPayoutOffsetX,
+          y + BET_RENDERING.sideLabelOffsetY,
+          'win',
+        );
       } else {
         this.tagRenderer.drawPayoutTag('PUSH', x + BET_RENDERING.mainPayoutOffsetX / 2, y + BET_RENDERING.sideLabelOffsetY, 'push');
       }
@@ -297,14 +305,21 @@ export abstract class PixiTableDrawing extends PixiTableSettlement {
       const sideWin = summary.sideWins.find((win) => win.betType === betType);
       this.chipRenderer.drawStack(amount, x + BET_RENDERING.sideWagerOffsetX, y, BET_RENDERING.sideChipRadius);
       if (sideWin) {
-        this.drawDealerPayout(
-          sideWin.profit,
+        if (sideWin.profitHalfUnits % 2 === 0) {
+          this.drawDealerPayout(
+            sideWin.profitHalfUnits / 2,
+            x + BET_RENDERING.sidePayoutOffsetX,
+            y,
+            BET_RENDERING.sideChipRadius,
+            `payout-${handId}-${betType}-${sideWin.profitHalfUnits / 2}`,
+          );
+        }
+        this.tagRenderer.drawPayoutTag(
+          formatHalfUnits(sideWin.profitHalfUnits, true),
           x + BET_RENDERING.sidePayoutOffsetX,
-          y,
-          BET_RENDERING.sideChipRadius,
-          `payout-${handId}-${betType}-${sideWin.profit}`,
+          y + BET_RENDERING.sideLabelOffsetY,
+          'win',
         );
-        this.tagRenderer.drawPayoutTag(`+£${sideWin.profit}`, x + BET_RENDERING.sidePayoutOffsetX, y + BET_RENDERING.sideLabelOffsetY, 'win');
       }
       this.tagRenderer.drawSideState('win', x + BET_RENDERING.sideWagerOffsetX, y + BET_RENDERING.sideLabelOffsetY);
     }

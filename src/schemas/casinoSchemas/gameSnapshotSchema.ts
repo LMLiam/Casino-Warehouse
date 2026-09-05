@@ -37,6 +37,8 @@ export const gameSnapshotSchema = (() => {
       handId: handIdSchema,
       mainResult: handResultSchema,
       stake: finiteNumberSchema,
+      mainProfitHalfUnits: profitHalfUnits,
+      sideProfitHalfUnits: profitHalfUnits,
       returnedHalfUnits,
       profitHalfUnits,
       returned: finiteNumberSchema,
@@ -48,6 +50,7 @@ export const gameSnapshotSchema = (() => {
       (value) =>
         value.returned === value.returnedHalfUnits / 2 &&
         value.profit === value.profitHalfUnits / 2 &&
+        value.profitHalfUnits === value.mainProfitHalfUnits + value.sideProfitHalfUnits &&
         value.returnedHalfUnits === value.stake * 2 + value.profitHalfUnits,
       'Round summary values must conserve exact half-units.',
     );
