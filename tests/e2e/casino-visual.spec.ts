@@ -416,6 +416,45 @@ test('phone-sized screens show the unsupported-device message', async ({ page })
   expectConsoleClean(page);
 });
 
+test('Beat the House shoe status, rules, and table status keep layout and privacy', async ({ page }) => {
+  await createSession(page);
+  await page.locator('[data-lobby-game="beat-the-house"]').click();
+  await page.getByRole('button', { name: 'Join Room' }).first().click();
+  await expect(page.locator('#tableHost')).toBeVisible();
+  await openHudSection(page, 'room');
+  await page.locator('#roomSeats').getByRole('button', { name: 'Left: open' }).click();
+  await expect(page.locator('#roomSeats')).toContainText('Left: QA Player');
+
+  await expect(page.locator('#beatShoeStatus')).toBeVisible();
+  await expect(page.locator('#beatShoeLabel')).toContainText('6-deck shoe');
+  await expect(page.locator('#beatShoeCounts')).toContainText('312');
+  await expect(page.locator('#beatShoeMeter')).toHaveAttribute('max', '312');
+  await expect(page.locator('#beatTableStatus')).toBeHidden();
+  await expect(page.locator('#beatTableStatus')).toHaveAttribute('role', 'status');
+  await expect(page.locator('#beatShoeCue')).toHaveAttribute('aria-live', 'polite');
+
+  await openHudSection(page, 'info');
+  await expect(page.locator('#beatRules')).toContainText('312 cards');
+  await expect(page.locator('#beatRules')).toContainText('219');
+  await expect(page.locator('#beatRules')).toContainText('234');
+  await expect(page.locator('#beatPaytable')).toContainText('12:1');
+  await expect(page.locator('#beatPaytable')).toContainText('60:1');
+  await expect(page.locator('#beatPaytable')).not.toContainText('10:1 for one black Ace');
+
+  const bodyText = await page.locator('#tableHost').evaluate((host) => host.outerHTML);
+  for (const forbidden of ['remainingCards', 'cutThresholdCardsDealt', 'shufflePending', 'rankCounts', 'suitCounts']) {
+    expect(bodyText).not.toContain(forbidden);
+  }
+
+  const shoeBox = await boundingBox(page.locator('#beatShoeStatus'));
+  const moneyBox = await boundingBox(page.locator('#moneyPill'));
+  const mineSeat = await boundingBox(page.locator('.seat-status-pill.mine'));
+  expect(boxesOverlap(shoeBox, moneyBox)).toBe(false);
+  expect(boxesOverlap(shoeBox, mineSeat)).toBe(false);
+  await expectNoHorizontalOverflow(page.locator('.game-shell'));
+  expectConsoleClean(page);
+});
+
 const createSession = async (page: Page): Promise<void> => {
   await page.waitForFunction(() => document.body.dataset.appReady === 'true');
   await waitForRealtime(page);

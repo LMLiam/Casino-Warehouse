@@ -22,6 +22,8 @@ import type { AppElements } from '../dom/appElements/AppElements';
 import { money } from '../format/appMoney';
 import { BeatControlsView } from '../views/BeatControlsView';
 import { BeatSeatStatusView } from '../views/BeatSeatStatusView';
+import { BeatShoeStatusView } from '../views/BeatShoeStatusView';
+import { BeatTableStatusView } from '../views/BeatTableStatusView';
 import { BlackjackView } from '../views/BlackjackView';
 import { GameLobbyView } from '../views/GameLobbyView';
 import { PlayerStripView } from '../views/PlayerStripView';
@@ -37,6 +39,8 @@ export abstract class GameAppRendering {
   protected abstract readonly elements: AppElements;
   protected abstract readonly beatControlsView: BeatControlsView;
   protected abstract readonly beatSeatStatusView: BeatSeatStatusView;
+  protected abstract readonly beatShoeStatusView: BeatShoeStatusView;
+  protected abstract readonly beatTableStatusView: BeatTableStatusView;
   protected abstract readonly blackjackView: BlackjackView;
   protected abstract readonly gameLobbyView: GameLobbyView;
   protected abstract readonly playerStripView: PlayerStripView;
@@ -76,6 +80,8 @@ export abstract class GameAppRendering {
       this.roomSeatsView.clear();
       this.beatControlsView.clearPending();
       this.beatSeatStatusView.clear();
+      this.beatShoeStatusView.hide();
+      this.beatTableStatusView.clear();
       return;
     }
     this.roomSeatsView.render(room, this.currentPlayer?.profileId, (seatId) => this.claimRoomSeat(seatId));
@@ -85,6 +91,7 @@ export abstract class GameAppRendering {
         room.players.find((candidate) => candidate.profileId === profileId) ?? room.spectators.find((candidate) => candidate.profileId === profileId);
       const controlsAvailable = Boolean(profileId && room.seats.some((seat) => seat.profileId === profileId));
       this.table.render(room.game, this.beatSettlementMetadataFor(room, this.currentPlayer?.profileId));
+      this.beatShoeStatusView.render(room.game.shoe, room.game.lastEvents);
       this.renderBeatControls(room.game, controlsAvailable, room, profileId, roomMember?.bankroll, true);
     }
     this.renderRoomBrowser();
@@ -121,6 +128,8 @@ export abstract class GameAppRendering {
     if (!player) {
       this.walletView.clear();
       this.elements.beatSettlementAnnouncement.textContent = '';
+      this.beatShoeStatusView.hide();
+      this.beatTableStatusView.clear();
       return;
     }
 
@@ -167,6 +176,14 @@ export abstract class GameAppRendering {
 
     if (isBeatTheHouse) {
       this.table.resize();
+    }
+    const isBeatTableActive = isBeatTheHouse && !this.showingGameLobby && !showingRoomLobby;
+    if (isBeatTableActive) {
+      this.beatShoeStatusView.render(beatSnapshot.shoe, beatSnapshot.lastEvents);
+      this.beatTableStatusView.setVisible(true);
+    } else {
+      this.beatShoeStatusView.hide();
+      this.beatTableStatusView.clear();
     }
     this.table.render(beatSnapshot, this.beatSettlementMetadataFor(activeRoom, player.profileId));
     this.beatSeatStatusView.render(beatSnapshot, isBeatTheHouse ? activeRoom : undefined, player.profileId, (seatId) => this.claimRoomSeat(seatId));

@@ -1,5 +1,6 @@
 import type { CasinoAudio } from '../../audio/casinoAudio/CasinoAudio';
 import { findGame } from '../../game/catalog/findGame';
+import { isSideBetWithinMainBet } from '../../game/engine/isSideBetWithinMainBet';
 import type { CasinoGameId } from '../../game/ids';
 import { defaultRealtimeUrl } from '../../multiplayer/client/defaultRealtimeUrl';
 import type { RoomRole } from '../../multiplayer/protocol/RoomRole';
@@ -53,8 +54,11 @@ export abstract class GameAppRoomActions extends GameAppSession {
       return;
     }
     const activeRoom = this.activeRoomForGame();
-    if ('betType' in target && target.betType !== 'main' && activeRoom && isBeatSnapshot(activeRoom.game) && activeRoom.game.bets[target.handId].main <= 0) {
-      return;
+    if ('betType' in target && target.betType !== 'main' && activeRoom && isBeatSnapshot(activeRoom.game)) {
+      const bets = activeRoom.game.bets[target.handId];
+      if (bets.main <= 0 || !isSideBetWithinMainBet(bets.main, bets[target.betType], amount)) {
+        return;
+      }
     }
     if (activeRoom) {
       if ('dealerTip' in target) {
@@ -123,6 +127,8 @@ export abstract class GameAppRoomActions extends GameAppSession {
     this.roomSeatsView.clear();
     this.beatControlsView.clearPending();
     this.beatSeatStatusView.clear();
+    this.beatShoeStatusView.hide();
+    this.beatTableStatusView.clear();
     this.refreshMultiplayerRooms();
     this.saveSession();
     this.renderCasino();
@@ -134,6 +140,8 @@ export abstract class GameAppRoomActions extends GameAppSession {
       this.roomSeatsView.clear();
       this.beatControlsView.clearPending();
       this.beatSeatStatusView.clear();
+      this.beatShoeStatusView.hide();
+      this.beatTableStatusView.clear();
     }
     this.showingGameLobby = true;
     this.elements.roomStatus.textContent = 'Choose a game to browse live rooms.';
@@ -161,6 +169,8 @@ export abstract class GameAppRoomActions extends GameAppSession {
     this.roomSeatsView.clear();
     this.beatControlsView.clearPending();
     this.beatSeatStatusView.clear();
+    this.beatShoeStatusView.hide();
+    this.beatTableStatusView.clear();
     this.multiplayer.clearRoomState();
     this.elements.shell.classList.add('hidden');
     this.elements.setup.classList.remove('hidden');

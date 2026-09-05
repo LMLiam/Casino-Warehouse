@@ -1,4 +1,5 @@
 import { Graphics } from 'pixi.js';
+import { isSideBetWithinMainBet } from '../../game/engine/isSideBetWithinMainBet';
 import type { BetType } from '../../game/types/BetType';
 import { betTypes } from '../../game/types/betTypes';
 import { formatHalfUnits } from '../../shared/formatHalfUnitMoney';
@@ -174,7 +175,8 @@ export abstract class PixiTableDrawing extends PixiTableSettlement {
 
   private drawBettingZone(snapshot: GameSnapshot, handId: HandId, betType: BetType, x: number, y: number, width: number, height: number): void {
     const isActive = snapshot.activeHand === handId;
-    const isBettable = snapshot.phase === 'betting' && this.selectedChip > 0 && (betType === 'main' || snapshot.bets[handId].main > 0);
+    const hasSideAllowance = betType === 'main' || isSideBetWithinMainBet(snapshot.bets[handId].main, snapshot.bets[handId][betType], this.selectedChip);
+    const isBettable = snapshot.phase === 'betting' && this.selectedChip > 0 && (betType === 'main' || snapshot.bets[handId].main > 0) && hasSideAllowance;
     const graphics = new Graphics();
     graphics.ellipse(x, y, width / 2, height / 2);
     graphics.fill({

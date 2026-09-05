@@ -57,6 +57,21 @@ export const renderTemplate = (): string => `
       </div>
       <div id="tableHost" class="table-host">
         <div id="beatSeatStatus" class="seat-status-overlay" aria-label="Beat the House seat status"></div>
+        <div id="beatShoeStatus" class="shoe-status-overlay hidden" aria-label="Beat the House shoe status">
+          <span id="beatShoeLabel">6-deck shoe</span>
+          <span id="beatShoeCounts"></span>
+          <meter id="beatShoeMeter" min="0" max="312" value="312"></meter>
+          <span id="beatShoeCut" class="hidden"></span>
+          <span id="beatShoeCue" role="status" aria-live="polite" aria-atomic="true"></span>
+        </div>
+        <div
+          id="beatTableStatus"
+          class="table-status-overlay hidden"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label="Beat the House table status"
+        ></div>
       </div>
       <div id="beatSettlementAnnouncement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
       <div id="blackjackView" class="blackjack-table-view hidden">

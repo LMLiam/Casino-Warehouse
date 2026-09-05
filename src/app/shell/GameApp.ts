@@ -10,8 +10,10 @@ import { CardRenderer } from '../../ui/renderers/CardRenderer';
 import { ChipRenderer } from '../../ui/renderers/ChipRenderer';
 import { EffectRenderer } from '../../ui/renderers/EffectRenderer';
 import { TagRenderer } from '../../ui/renderers/TagRenderer';
+import { isSideBetWithinMainBet } from '../../game/engine/isSideBetWithinMainBet';
 import type { CasinoSaveState } from '../../state/profiles/CasinoSaveState';
 import type { CasinoSessionRoomState } from '../../state/session/CasinoSessionRoomState';
+import { isBeatSnapshot } from '../state/appSnapshots/isBeatSnapshot';
 import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
 import { MultiplayerClient } from '../../multiplayer/client/MultiplayerClient';
@@ -21,6 +23,8 @@ import type { CasinoPlayer } from '../state/casinoPlayer/CasinoPlayer';
 import { AudioControls } from '../views/AudioControls';
 import { BeatControlsView } from '../views/BeatControlsView';
 import { BeatSeatStatusView } from '../views/BeatSeatStatusView';
+import { BeatShoeStatusView } from '../views/BeatShoeStatusView';
+import { BeatTableStatusView } from '../views/BeatTableStatusView';
 import { BlackjackView } from '../views/BlackjackView';
 import { GameLobbyView } from '../views/GameLobbyView';
 import { PlayerStripView } from '../views/PlayerStripView';
@@ -51,6 +55,8 @@ export class GameApp extends GameAppProfileActions {
   protected readonly audioControls: AudioControls;
   protected readonly beatControlsView: BeatControlsView;
   protected readonly beatSeatStatusView: BeatSeatStatusView;
+  protected readonly beatShoeStatusView: BeatShoeStatusView;
+  protected readonly beatTableStatusView: BeatTableStatusView;
   protected readonly blackjackView: BlackjackView;
   protected readonly gameLobbyView: GameLobbyView;
   protected readonly playerStripView: PlayerStripView;
@@ -86,6 +92,8 @@ export class GameApp extends GameAppProfileActions {
     this.audioControls = new AudioControls(this.elements, this.audio);
     this.beatControlsView = new BeatControlsView(this.elements, (bankroll, canSelectChip) => this.beatChipSelection.syncBankroll(bankroll, canSelectChip));
     this.beatSeatStatusView = new BeatSeatStatusView(this.elements);
+    this.beatShoeStatusView = new BeatShoeStatusView(this.elements);
+    this.beatTableStatusView = new BeatTableStatusView(this.elements.beatTableStatus);
     this.blackjackView = new BlackjackView(this.elements);
     this.gameLobbyView = new GameLobbyView(this.elements);
     this.playerStripView = new PlayerStripView(this.elements);
@@ -122,6 +130,12 @@ export class GameApp extends GameAppProfileActions {
           return;
         }
         this.elements.roomStatus.textContent = message;
+        const activeRoom = this.activeRoomForGame();
+        if (activeRoom && activeRoom.gameId === 'beat-the-house' && isBeatSnapshot(activeRoom.game)) {
+          this.beatControlsView.clearPending();
+          this.beatTableStatusView.show(message);
+          this.renderCasino();
+        }
       },
       onRoom: (room) => {
         this.returnHomeOnServerResync = false;
@@ -129,6 +143,7 @@ export class GameApp extends GameAppProfileActions {
         this.activeGame = room.gameId;
         this.showingGameLobby = false;
         this.elements.roomStatus.textContent = `${room.gameTitle} room ${room.roomId} • ${room.status} • ${room.players.length}/${room.maxPlayers} seated • ${room.spectators.length} spectator(s)`;
+        this.beatTableStatusView.clear();
         this.syncCurrentRoomBankroll(room);
         this.renderMultiplayerRoom();
         this.renderCasino();
@@ -156,11 +171,18 @@ export class GameApp extends GameAppProfileActions {
             if (!this.canUseServer()) {
               return;
             }
-            if (this.activeRoomForGame()) {
+            const activeRoom = this.activeRoomForGame();
+            if (activeRoom) {
               if (chipTarget === 'dealerTip') {
                 this.multiplayer.send({ type: 'place-tip', seatId: handId, amount: selectedChip });
                 this.beatControlsView.markPendingBet('dealerTip');
               } else {
+                if (chipTarget !== 'main' && isBeatSnapshot(activeRoom.game)) {
+                  const bets = activeRoom.game.bets[handId];
+                  if (!isSideBetWithinMainBet(bets.main, bets[chipTarget], selectedChip)) {
+                    return;
+                  }
+                }
                 this.multiplayer.send({ type: 'place-chip', seatId: handId, betType: chipTarget, amount: selectedChip });
                 this.beatControlsView.markPendingBet(chipTarget);
               }
