@@ -2,6 +2,7 @@ import type { ConnectionId } from '../schemas/casinoSchemas/ConnectionId';
 import type { ProfileId } from '../schemas/casinoSchemas/ProfileId';
 import type { CasinoProfile } from '../state/profiles/CasinoProfile';
 import type { RoomPlayer } from './protocol/RoomPlayer';
+import type { RoomSettlement } from './protocol/RoomSettlement';
 import type { RoomSnapshot } from './protocol/RoomSnapshot';
 import type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
 import type { RoomState } from './roomAuthorityModel/RoomState';
@@ -54,6 +55,7 @@ export abstract class RoomAuthorityMembership extends RoomAuthoritySettlement {
   protected reconcileRooms(reason: string, profileId?: ProfileId): AuthorityResult {
     const profiles = new Map(this.dataStore.snapshot().profileState.profiles.map((profile) => [profile.id, profile]));
     const broadcasts: RoomSnapshot[] = [];
+    const settlements: RoomSettlement[] = [];
     const roomClosures: Array<NonNullable<AuthorityResult['roomClosures']>[number]> = [];
 
     for (const room of [...this.rooms.values()]) {
@@ -87,7 +89,11 @@ export abstract class RoomAuthorityMembership extends RoomAuthoritySettlement {
       }
 
       if (room.serverManaged && this.roomMemberCount(room) === 0) {
-        this.resetServerManagedRoom(room);
+        const resetResult = this.resetServerManagedRoom(room);
+        if (resetResult?.error) {
+          return resetResult;
+        }
+        settlements.push(...(resetResult?.settlements ?? []));
       }
       this.syncBeatBankroll(room);
       if (removedConnectionIds.length > 0) {
@@ -100,11 +106,12 @@ export abstract class RoomAuthorityMembership extends RoomAuthoritySettlement {
       broadcasts.push(broadcastSnapshot);
     }
 
-    return { broadcasts, settlements: [], roomClosures };
+    return { broadcasts, settlements, roomClosures };
   }
 
   protected clearAllRooms(reason: string): AuthorityResult {
     const broadcasts: RoomSnapshot[] = [];
+    const settlements: RoomSettlement[] = [];
     const roomClosures: Array<NonNullable<AuthorityResult['roomClosures']>[number]> = [];
     const broadcastRecipients: Array<NonNullable<AuthorityResult['broadcastRecipients']>[number]> = [];
 
@@ -116,10 +123,13 @@ export abstract class RoomAuthorityMembership extends RoomAuthoritySettlement {
         this.rooms.delete(room.roomId);
         continue;
       }
+      const resetResult = this.resetServerManagedRoom(room);
+      if (resetResult?.error) {
+        return resetResult;
+      }
       room.players.clear();
       room.spectators.clear();
       room.connectionToMember.clear();
-      this.resetServerManagedRoom(room);
       const snapshot = this.broadcast(room).broadcasts[0];
       if (!snapshot) {
         throw new Error('Broadcast produced no snapshot.');
@@ -128,9 +138,12 @@ export abstract class RoomAuthorityMembership extends RoomAuthoritySettlement {
       if (connectionIds.length > 0) {
         broadcastRecipients.push({ roomId: snapshot.roomId, connectionIds });
       }
+      if (resetResult) {
+        settlements.push(...resetResult.settlements);
+      }
     }
 
-    return { broadcasts, settlements: [], roomClosures, broadcastRecipients };
+    return { broadcasts, settlements, roomClosures, broadcastRecipients };
   }
 
   protected removeExistingMember(room: RoomState, profileId: ProfileId): void {
@@ -161,7 +174,7 @@ export abstract class RoomAuthorityMembership extends RoomAuthoritySettlement {
 
   protected abstract clearBeatReadiness(room: RoomState): void;
 
-  protected abstract resetServerManagedRoom(room: RoomState): void;
+  protected abstract resetServerManagedRoom(room: RoomState): AuthorityResult | undefined;
 
   protected abstract syncBeatBankroll(room: RoomState): void;
 

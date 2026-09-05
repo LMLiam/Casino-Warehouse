@@ -276,8 +276,9 @@ export abstract class PixiTableDrawing extends PixiTableSettlement {
 
       this.chipRenderer.drawStack(amount, x + BET_RENDERING.mainWagerOffsetX, y, BET_RENDERING.mainChipRadius);
       if (summary.mainResult === 'win') {
-        this.drawDealerPayout(amount, x + BET_RENDERING.mainPayoutOffsetX, y, BET_RENDERING.mainChipRadius, `payout-${handId}-main-${amount}`);
-        this.tagRenderer.drawPayoutTag(`PAID +£${amount}`, x + BET_RENDERING.mainPayoutOffsetX, y + BET_RENDERING.sideLabelOffsetY, 'win');
+        const mainProfit = PixiTableSettlement.mainProfitForSummary(snapshot, summary);
+        this.drawDealerPayout(mainProfit, x + BET_RENDERING.mainPayoutOffsetX, y, BET_RENDERING.mainChipRadius, `payout-${handId}-main-${mainProfit}`);
+        this.tagRenderer.drawPayoutTag(`PAID +£${mainProfit}`, x + BET_RENDERING.mainPayoutOffsetX, y + BET_RENDERING.sideLabelOffsetY, 'win');
       } else {
         this.tagRenderer.drawPayoutTag('PUSH', x + BET_RENDERING.mainPayoutOffsetX / 2, y + BET_RENDERING.sideLabelOffsetY, 'push');
       }

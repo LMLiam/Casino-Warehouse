@@ -52,10 +52,9 @@ export abstract class PixiTableSettlement extends PixiTableBase {
   }
 
   protected static settlementPopupForSummary(snapshot: GameSnapshot, summary: RoundSummary, settlementMetadata: readonly PixiTableSettlementMetadata[] = []) {
-    const mainStake = snapshot.bets[summary.handId].main;
     const sideStake = sideBetTypes.reduce((total, betType) => total + snapshot.bets[summary.handId][betType], 0);
     const dealerThanks = snapshot.dealerTipRewards[summary.handId];
-    const mainProfit = PixiTableSettlement.mainProfitForSummary(summary.mainResult, mainStake);
+    const mainProfit = PixiTableSettlement.mainProfitForSummary(snapshot, summary);
     const sideProfit = summary.profit - mainProfit;
     const houseAdvanceRepayment = Math.max(
       0,
@@ -87,14 +86,10 @@ export abstract class PixiTableSettlement extends PixiTableBase {
     ];
   }
 
-  private static mainProfitForSummary(result: RoundSummary['mainResult'], mainStake: number): number {
-    if (result === 'win') {
-      return mainStake;
-    }
-    if (result === 'lose') {
-      return -mainStake;
-    }
-    return 0;
+  protected static mainProfitForSummary(snapshot: GameSnapshot, summary: RoundSummary): number {
+    const sideStakeHalfUnits = sideBetTypes.reduce((total, betType) => total + snapshot.bets[summary.handId][betType] * 2, 0);
+    const sideReturnedHalfUnits = summary.sideWins.reduce((total, win) => total + win.returnedHalfUnits, 0);
+    return (summary.profitHalfUnits - (sideReturnedHalfUnits - sideStakeHalfUnits)) / 2;
   }
 
   private static netLabel(profit: number, zeroLabel: string): string {

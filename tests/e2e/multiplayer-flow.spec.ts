@@ -10,6 +10,8 @@ import { RoomAuthority } from '../../src/multiplayer/roomAuthority';
 import type { ClientMessage } from '../../src/multiplayer/protocol/ClientMessage';
 import type { AuthorityResult } from '../../src/multiplayer/roomAuthorityModel/AuthorityResult';
 import type { RoomState } from '../../src/multiplayer/roomAuthorityModel/RoomState';
+import { handIds } from '../../src/game/types/handIds';
+import { totalBeatStake } from '../../src/multiplayer/roomAuthorityModel/totalBeatStake';
 import { createMemoryServerDataStore } from '../../src/state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../../src/state/serverDataStore/ServerDataStore';
 import { createSessionState } from '../../src/state/session/createSessionState';
@@ -486,10 +488,10 @@ test('Beat the House win popup includes House Advance repayment from authoritati
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
     await expect
       .poll(async () => flatPopupLines(page))
-      .toEqual(expect.arrayContaining(['Main WIN +£25', 'Side bets NONE +£0', 'Gross WIN +£25', 'House Advance payment -£2', 'Net WIN +£23']));
+      .toEqual(expect.arrayContaining(['Main WIN +£37.5', 'Side bets NONE +£0', 'Gross WIN +£37.5', 'House Advance payment -£3', 'Net WIN +£34.5']));
     await openHudSection(page, 'stats');
     await expect(page.locator('#auditLog')).toContainText('House Advance repayment withheld from beat-the-house net winnings.');
-    await expect(page.locator('#auditLog')).toContainText('Withheld £2; owed £98.');
+    await expect(page.locator('#auditLog')).toContainText('Withheld £3; owed £97.');
   } finally {
     await context.close().catch(() => undefined);
   }
@@ -850,6 +852,13 @@ class RiggedBeatRoundAuthority extends RoomAuthority {
       ...room.model.game.saveState(),
       shoe: createDeterministicBeatTheHouseShoe({ dealOrder: this.dealOrder }).saveState(),
     });
+    room.beatHandOwners = {};
+    for (const handId of handIds) {
+      const ownerProfileId = room.seats.get(handId);
+      if (ownerProfileId && totalBeatStake(before, handId) > 0) {
+        room.beatHandOwners[handId] = ownerProfileId;
+      }
+    }
     const snapshot = room.model.game.deal();
     room.lastBeatEvents = snapshot.lastEvents;
     const settlements = snapshot.phase === 'roundOver' && before.phase !== 'roundOver' ? this.settleBeat(room, snapshot) : [];

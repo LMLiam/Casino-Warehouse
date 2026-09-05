@@ -4,6 +4,7 @@ import type { HandId } from './HandId';
 import type { HandResult } from './HandResult';
 import type { GameEventType } from './GameEventType';
 import type { RoundSummary } from './RoundSummary';
+import type { HalfUnits } from '../beatTheHouse/HalfUnits';
 
 export interface GameEvent {
   readonly type: GameEventType;
@@ -15,6 +16,7 @@ export interface GameEvent {
   readonly cardIndex?: number | undefined;
   readonly result?: HandResult | undefined;
   readonly summaries?: RoundSummary[] | undefined;
+  readonly totalProfitHalfUnits?: HalfUnits | undefined;
   readonly totalProfit?: number | undefined;
   readonly dealerThanksTotal?: number | undefined;
 }

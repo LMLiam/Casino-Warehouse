@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { asHalfUnits } from '../../game/beatTheHouse/asHalfUnits';
+import { asNonNegativeHalfUnits } from '../../game/beatTheHouse/asNonNegativeHalfUnits';
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import { betTypeSchema } from './betTypeSchema';
 import { cardSchema } from './cardSchema';
@@ -14,17 +16,41 @@ import { beatTheHouseShoeSnapshotSchema } from './beatTheHouseShoeSnapshotSchema
 export const gameSnapshotSchema = (() => {
   const bets = z.record(handIdSchema, z.record(betTypeSchema, finiteNumberSchema));
   const dealerTips = z.record(handIdSchema, finiteNumberSchema);
-  const sideWin = z.object({ betType: sideBetTypeSchema, label: z.string(), profit: finiteNumberSchema, returned: finiteNumberSchema }).strict();
+  const returnedHalfUnits = z.int().nonnegative().transform(asNonNegativeHalfUnits);
+  const profitHalfUnits = z.int().transform(asHalfUnits);
+  const sideWin = z
+    .object({
+      betType: sideBetTypeSchema,
+      label: z.string(),
+      returnedHalfUnits,
+      profitHalfUnits,
+      profit: finiteNumberSchema,
+      returned: finiteNumberSchema,
+    })
+    .strict()
+    .refine(
+      (value) => value.returned === value.returnedHalfUnits / 2 && value.profit === value.profitHalfUnits / 2,
+      'Side win display values must derive from half-units.',
+    );
   const roundSummary = z
     .object({
       handId: handIdSchema,
       mainResult: handResultSchema,
       stake: finiteNumberSchema,
+      returnedHalfUnits,
+      profitHalfUnits,
       returned: finiteNumberSchema,
       profit: finiteNumberSchema,
       sideWins: z.array(sideWin),
     })
-    .strict();
+    .strict()
+    .refine(
+      (value) =>
+        value.returned === value.returnedHalfUnits / 2 &&
+        value.profit === value.profitHalfUnits / 2 &&
+        value.returnedHalfUnits === value.stake * 2 + value.profitHalfUnits,
+      'Round summary values must conserve exact half-units.',
+    );
   const playerHand = z
     .object({
       id: handIdSchema,
@@ -55,10 +81,15 @@ export const gameSnapshotSchema = (() => {
       cardIndex: finiteNumberSchema.optional(),
       result: handResultSchema.optional(),
       summaries: z.array(roundSummary).optional(),
+      totalProfitHalfUnits: profitHalfUnits.optional(),
       totalProfit: finiteNumberSchema.optional(),
       dealerThanksTotal: finiteNumberSchema.optional(),
     })
-    .strict();
+    .strict()
+    .refine(
+      (value) => value.totalProfitHalfUnits === undefined || value.totalProfit === value.totalProfitHalfUnits / 2,
+      'Round total display value must derive from half-units.',
+    );
 
   return z
     .object({
