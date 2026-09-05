@@ -43,6 +43,13 @@ export interface AppElements {
   readonly tableHost: HTMLDivElement;
   readonly beatSettlementAnnouncement: HTMLElement;
   readonly beatSeatStatus: HTMLDivElement;
+  readonly beatShoeStatus: HTMLDivElement;
+  readonly beatShoeLabel: HTMLElement;
+  readonly beatShoeCounts: HTMLElement;
+  readonly beatShoeMeter: HTMLMeterElement;
+  readonly beatShoeCut: HTMLElement;
+  readonly beatShoeCue: HTMLElement;
+  readonly beatTableStatus: HTMLElement;
   readonly blackjackView: HTMLDivElement;
   readonly slotsView: HTMLDivElement;
   readonly gameHud: HTMLDivElement;

@@ -108,6 +108,24 @@
     padding: 5px 8px;
   }
 
+  .shoe-status-overlay {
+    top: 60px;
+    left: 10px;
+    max-width: min(320px, calc(100% - 20px));
+    font-size: 11px;
+  }
+
+  .shoe-status-overlay meter {
+    width: 110px;
+  }
+
+  .table-status-overlay {
+    top: 108px;
+    left: 10px;
+    width: min(320px, calc(100% - 20px));
+    font-size: 12px;
+  }
+
   .slot-reels {
     grid-template-columns: repeat(3, minmax(70px, 1fr));
     grid-template-rows: repeat(5, minmax(70px, 1fr));
