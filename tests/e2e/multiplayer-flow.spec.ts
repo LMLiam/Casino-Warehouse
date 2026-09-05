@@ -295,6 +295,71 @@ test('Beat the House multiplayer waits for player readiness before deal and next
   }
 });
 
+test('Beat the House side-bet cap blocks oversized drops and shows stale rejections at the table', async ({ browser, baseURL }) => {
+  test.setTimeout(150_000);
+  const { profileAuthByName, wsUrl } = await startRealtimeServer(['Cap QA']);
+  const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Cap QA'));
+  try {
+    const page = await newPlayerPage(context, baseURL, 'Cap QA');
+    await page.locator('[data-lobby-game="beat-the-house"]').click();
+    await page.locator('#roomNameInput').fill('Cap Room');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await expect(page.locator('#tableHost')).toBeVisible();
+    await claimRoomSeat(page, 'Left');
+
+    await expect(page.locator('#beatShoeStatus')).toBeVisible();
+    await expect(page.locator('#beatShoeLabel')).toContainText('6-deck shoe');
+    await expect(page.locator('#beatShoeCounts')).toContainText('312');
+    await expect(page.locator('#beatTableStatus')).toBeHidden();
+
+    await page.getByLabel('£25 chip').click();
+    await dropChipPercent(page, 19.25, 70.55, 25);
+    await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left'), { timeout: 10_000 }).toBe(true);
+
+    await dropChipPercent(page, 29.7, 44.2, 25);
+    await expect.poll(() => tableAmount(page), { timeout: 10_000 }).toBeGreaterThanOrEqual(50);
+    const bankrollAfterFullSide = await tableAmount(page);
+
+    await dropChipPercent(page, 29.7, 44.2, 5);
+    await page.waitForTimeout(500);
+    expect(await tableAmount(page)).toBe(bankrollAfterFullSide);
+
+    await dropChipPercent(page, 19.25, 70.55, 5);
+    await expect.poll(() => tableAmount(page), { timeout: 10_000 }).toBeGreaterThan(bankrollAfterFullSide);
+
+    await dropChipPercent(page, 29.7, 44.2, 5);
+    await expect.poll(() => tableAmount(page), { timeout: 10_000 }).toBeGreaterThan(bankrollAfterFullSide + 5);
+
+    await page.getByLabel('£25 chip').click();
+    await page.locator('#tableHost').evaluate((host) => {
+      const box = host.getBoundingClientRect();
+      const scale = Math.min(box.width / 1672, box.height / 941);
+      const xOffset = (box.width - 1672 * scale) / 2;
+      const yOffset = (box.height - 941 * scale) / 2;
+      for (const _ignored of [0, 1]) {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.setData('text/plain', '25');
+        host.dispatchEvent(
+          new DragEvent('drop', {
+            bubbles: true,
+            cancelable: true,
+            clientX: box.left + xOffset + 1672 * scale * (16.15 / 100),
+            clientY: box.top + yOffset + 941 * scale * (41.0 / 100),
+            dataTransfer,
+          }),
+        );
+      }
+    });
+    await expect.poll(() => tableAmount(page), { timeout: 10_000 }).toBeGreaterThanOrEqual(85);
+    await expect(page.locator('#beatTableStatus')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#beatTableStatus')).toHaveAttribute('role', 'status');
+    await expect(page.locator('#onTable')).not.toContainText('£0');
+    await expect(page.locator('#dealBtn')).toBeVisible();
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+});
+
 const beatActionDockSeatScenarios = [
   { seatLabel: 'Left', activeMainBet: 'left', chipXPercent: 19.25 },
   { seatLabel: 'Right', activeMainBet: 'right', chipXPercent: 80.85 },
