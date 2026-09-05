@@ -29,7 +29,14 @@ describe('BeatTheHouseGame', () => {
     expect(snapshot.phase).toBe('roundOver');
     expect(snapshot.hands.left.result).toBe('win');
     expect(snapshot.bankroll).toBe(115);
-    expect(requireSummary(snapshot)).toMatchObject({ profitHalfUnits: 30, returnedHalfUnits: 50, profit: 15, returned: 25 });
+    expect(requireSummary(snapshot)).toMatchObject({
+      mainProfitHalfUnits: 30,
+      sideProfitHalfUnits: 0,
+      profitHalfUnits: 30,
+      returnedHalfUnits: 50,
+      profit: 15,
+      returned: 25,
+    });
   });
 
   it('keeps a £1 first-card black-Ace result exact in summaries and events', () => {
@@ -42,6 +49,8 @@ describe('BeatTheHouseGame', () => {
 
     expect(summary).toMatchObject({
       stake: 1,
+      mainProfitHalfUnits: 3,
+      sideProfitHalfUnits: 0,
       returnedHalfUnits: 5,
       profitHalfUnits: 3,
       returned: 2.5,
@@ -63,6 +72,7 @@ describe('BeatTheHouseGame', () => {
     expect(requireSummary(snapshot).sideWins).toEqual([
       { betType: 'aceFlash', label: 'Ace Flash', profitHalfUnits: 120, returnedHalfUnits: 122, profit: 60, returned: 61 },
     ]);
+    expect(requireSummary(snapshot)).toMatchObject({ mainProfitHalfUnits: 30, sideProfitHalfUnits: 120 });
     expect(snapshot.bankroll).toBe(175);
   });
 
@@ -93,6 +103,7 @@ describe('BeatTheHouseGame', () => {
     expect(requireSummary(snapshot).sideWins).toEqual([
       { betType: 'matchPush', label: 'Match Push', profitHalfUnits: 18, returnedHalfUnits: 20, profit: 9, returned: 10 },
     ]);
+    expect(requireSummary(snapshot)).toMatchObject({ mainProfitHalfUnits: 0, sideProfitHalfUnits: 16 });
     expect(requireSummary(snapshot).profit).toBe(8);
     expect(snapshot.bankroll).toBe(108);
   });
