@@ -119,6 +119,8 @@ export abstract class GameAppRendering {
   protected renderCasino(): void {
     const player = this.currentPlayer;
     if (!player) {
+      this.walletView.clear();
+      this.elements.beatSettlementAnnouncement.textContent = '';
       return;
     }
 
@@ -168,7 +170,8 @@ export abstract class GameAppRendering {
     }
     this.table.render(beatSnapshot, this.beatSettlementMetadataFor(activeRoom, player.profileId));
     this.beatSeatStatusView.render(beatSnapshot, isBeatTheHouse ? activeRoom : undefined, player.profileId, (seatId) => this.claimRoomSeat(seatId));
-    this.renderWallet(beatSnapshot, roomMember?.bankroll);
+    const showBeatHalfChip = isBeatTheHouse && !this.showingGameLobby && !showingRoomLobby;
+    this.renderWallet(beatSnapshot, roomMember?.bankroll, showBeatHalfChip);
     this.renderBeatControls(beatSnapshot, canUseGameControls, activeRoom, player.profileId, beatBankroll);
     this.blackjackView.render(blackjackSnapshot, player.profileId);
     this.slotsView.render(slotsSnapshot, this.activeGame, activeRoom, player.profileId);
@@ -200,8 +203,8 @@ export abstract class GameAppRendering {
     );
   }
 
-  protected renderWallet(snapshot: GameSnapshot, bankrollOverride?: number): void {
-    this.walletView.render(snapshot, this.currentProfile(), bankrollOverride);
+  protected renderWallet(snapshot: GameSnapshot, bankrollOverride?: number, showBeatHalfChip = false): void {
+    this.walletView.render(snapshot, this.currentProfile(), bankrollOverride, showBeatHalfChip);
   }
 
   protected renderConnectionState(): void {

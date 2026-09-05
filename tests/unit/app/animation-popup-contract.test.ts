@@ -286,22 +286,40 @@ describe('Beat the House popup and animation behaviour', () => {
     table.render(game.deal());
 
     expect(tagRenderer.drawResultPopup).toHaveBeenCalledWith(
-      'Main WIN +£1.5',
+      'Main WIN +£1.50',
       'Side bets NONE +£0',
-      ['Total WIN +£1.5'],
+      ['Total WIN +£1.50'],
       expect.any(Number),
       expect.any(Number),
       'win',
       false,
     );
-    expect(chipRenderer.drawStack).toHaveBeenCalledWith(
-      1.5,
-      expect.any(Number),
-      expect.any(Number),
-      expect.any(Number),
-      expect.objectContaining({ key: 'payout-left-main-1.5', from: toPixels(dealerChipBank) }),
-    );
-    expect(tagRenderer.drawPayoutTag).toHaveBeenCalledWith('PAID +£1.5', expect.any(Number), expect.any(Number), 'win');
+    expect(vi.mocked(chipRenderer.drawStack).mock.calls.some(([amount]) => !Number.isInteger(amount))).toBe(false);
+    expect(tagRenderer.drawPayoutTag).toHaveBeenCalledWith('PAID +£1.50', expect.any(Number), expect.any(Number), 'win');
+  });
+
+  it('announces exact settlement text once and clears it for the next round', () => {
+    vi.stubGlobal('window', {
+      clearTimeout: vi.fn(),
+      matchMedia: vi.fn(() => ({ matches: false })),
+      setTimeout: vi.fn((callback: () => void) => {
+        callback();
+        return 1;
+      }),
+    });
+    const onSettlementAnnouncement = vi.fn();
+    const { table } = createInitializedTable(onSettlementAnnouncement);
+    const game = createGame(500, [card('A', 'spades'), card('K', 'hearts')]);
+    game.placeBet('left', 'main', 1);
+
+    table.render(game.deal());
+
+    expect(onSettlementAnnouncement).toHaveBeenCalledTimes(1);
+    expect(onSettlementAnnouncement).toHaveBeenCalledWith(expect.stringContaining('Main WIN +£1.50'));
+
+    table.render(game.nextRound());
+
+    expect(onSettlementAnnouncement).toHaveBeenLastCalledWith('');
   });
 
   it('draws dealer tip chips while betting and includes Dealer Thanks in the net breakdown', () => {
@@ -575,7 +593,7 @@ describe('Beat the House popup and animation behaviour', () => {
   });
 });
 
-const createInitializedTable = () => {
+const createInitializedTable = (onSettlementAnnouncement?: (message: string) => void) => {
   const chipRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createChipRenderer']>>({ clearAnimations: vi.fn(), drawStack: vi.fn() });
   const effectRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createEffectRenderer']>>({ drawConfetti: vi.fn(), drawSideBetWin: vi.fn() });
   const tagRenderer = rendererTestDouble<ReturnType<PixiTableDependencies['createTagRenderer']>>({
@@ -605,7 +623,11 @@ const createInitializedTable = () => {
     clientHeight: 1000,
     classList: { toggle: vi.fn() },
   });
-  const table = new PixiTable(host, { onBet: vi.fn() }, dependencies);
+  const options = {
+    onBet: vi.fn(),
+    ...(onSettlementAnnouncement ? { onSettlementAnnouncement } : {}),
+  };
+  const table = new PixiTable(host, options, dependencies);
   const mutableTable = pixiTableInternals(table);
   mutableTable.initialized = true;
   mutableTable.chipRenderer = chipRenderer;

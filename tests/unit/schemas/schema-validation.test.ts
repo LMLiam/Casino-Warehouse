@@ -163,9 +163,35 @@ describe('Zod-backed runtime validation', () => {
 
   it('validates the complete private shoe and public snapshot contracts', () => {
     const snapshot = new BeatTheHouseGame({ initialBankroll: 100 }).snapshot();
+    const exactSummary = {
+      handId: 'left',
+      mainResult: 'win',
+      stake: 1,
+      mainProfitHalfUnits: 3,
+      sideProfitHalfUnits: 0,
+      returnedHalfUnits: 5,
+      profitHalfUnits: 3,
+      returned: 2.5,
+      profit: 1.5,
+      sideWins: [],
+    };
+    const exactSnapshot = { ...snapshot, summaries: [exactSummary] };
     const savedShoe = new BeatTheHouseGame({ initialBankroll: 100 }).saveState().shoe;
 
     expect(gameSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    expect(gameSnapshotSchema.safeParse(exactSnapshot).success).toBe(true);
+    expect(
+      gameSnapshotSchema.safeParse({
+        ...exactSnapshot,
+        summaries: [{ ...exactSummary, sideProfitHalfUnits: 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      gameSnapshotSchema.safeParse({
+        ...exactSnapshot,
+        summaries: [{ ...exactSummary, mainProfitHalfUnits: undefined }],
+      }).success,
+    ).toBe(false);
     expect(gameSnapshotSchema.safeParse({ ...snapshot, dealer: { ...snapshot.dealer, holeCard: { rank: 'A', suit: 'spades' } } }).success).toBe(false);
     expect(
       gameSnapshotSchema.safeParse({

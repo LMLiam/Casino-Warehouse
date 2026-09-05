@@ -41,12 +41,15 @@ export interface AppElements {
   readonly roomSeats: HTMLElement;
   readonly roomBrowser: HTMLDivElement;
   readonly tableHost: HTMLDivElement;
+  readonly beatSettlementAnnouncement: HTMLElement;
   readonly beatSeatStatus: HTMLDivElement;
   readonly blackjackView: HTMLDivElement;
   readonly slotsView: HTMLDivElement;
   readonly gameHud: HTMLDivElement;
   readonly hudOverflowMenu: HTMLDetailsElement;
+  readonly walletStack: HTMLDivElement;
   readonly moneyPill: HTMLDivElement;
+  readonly beatHalfChipIndicator: HTMLElement;
   readonly actionDock: HTMLDivElement;
   readonly bankroll: HTMLElement;
   readonly bankrollDelta: HTMLElement;

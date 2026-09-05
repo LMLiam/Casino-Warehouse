@@ -3,4 +3,5 @@ import type { HandId } from '../../game/types/HandId';
 
 export interface PixiTableOptions {
   readonly onBet: (handId: HandId, chipTarget: BeatTheHouseChipTarget) => void;
+  readonly onSettlementAnnouncement?: (message: string) => void;
 }

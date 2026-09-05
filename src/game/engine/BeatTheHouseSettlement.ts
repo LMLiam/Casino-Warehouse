@@ -82,6 +82,8 @@ export abstract class BeatTheHouseSettlement extends BeatTheHouseRound {
         handId,
         mainResult: main.result,
         stake,
+        mainProfitHalfUnits: main.profitHalfUnits,
+        sideProfitHalfUnits: side.profitHalfUnits,
         returnedHalfUnits: handReturnedHalfUnits,
         profitHalfUnits: handProfitHalfUnits,
         returned: handReturnedHalfUnits / 2,

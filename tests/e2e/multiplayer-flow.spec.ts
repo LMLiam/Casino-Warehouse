@@ -346,6 +346,8 @@ for (const scenario of beatActionDockSeatScenarios) {
 
 test('Beat the House table keeps per-hand popups, side-bet labels, deal order, and cleanup stable', async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
+  const previousNextRoundTimeout = process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS;
+  process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS = '120000';
   const { profileAuthByName, wsUrl } = await startRealtimeServer(['Beat QA']);
   const context = await newPlayerContext(browser, wsUrl, profileAuthByName.get('Beat QA'));
   try {
@@ -451,6 +453,11 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
     await expect.poll(async () => (await parsedDataset(page, 'sideBetLabels')).some((label) => String(label).includes('Dealer Sevens'))).toBe(true);
   } finally {
     await context.close().catch(() => undefined);
+    if (previousNextRoundTimeout === undefined) {
+      delete process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS;
+    } else {
+      process.env.CASINO_BEAT_NEXT_ROUND_TIMEOUT_MS = previousNextRoundTimeout;
+    }
   }
 });
 
@@ -488,10 +495,66 @@ test('Beat the House win popup includes House Advance repayment from authoritati
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
     await expect
       .poll(async () => flatPopupLines(page))
-      .toEqual(expect.arrayContaining(['Main WIN +£37.5', 'Side bets NONE +£0', 'Gross WIN +£37.5', 'House Advance payment -£3', 'Net WIN +£34.5']));
+      .toEqual(expect.arrayContaining(['Main WIN +£37.50', 'Side bets NONE +£0', 'Gross WIN +£37.50', 'House Advance payment -£3', 'Net WIN +£34.50']));
     await openHudSection(page, 'stats');
     await expect(page.locator('#auditLog')).toContainText('House Advance repayment withheld from beat-the-house net winnings.');
     await expect(page.locator('#auditLog')).toContainText('Withheld £3; owed £97.');
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+});
+
+test('Beat the House displays exact half credits and consolidates the profile residual', async ({ browser, baseURL }) => {
+  test.setTimeout(90_000);
+  const { dataStore, profileAuthByName } = seedDataStore(['Half Credit Popup QA']);
+  const profileAuth = profileAuthByName.get('Half Credit Popup QA');
+  if (!profileAuth) {
+    throw new Error('Expected seeded half-credit profile auth.');
+  }
+  const authority = new RiggedBeatRoundAuthority(dataStore, [
+    { rank: 'A', suit: 'spades' },
+    { rank: 'K', suit: 'hearts' },
+  ]);
+  const wsUrl = await startRealtimeServerWithStore(dataStore, 0, authority);
+  const context = await newPlayerContext(browser, wsUrl, profileAuth);
+  try {
+    const page = await newPlayerPage(context, baseURL, 'Half Credit Popup QA');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('[data-lobby-game="beat-the-house"]').click();
+    await page.locator('#roomNameInput').fill('Half Credit Room');
+    await page.getByRole('button', { name: 'Create Room' }).click();
+    await expect(page.locator('#tableHost')).toBeVisible();
+    await claimRoomSeat(page, 'Left');
+
+    await page.getByLabel('£1 chip').click();
+    await dropChipPercent(page, 19.25, 70.55, 1);
+    await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left')).toBe(true);
+    await page.locator('#dealBtn').click();
+
+    await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
+    await expect.poll(async () => flatPopupLines(page)).toEqual(expect.arrayContaining(['Main WIN +£1.50', 'Side bets NONE +£0', 'Total WIN +£1.50']));
+    await expect(page.locator('#bankroll')).toHaveText('£1,001');
+    await expect(page.locator('#beatHalfChipIndicator')).toBeVisible();
+    await expect(page.locator('#beatHalfChipIndicator')).toHaveText('Half chip: one half');
+    await expect(page.locator('#chipRail')).not.toContainText('Half chip');
+
+    await page.locator('#nextBtn').click();
+    await expect(page.locator('#chipRail')).toBeVisible();
+    await page.getByLabel('£1 chip').click();
+    await dropChipPercent(page, 19.25, 70.55, 1);
+    await page.locator('#dealBtn').click();
+
+    await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
+    await expect(page.locator('#bankroll')).toHaveText('£1,003');
+    await expect(page.locator('#beatHalfChipIndicator')).toBeHidden();
+
+    await page.locator('#backToLobbyBtn').click();
+    await expect(page.locator('#gameLobby')).toBeVisible();
+    await expect(page.locator('#beatHalfChipIndicator')).toBeHidden();
+    await page.locator('[data-lobby-game="blackjack"]').click();
+    await expect(page.locator('#roomLobby')).toBeVisible();
+    await expect(page.locator('#beatHalfChipIndicator')).toBeHidden();
+    await expect(page.locator('[data-chip*="half"], [aria-label*="half chip" i]')).toHaveCount(0);
   } finally {
     await context.close().catch(() => undefined);
   }

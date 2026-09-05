@@ -1,6 +1,8 @@
 import type { GameSnapshot } from '../../game/types/GameSnapshot';
 import type { RoundSummary } from '../../game/types/RoundSummary';
 import { sideBetTypes } from '../../game/types/sideBetTypes';
+import { asHalfUnits } from '../../game/beatTheHouse/asHalfUnits';
+import { formatHalfUnits } from '../../shared/formatHalfUnitMoney';
 import { CARD_ANIMATION } from '../renderers/renderingConstants/CARD_ANIMATION';
 import type { PixiTableSettlementMetadata } from './PixiTableSettlementMetadata';
 import { PixiTableBase } from './PixiTableBase';
@@ -17,8 +19,8 @@ export abstract class PixiTableSettlement extends PixiTableBase {
       return;
     }
 
-    const totalProfit = roundSettled?.totalProfit ?? snapshot.summaries.reduce((sum, summary) => sum + summary.profit, 0);
-    const key = `${snapshot.dealer.cards.map((card) => `${card.rank}-${card.suit}`).join('|')}:${totalProfit}`;
+    const totalProfitHalfUnits = roundSettled?.totalProfitHalfUnits ?? snapshot.summaries.reduce((sum, summary) => sum + summary.profitHalfUnits, 0);
+    const key = `${snapshot.dealer.cards.map((card) => `${card.rank}-${card.suit}`).join('|')}:${totalProfitHalfUnits}`;
     if (this.settlementKey === key) {
       return;
     }
@@ -47,66 +49,72 @@ export abstract class PixiTableSettlement extends PixiTableBase {
     return snapshot.summaries.flatMap((summary) => PixiTableSettlement.sideLinesForSummary(snapshot, summary));
   }
 
-  protected static formatProfit(profit: number): string {
-    return `${profit >= 0 ? '+' : '-'}£${Math.abs(profit)}`;
+  protected settlementAnnouncementForSnapshot(snapshot: GameSnapshot): string {
+    return snapshot.summaries
+      .map((summary) => {
+        const popup = PixiTableSettlement.settlementPopupForSummary(snapshot, summary, this.settlementMetadata);
+        return [popup.mainLine, popup.sideLine, ...popup.detailLines].join('. ');
+      })
+      .join('. ');
   }
 
   protected static settlementPopupForSummary(snapshot: GameSnapshot, summary: RoundSummary, settlementMetadata: readonly PixiTableSettlementMetadata[] = []) {
     const sideStake = sideBetTypes.reduce((total, betType) => total + snapshot.bets[summary.handId][betType], 0);
     const dealerThanks = snapshot.dealerTipRewards[summary.handId];
-    const mainProfit = PixiTableSettlement.mainProfitForSummary(snapshot, summary);
-    const sideProfit = summary.profit - mainProfit;
-    const houseAdvanceRepayment = Math.max(
-      0,
-      Math.floor(settlementMetadata.find((metadata) => metadata.handId === summary.handId)?.houseAdvanceRepayment ?? 0),
-    );
-    const netProfit = summary.profit - houseAdvanceRepayment + dealerThanks;
+    const houseAdvanceRepayment = Math.max(0, settlementMetadata.find((metadata) => metadata.handId === summary.handId)?.houseAdvanceRepayment ?? 0);
+    const houseAdvanceRepaymentHalfUnits = asHalfUnits(houseAdvanceRepayment + houseAdvanceRepayment);
+    const dealerThanksHalfUnits = asHalfUnits(dealerThanks + dealerThanks);
+    const netProfitHalfUnits = asHalfUnits(summary.profitHalfUnits - houseAdvanceRepaymentHalfUnits + dealerThanksHalfUnits);
     return {
-      mainLine: `Main ${summary.mainResult.toUpperCase()} ${PixiTableSettlement.formatProfit(mainProfit)}`,
-      sideLine: `Side bets ${sideStake > 0 ? PixiTableSettlement.netLabel(sideProfit, 'EVEN') : 'NONE'} ${PixiTableSettlement.formatProfit(sideProfit)}`,
-      detailLines: PixiTableSettlement.settlementDetailLines(summary.profit, houseAdvanceRepayment, dealerThanks, netProfit),
-      result: PixiTableSettlement.resultForProfit(netProfit),
+      mainLine: `Main ${summary.mainResult.toUpperCase()} ${formatHalfUnits(summary.mainProfitHalfUnits, true)}`,
+      sideLine: `Side bets ${sideStake > 0 ? PixiTableSettlement.netLabel(summary.sideProfitHalfUnits, 'EVEN') : 'NONE'} ${formatHalfUnits(summary.sideProfitHalfUnits, true)}`,
+      detailLines: PixiTableSettlement.settlementDetailLines(
+        summary.profitHalfUnits,
+        houseAdvanceRepaymentHalfUnits,
+        dealerThanksHalfUnits,
+        netProfitHalfUnits,
+      ),
+      result: PixiTableSettlement.resultForProfit(netProfitHalfUnits),
     };
   }
 
-  private static settlementDetailLines(profit: number, houseAdvanceRepayment: number, dealerThanks: number, netProfit: number): string[] {
-    if (houseAdvanceRepayment <= 0 && dealerThanks <= 0) {
-      return [`Total ${PixiTableSettlement.netLabel(profit, 'PUSH')} ${PixiTableSettlement.formatProfit(profit)}`];
+  private static settlementDetailLines(
+    profitHalfUnits: number,
+    houseAdvanceRepaymentHalfUnits: number,
+    dealerThanksHalfUnits: number,
+    netProfitHalfUnits: number,
+  ): string[] {
+    if (houseAdvanceRepaymentHalfUnits <= 0 && dealerThanksHalfUnits <= 0) {
+      return [`Total ${PixiTableSettlement.netLabel(profitHalfUnits, 'PUSH')} ${formatHalfUnits(asHalfUnits(profitHalfUnits), true)}`];
     }
 
-    const openingLabel = houseAdvanceRepayment > 0 ? 'Gross' : 'Gameplay';
+    const openingLabel = houseAdvanceRepaymentHalfUnits > 0 ? 'Gross' : 'Gameplay';
     const adjustmentLines = [
-      ...(houseAdvanceRepayment > 0 ? [`House Advance payment -£${houseAdvanceRepayment}`] : []),
-      ...(dealerThanks > 0 ? [`Dealer's Thanks +£${dealerThanks}`] : []),
+      ...(houseAdvanceRepaymentHalfUnits > 0 ? [`House Advance payment ${formatHalfUnits(asHalfUnits(-houseAdvanceRepaymentHalfUnits))}`] : []),
+      ...(dealerThanksHalfUnits > 0 ? [`Dealer's Thanks ${formatHalfUnits(asHalfUnits(dealerThanksHalfUnits), true)}`] : []),
     ];
     return [
-      `${openingLabel} ${PixiTableSettlement.netLabel(profit, 'PUSH')} ${PixiTableSettlement.formatProfit(profit)}`,
+      `${openingLabel} ${PixiTableSettlement.netLabel(profitHalfUnits, 'PUSH')} ${formatHalfUnits(asHalfUnits(profitHalfUnits), true)}`,
       ...adjustmentLines,
-      `Net ${PixiTableSettlement.netLabel(netProfit, 'PUSH')} ${PixiTableSettlement.formatProfit(netProfit)}`,
+      `Net ${PixiTableSettlement.netLabel(netProfitHalfUnits, 'PUSH')} ${formatHalfUnits(asHalfUnits(netProfitHalfUnits), true)}`,
     ];
   }
 
-  protected static mainProfitForSummary(snapshot: GameSnapshot, summary: RoundSummary): number {
-    const sideStakeHalfUnits = sideBetTypes.reduce((total, betType) => total + snapshot.bets[summary.handId][betType] * 2, 0);
-    const sideReturnedHalfUnits = summary.sideWins.reduce((total, win) => total + win.returnedHalfUnits, 0);
-    return (summary.profitHalfUnits - (sideReturnedHalfUnits - sideStakeHalfUnits)) / 2;
-  }
-
-  private static netLabel(profit: number, zeroLabel: string): string {
-    if (profit > 0) {
+  private static netLabel(profitHalfUnits: number, zeroLabel: string): string {
+    if (profitHalfUnits > 0) {
       return 'WIN';
     }
-    if (profit < 0) {
+    if (profitHalfUnits < 0) {
       return 'LOSE';
     }
     return zeroLabel;
   }
 
-  private static resultForProfit(profit: number): RoundSummary['mainResult'] {
-    if (profit > 0) {
+  private static resultForProfit(profitHalfUnits: number): RoundSummary['mainResult'] {
+    if (profitHalfUnits > 0) {
       return 'win';
     }
-    if (profit < 0) {
+    if (profitHalfUnits < 0) {
       return 'lose';
     }
     return 'push';
@@ -117,7 +125,7 @@ export abstract class PixiTableSettlement extends PixiTableBase {
       const stake = snapshot.bets[summary.handId][betType];
       const sideWin = summary.sideWins.find((win) => win.betType === betType);
       if (sideWin) {
-        return [`${sideWin.label} WIN +£${sideWin.profit}`];
+        return [`${sideWin.label} WIN ${formatHalfUnits(sideWin.profitHalfUnits, true)}`];
       }
       return stake > 0 && snapshot.sideStates[summary.handId][betType] === 'lose' ? [`${PixiTableSettlement.betTypeLabel(betType)} LOSE -£${stake}`] : [];
     });

@@ -146,6 +146,8 @@ export abstract class GameAppRoomActions extends GameAppSession {
       this.multiplayer.leaveRoom();
     }
     this.player = undefined;
+    this.walletView.clear();
+    this.elements.beatSettlementAnnouncement.textContent = '';
     this.activeGame = 'beat-the-house';
     this.showingGameLobby = true;
     this.sessionWagered = 0;

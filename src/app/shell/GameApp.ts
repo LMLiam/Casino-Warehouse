@@ -168,6 +168,9 @@ export class GameApp extends GameAppProfileActions {
             this.audio.play('chip');
           }
         },
+        onSettlementAnnouncement: (message) => {
+          this.elements.beatSettlementAnnouncement.textContent = message;
+        },
       },
       {
         createCardRenderer: (layer: Container) => new CardRenderer(layer),

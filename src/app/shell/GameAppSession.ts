@@ -63,6 +63,8 @@ export abstract class GameAppSession extends GameAppRendering {
       this.elements.roomStatus.textContent = `Invite loaded for room ${this.pendingInviteRoomCode}. Select a profile to join.`;
     }
     if (!this.player) {
+      this.walletView.clear();
+      this.elements.beatSettlementAnnouncement.textContent = '';
       this.showingGameLobby = true;
       this.multiplayerRooms = [];
       this.elements.shell.classList.add('hidden');

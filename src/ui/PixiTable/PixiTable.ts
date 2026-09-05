@@ -95,17 +95,25 @@ export class PixiTable extends PixiTableDrawing {
     }
     this.cardAnimationQueue = PixiTable.createCardAnimationQueue(snapshot.lastEvents);
     this.prepareSettlementVisibility(snapshot);
-    this.host.dataset.settlementVisible = String(this.shouldShowSettlement(snapshot));
-    this.host.dataset.settlementHandCount = String(this.shouldShowSettlement(snapshot) ? snapshot.summaries.length : 0);
+    const settlementVisible = this.shouldShowSettlement(snapshot);
+    if (settlementVisible && this.announcedSettlementKey !== this.settlementKey) {
+      this.options.onSettlementAnnouncement?.(this.settlementAnnouncementForSnapshot(snapshot));
+      this.announcedSettlementKey = this.settlementKey;
+    } else if (!settlementVisible && this.announcedSettlementKey) {
+      this.options.onSettlementAnnouncement?.('');
+      this.announcedSettlementKey = '';
+    }
+    this.host.dataset.settlementVisible = String(settlementVisible);
+    this.host.dataset.settlementHandCount = String(settlementVisible ? snapshot.summaries.length : 0);
     this.host.dataset.dealerTipSeats = JSON.stringify(handLayouts.filter((hand) => snapshot.dealerTips[hand.id] > 0).map((hand) => hand.id));
     this.host.dataset.dealerThanksRewards = JSON.stringify(
       handLayouts.flatMap((hand) => (snapshot.dealerTipRewards[hand.id] > 0 ? [`${hand.id}:${snapshot.dealerTipRewards[hand.id]}`] : [])),
     );
     this.host.dataset.settlementResults = JSON.stringify(
-      this.shouldShowSettlement(snapshot) ? snapshot.summaries.map((summary) => `${summary.handId}:${summary.mainResult}:${summary.profit}`) : [],
+      settlementVisible ? snapshot.summaries.map((summary) => `${summary.handId}:${summary.mainResult}:${summary.profit}`) : [],
     );
     this.host.dataset.settlementPopupLines = JSON.stringify(
-      this.shouldShowSettlement(snapshot)
+      settlementVisible
         ? snapshot.summaries.map((summary) => {
             const popup = PixiTableSettlement.settlementPopupForSummary(snapshot, summary, this.settlementMetadata);
             return [popup.mainLine, popup.sideLine, ...popup.detailLines];
@@ -123,7 +131,7 @@ export class PixiTable extends PixiTableDrawing {
     this.drawBettingZones(snapshot);
     this.drawHands(snapshot);
     this.drawDealer(snapshot);
-    if (this.shouldShowSettlement(snapshot)) {
+    if (settlementVisible) {
       this.drawRoundSummaries(snapshot);
       this.host.dataset.profitableCelebration = String(snapshot.summaries.some((summary) => summary.profit > 0));
       if (this.celebratedSettlementKey !== this.settlementKey) {
