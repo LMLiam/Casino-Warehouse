@@ -45,29 +45,27 @@ export const gameCatalog: readonly GameCatalogEntry[] = [
     ],
     paytable: ['Blackjack pays 3:2.', 'Regular wins pay 1:1.', 'Pushes return the wager.'],
   },
-  ...slotThemes.map(
-    (slotTheme): GameCatalogEntry => ({
-      id: roomGameIdSchema.parse(`slots:${slotTheme.id}`),
-      title: slotTheme.title,
-      kind: 'slots',
-      description: 'Themed slot machine with jackpots and bonus picks.',
-      accent: slotTheme.accent,
-      rules: [
-        `${slotTheme.title} uses a ${slotTheme.columns} column by ${slotTheme.rows} row grid with ${slotTheme.bonus.triggerSymbol} scatter-style bonus symbols.`,
-        ...(slotTheme.wildSymbol ? [`${slotTheme.wildSymbol} symbols act as wilds on left-to-right line wins.`] : []),
-        `Three ${slotTheme.bonus.triggerSymbol} symbols open a ${slotTheme.bonus.picks}-pick bonus.`,
-        `Two ${slotTheme.bonus.triggerSymbol} symbols award ${slotTheme.bonus.freeSpinsOnTwoBonus} free spins.`,
-        'Free spins use the current wager without another bankroll debit.',
-      ],
-      paytable: [
-        ...Object.entries(slotTheme.jackpots).map(([, jackpot]) => `${jackpot.label}: three ${jackpot.symbol} symbols pay ${jackpot.multiplier}:1.`),
-        ...Object.entries(slotTheme.payouts).map(([symbol, multiplier]) => `Three ${symbol} symbols pay ${multiplier}:1.`),
-        ...(slotTheme.wildSymbol ? [`${slotTheme.wildSymbol} substitutes for every paying symbol except ${slotTheme.bonus.triggerSymbol}.`] : []),
-        `Bonus picks can award ${slotTheme.bonus.multipliers.join(', ')}x the wager.`,
-      ],
-      slotTheme,
-    }),
-  ),
+  ...slotThemes.map((slotTheme): GameCatalogEntry => ({
+    id: roomGameIdSchema.parse(`slots:${slotTheme.id}`),
+    title: slotTheme.title,
+    kind: 'slots',
+    description: 'Themed slot machine with jackpots and bonus picks.',
+    accent: slotTheme.accent,
+    rules: [
+      `${slotTheme.title} uses a ${slotTheme.columns} column by ${slotTheme.rows} row grid with ${slotTheme.bonus.triggerSymbol} scatter-style bonus symbols.`,
+      ...(slotTheme.wildSymbol ? [`${slotTheme.wildSymbol} symbols act as wilds on left-to-right line wins.`] : []),
+      `Three ${slotTheme.bonus.triggerSymbol} symbols open a ${slotTheme.bonus.picks}-pick bonus.`,
+      `Two ${slotTheme.bonus.triggerSymbol} symbols award ${slotTheme.bonus.freeSpinsOnTwoBonus} free spins.`,
+      'Free spins use the current wager without another bankroll debit.',
+    ],
+    paytable: [
+      ...Object.entries(slotTheme.jackpots).map(([, jackpot]) => `${jackpot.label}: three ${jackpot.symbol} symbols pay ${jackpot.multiplier}:1.`),
+      ...Object.entries(slotTheme.payouts).map(([symbol, multiplier]) => `Three ${symbol} symbols pay ${multiplier}:1.`),
+      ...(slotTheme.wildSymbol ? [`${slotTheme.wildSymbol} substitutes for every paying symbol except ${slotTheme.bonus.triggerSymbol}.`] : []),
+      `Bonus picks can award ${slotTheme.bonus.multipliers.join(', ')}x the wager.`,
+    ],
+    slotTheme,
+  })),
 ];
 
 gameCatalogSchema.parse(gameCatalog);
