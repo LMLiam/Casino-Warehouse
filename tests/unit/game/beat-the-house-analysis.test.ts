@@ -11,6 +11,7 @@ describe('Beat the House analysis', () => {
 
   it('rejects simultaneous shoe and round counts', () => {
     const config = {
+      configurationId: 'test',
       seed: 1,
       path: 'production',
       shoes: 1,

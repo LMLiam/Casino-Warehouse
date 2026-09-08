@@ -4,6 +4,8 @@ import type { ProfileResult } from './simulate';
 
 export type AnalysisOutput = {
   readonly result: {
+    readonly configurationId: string;
+    readonly rulesetId: 'beat-the-house-six-deck';
     readonly seed: number;
     readonly path: string;
     readonly profiles: readonly ProfileResult[];
@@ -14,6 +16,8 @@ export type AnalysisOutput = {
 
 export const createOutput = (config: AnalysisConfig, profiles: readonly ProfileResult[], runtimeMs: number): AnalysisOutput => ({
   result: {
+    configurationId: config.configurationId,
+    rulesetId: 'beat-the-house-six-deck',
     seed: config.seed,
     path: config.path,
     profiles,

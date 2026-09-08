@@ -1,513 +1,166 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { beatTheHouseRules } from '../../../src/game/beatTheHouse/beatTheHouseRules';
-import type { Card } from '../../../src/game/cards/Card';
-import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
-import type { BetType } from '../../../src/game/types/BetType';
+import { type AnalysisConfig, loadConfig, parseConfig } from '../../../scripts/beat-the-house-analysis/config';
+import { type AnalysisOutput } from '../../../scripts/beat-the-house-analysis/output';
+import { type MetricStatistics, type ProfileMetrics, type ProfileResult, simulate } from '../../../scripts/beat-the-house-analysis/simulate';
+import { handIds } from '../../../src/game/types/handIds';
+import type { SideBet } from '../../../scripts/beat-the-house-analysis/config';
 
-type SideBet = Exclude<BetType, 'main'>;
-type BeatAction = 'hit' | 'stick';
-type MainMode = 'automaticWin' | 'compare' | 'lose';
-type CardKind = {
-  readonly label: string;
-  readonly rank: Card['rank'];
-  readonly suit: Card['suit'];
-  readonly count: number;
-  readonly value: number;
-  readonly blackAce: boolean;
-};
-type StrategyRow = {
-  readonly oneCardHitThrough: number;
-  readonly twoCardHitThrough: number;
-  readonly threeCardHitThrough: number;
-};
-type WagerProfile = {
-  readonly name: string;
-  readonly sideBets: readonly SideBet[];
-  readonly stake: number;
-  readonly expectedReturned: number;
-  readonly expectedRtp: number;
-  readonly roundStandardDeviationEnvelope: number;
-  readonly strategy: StrategyRow;
-};
-type RoundStats = {
-  readonly mean: number;
-  readonly standardDeviation: number;
-};
-type DealerOutcome = {
-  first: number;
-  finalValue?: number | undefined;
-  bust: boolean;
-  blackAce: boolean;
-  sevenCount: number;
+const canonicalConfigPath = 'scripts/beat-the-house-analysis/canonical-config.json';
+const canonicalResultsPath = 'scripts/beat-the-house-analysis/canonical-results.json';
+const canonicalConfig = loadConfig(canonicalConfigPath);
+const ciSampleShoes = 20;
+const ciSeedBase = 90210;
+const sigmaAllowance = { name: 'four-standard-errors', value: 4, reason: 'The canonical and CI runs are independent two-shoe samples.' } as const;
+const numericalTolerance = { value: 1e-12, reason: 'Allow binary floating-point normalisation at the comparison boundary.' } as const;
+
+type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+
+const record = (value: JsonValue | undefined): { readonly [key: string]: JsonValue } => {
+  if (value === null || Array.isArray(value) || Object(value) !== value) throw new Error('Expected a record.');
+  return value as { readonly [key: string]: JsonValue };
 };
 
-const TWO_VALUE = 2;
-const THREE_VALUE = 3;
-const FOUR_VALUE = 4;
-const FIVE_VALUE = 5;
-const SIX_VALUE = 6;
-const SEVEN_VALUE = 7;
-const EIGHT_VALUE = 8;
-const NINE_VALUE = 9;
-const TEN_VALUE = 10;
-const JACK_VALUE = 11;
-const QUEEN_VALUE = 12;
-const KING_VALUE = 13;
-const ACE_VALUE = 14;
-const CARDS_PER_RANK_PER_DECK = 4;
-const ACES_PER_COLOUR_PER_DECK = 2;
-const SIX_DECK_RANK_COUNT = CARDS_PER_RANK_PER_DECK * beatTheHouseRules.deckCount;
-const SIX_DECK_ACE_COLOR_COUNT = ACES_PER_COLOUR_PER_DECK * beatTheHouseRules.deckCount;
-const MAX_PLAYER_CARDS = 4;
-const MAX_DEALER_CARDS = 4;
-const MAIN_STAKE = 1;
-const SIDE_STAKE = 1;
-const MAIN_WIN_RETURNED = 2;
-const MAIN_PUSH_RETURNED = 1;
-const ACE_FLASH_SINGLE_RETURNED = 11;
-const ACE_FLASH_BOTH_RETURNED = 51;
-const DEALER_BUST_RETURNED = 5;
-const MATCH_PUSH_RETURNED = 10;
-const THREE_SEVENS_COUNT = 3;
-const FOUR_SEVENS_COUNT = 4;
-const DEALER_SEVENS_RETURNED = {
-  oneSeven: 4,
-  twoSevens: 19,
-  threeSevens: 151,
-  fourSevens: 1001,
-} as const;
-const MONTE_CARLO_SEED = 171_171;
-const RTP_SAMPLE_ROUNDS_PER_PROFILE = 20_000;
-const ACTION_VALUE_SAMPLE_ROUNDS = 20_000;
-const MONTE_CARLO_SIGMA_TOLERANCE = 6;
-const MIN_RETURN_TOLERANCE = 0.05;
-const RTP_GUARDRAIL_TEST_TIMEOUT_MS = 120_000;
-const MAIN_ONLY_J_ACTION_MARGIN = 0.001;
-const MATCH_PUSH_J_ACTION_MARGIN = 0.01;
-const MULBERRY_INCREMENT = 0x6d2b79f5;
-const MULBERRY_FIRST_SHIFT = 15;
-const MULBERRY_SECOND_SHIFT = 7;
-const MULBERRY_SECOND_MULTIPLIER = 61;
-const MULBERRY_FINAL_SHIFT = 14;
-const UNSIGNED_32BIT_RANGE = 4_294_967_296;
-
-const rankValues: Record<Card['rank'], number> = {
-  '2': TWO_VALUE,
-  '3': THREE_VALUE,
-  '4': FOUR_VALUE,
-  '5': FIVE_VALUE,
-  '6': SIX_VALUE,
-  '7': SEVEN_VALUE,
-  '8': EIGHT_VALUE,
-  '9': NINE_VALUE,
-  '10': TEN_VALUE,
-  J: JACK_VALUE,
-  Q: QUEEN_VALUE,
-  K: KING_VALUE,
-  A: ACE_VALUE,
+const numberValue = (value: JsonValue | undefined, name: string): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${name} must be a finite number.`);
+  return value;
 };
-const cardKinds = [
-  { label: '2', rank: '2', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: TWO_VALUE, blackAce: false },
-  { label: '3', rank: '3', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: THREE_VALUE, blackAce: false },
-  { label: '4', rank: '4', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: FOUR_VALUE, blackAce: false },
-  { label: '5', rank: '5', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: FIVE_VALUE, blackAce: false },
-  { label: '6', rank: '6', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: SIX_VALUE, blackAce: false },
-  { label: '7', rank: '7', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: SEVEN_VALUE, blackAce: false },
-  { label: '8', rank: '8', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: EIGHT_VALUE, blackAce: false },
-  { label: '9', rank: '9', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: NINE_VALUE, blackAce: false },
-  { label: '10', rank: '10', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: TEN_VALUE, blackAce: false },
-  { label: 'J', rank: 'J', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: JACK_VALUE, blackAce: false },
-  { label: 'Q', rank: 'Q', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: QUEEN_VALUE, blackAce: false },
-  { label: 'K', rank: 'K', suit: 'clubs', count: SIX_DECK_RANK_COUNT, value: KING_VALUE, blackAce: false },
-  { label: 'black A', rank: 'A', suit: 'spades', count: SIX_DECK_ACE_COLOR_COUNT, value: ACE_VALUE, blackAce: true },
-  { label: 'red A', rank: 'A', suit: 'hearts', count: SIX_DECK_ACE_COLOR_COUNT, value: ACE_VALUE, blackAce: false },
-] as const satisfies readonly CardKind[];
-const initialCounts = cardKinds.map((kind) => kind.count);
 
-const requireKind = (index: number): CardKind => {
-  const kind = cardKinds[index];
-  if (!kind) {
-    throw new Error(`Missing card kind at index ${index}.`);
+const validateMetric = (value: JsonValue | undefined, label: string): void => {
+  const metric = record(value);
+  if (metric.observationUnit !== 'shoe' || typeof metric.denominator !== 'string') throw new Error(`${label} has an invalid metric contract.`);
+  const statistics = record(metric.statistics);
+  for (const name of ['meanReturned', 'meanProfit', 'standardDeviation', 'standardError']) {
+    if (statistics[name] !== null) numberValue(statistics[name], `${label}.${name}`);
   }
-  return kind;
-};
-
-// Shared forced cases: first-card black Ace auto-wins, first-card 2 auto-loses, hit 2 loses, and four player cards force standing.
-const mainOnlyStrategy = { oneCardHitThrough: JACK_VALUE, twoCardHitThrough: TEN_VALUE, threeCardHitThrough: TEN_VALUE } as const;
-const matchPushStrategy = { oneCardHitThrough: TEN_VALUE, twoCardHitThrough: TEN_VALUE, threeCardHitThrough: TEN_VALUE } as const;
-
-// The per-round standard deviations are conservative envelopes for the fixed simulation scope.
-// Expected returns are rounded current-rule baselines for the fixed strategy and six-deck shoe.
-const wagerProfiles = [
-  profile('main-only', [], 1.036, 1.036, 1.5, mainOnlyStrategy),
-  profile('aceFlash', ['aceFlash'], 2.069, 1.034, 5.0, mainOnlyStrategy),
-  profile('dealerBust', ['dealerBust'], 2.107, 1.053, 3.0, mainOnlyStrategy),
-  profile('aceFlash+dealerBust', ['aceFlash', 'dealerBust'], 3.193, 1.064, 6.0, mainOnlyStrategy),
-  profile('matchPush', ['matchPush'], 2.005, 1.003, 4.0, matchPushStrategy),
-  profile('aceFlash+matchPush', ['aceFlash', 'matchPush'], 3.034, 1.011, 6.0, matchPushStrategy),
-  profile('dealerBust+matchPush', ['dealerBust', 'matchPush'], 3.05, 1.017, 5.0, matchPushStrategy),
-  profile('aceFlash+dealerBust+matchPush', ['aceFlash', 'dealerBust', 'matchPush'], 4.131, 1.033, 7.0, matchPushStrategy),
-  profile('dealerSevens', ['dealerSevens'], 2.046, 1.023, 20.0, mainOnlyStrategy),
-  profile('aceFlash+dealerSevens', ['aceFlash', 'dealerSevens'], 3.096, 1.032, 20.0, mainOnlyStrategy),
-  profile('dealerBust+dealerSevens', ['dealerBust', 'dealerSevens'], 3.101, 1.034, 20.0, mainOnlyStrategy),
-  profile('aceFlash+dealerBust+dealerSevens', ['aceFlash', 'dealerBust', 'dealerSevens'], 4.153, 1.038, 20.0, mainOnlyStrategy),
-  profile('matchPush+dealerSevens', ['matchPush', 'dealerSevens'], 3.058, 1.019, 20.0, matchPushStrategy),
-  profile('aceFlash+matchPush+dealerSevens', ['aceFlash', 'matchPush', 'dealerSevens'], 4.095, 1.024, 20.0, matchPushStrategy),
-  profile('dealerBust+matchPush+dealerSevens', ['dealerBust', 'matchPush', 'dealerSevens'], 4.181, 1.045, 20.0, matchPushStrategy),
-  profile('aceFlash+dealerBust+matchPush+dealerSevens', ['aceFlash', 'dealerBust', 'matchPush', 'dealerSevens'], 5.187, 1.037, 20.0, matchPushStrategy),
-] as const satisfies readonly WagerProfile[];
-
-const requireWagerProfile = (index: number): WagerProfile => {
-  const profile = wagerProfiles[index];
-  if (!profile) {
-    throw new Error(`Missing wager profile at index ${index}.`);
+  for (const name of ['sampleSize', 'totalRounds', 'totalHands']) {
+    if (!Number.isSafeInteger(statistics[name]) || Number(statistics[name]) < 0) throw new Error(`${label}.${name} must be a non-negative integer.`);
   }
-  return profile;
+  if (Number(statistics.sampleSize) < 2 || statistics.standardDeviation === null || statistics.standardError === null)
+    throw new Error(`${label} must contain at least two independent shoe observations.`);
 };
 
-describe('Beat the House RTP guardrails', () => {
-  it('documents every normalized wager profile and the optimal strategy row used by the RTP guardrail', () => {
-    expect(wagerProfiles).toHaveLength(16);
-
-    for (const wagerProfile of wagerProfiles) {
-      expect(wagerProfile.stake, wagerProfile.name).toBe(MAIN_STAKE + wagerProfile.sideBets.length * SIDE_STAKE);
-      expect(strategyAction(wagerProfile.strategy, 1, TEN_VALUE), wagerProfile.name).toBe('hit');
-      expect(strategyAction(wagerProfile.strategy, 2, TEN_VALUE), wagerProfile.name).toBe('hit');
-      expect(strategyAction(wagerProfile.strategy, 3, TEN_VALUE), wagerProfile.name).toBe('hit');
-
-      if (wagerProfile.sideBets.includes('matchPush')) {
-        expect(strategyAction(wagerProfile.strategy, 1, JACK_VALUE), wagerProfile.name).toBe('stick');
-        expect(strategyAction(wagerProfile.strategy, 2, JACK_VALUE), wagerProfile.name).toBe('stick');
-      } else {
-        expect(strategyAction(wagerProfile.strategy, 1, JACK_VALUE), wagerProfile.name).toBe('hit');
-        expect(strategyAction(wagerProfile.strategy, 2, JACK_VALUE), wagerProfile.name).toBe('stick');
-      }
-
-      expect(strategyAction(wagerProfile.strategy, 3, JACK_VALUE), wagerProfile.name).toBe('stick');
-      expect(strategyAction(wagerProfile.strategy, 1, QUEEN_VALUE), wagerProfile.name).toBe('stick');
-      expect(strategyAction(wagerProfile.strategy, 2, KING_VALUE), wagerProfile.name).toBe('stick');
-      expect(strategyAction(wagerProfile.strategy, 3, ACE_VALUE), wagerProfile.name).toBe('stick');
-    }
-  });
-
-  it('includes active side-bet returns when checking the J hit/stick action value', () => {
-    const mainOnly = requireWagerProfile(0);
-    const matchPush = requireWagerProfile(4);
-    const oneCardJack = [kindIndex('J')];
-    const twoCardJack = [kindIndex('3'), kindIndex('J')];
-
-    expect(estimatedActionValue(mainOnly, oneCardJack, 'hit', MONTE_CARLO_SEED).mean).toBeGreaterThan(
-      estimatedActionValue(mainOnly, oneCardJack, 'stick', MONTE_CARLO_SEED + 1).mean + MAIN_ONLY_J_ACTION_MARGIN,
-    );
-    expect(estimatedActionValue(mainOnly, twoCardJack, 'stick', MONTE_CARLO_SEED + 3).mean).toBeGreaterThan(
-      estimatedActionValue(mainOnly, twoCardJack, 'hit', MONTE_CARLO_SEED + 2).mean + MAIN_ONLY_J_ACTION_MARGIN,
-    );
-    expect(estimatedActionValue(matchPush, oneCardJack, 'stick', MONTE_CARLO_SEED + 4).mean).toBeGreaterThan(
-      estimatedActionValue(matchPush, oneCardJack, 'hit', MONTE_CARLO_SEED + 5).mean + MATCH_PUSH_J_ACTION_MARGIN,
-    );
-    expect(estimatedActionValue(matchPush, twoCardJack, 'stick', MONTE_CARLO_SEED + 6).mean).toBeGreaterThan(
-      estimatedActionValue(matchPush, twoCardJack, 'hit', MONTE_CARLO_SEED + 7).mean + MATCH_PUSH_J_ACTION_MARGIN,
-    );
-  });
-
-  it(
-    'keeps production BeatTheHouseGame returns inside seeded RTP guardrails for all 16 profiles',
-    () => {
-      for (const [profileIndex, wagerProfile] of wagerProfiles.entries()) {
-        const observed = simulateProductionProfile(wagerProfile, MONTE_CARLO_SEED + profileIndex);
-        const standardError = wagerProfile.roundStandardDeviationEnvelope / Math.sqrt(RTP_SAMPLE_ROUNDS_PER_PROFILE);
-        const tolerance = Math.max(MIN_RETURN_TOLERANCE, standardError * MONTE_CARLO_SIGMA_TOLERANCE);
-
-        expect(Math.abs(observed.mean - wagerProfile.expectedReturned), wagerProfile.name).toBeLessThanOrEqual(tolerance);
-        expect(observed.standardDeviation, wagerProfile.name).toBeLessThanOrEqual(wagerProfile.roundStandardDeviationEnvelope);
-        expect(observed.mean / wagerProfile.stake, wagerProfile.name).toBeCloseTo(wagerProfile.expectedRtp, 1);
-      }
-    },
-    RTP_GUARDRAIL_TEST_TIMEOUT_MS,
+const validateArtifact = (value: JsonValue): AnalysisOutput => {
+  const result = record(record(value).result);
+  if (result.rulesetId !== 'beat-the-house-six-deck' || result.configurationId !== canonicalConfig.configurationId)
+    throw new Error('Canonical identity does not match.');
+  if (result.seed !== canonicalConfig.seed || result.path !== 'production') throw new Error('Canonical run identity does not match.');
+  if (!Array.isArray(result.profiles) || result.profiles.length !== canonicalConfig.activeHands.length * canonicalConfig.sideBetProfiles.length)
+    throw new Error('Canonical profile count is invalid.');
+  const expectedProfiles = canonicalConfig.activeHands.flatMap((activeHands) =>
+    canonicalConfig.sideBetProfiles.map((profile) => `${activeHands}:${profile.name}`),
   );
+  const rawProfiles = result.profiles as readonly JsonValue[];
+  const profiles = result.profiles as readonly ProfileResult[];
+  const actualProfiles = profiles.map((profile) => `${profile.activeHands}:${profile.name}`);
+  if (JSON.stringify(actualProfiles) !== JSON.stringify(expectedProfiles)) throw new Error('Canonical profile order is invalid.');
+  for (const profileValue of rawProfiles) {
+    const profile = record(profileValue);
+    if (
+      !Array.isArray(profile.sideBets) ||
+      typeof profile.strategy !== 'string' ||
+      !record(profile.sideBetRatios) ||
+      !record(profile.strategyTable) ||
+      !Array.isArray(profile.assertedMetrics)
+    )
+      throw new Error('Canonical profile configuration is invalid.');
+    const metrics = record(profile.metrics);
+    for (const name of ['returnedPerTotalStake', 'profitPerTotalStake', 'mainReturnedPerMainStake', 'mainProfitPerMainStake'])
+      validateMetric(metrics[name], `${profile.name}.${name}`);
+    for (const sideBet of profile.sideBets as SideBet[]) {
+      const sideMetrics = record(record(metrics.sideBets)[sideBet]);
+      validateMetric(sideMetrics.returnedPerSideStake, `${profile.name}.${sideBet}.returned`);
+      validateMetric(sideMetrics.profitPerSideStake, `${profile.name}.${sideBet}.profit`);
+    }
+    for (const handId of profile.activeHands === 1 ? ['left'] : profile.activeHands === 2 ? ['left', 'centre'] : handIds) {
+      const seatMetrics = record(record(metrics.seats)[handId]);
+      validateMetric(seatMetrics.returnedPerSeatStake, `${profile.name}.${handId}.returned`);
+      validateMetric(seatMetrics.profitPerSeatStake, `${profile.name}.${handId}.profit`);
+    }
+    if (profile.assertedMetrics.length === 0) throw new Error(`${profile.name} metric assertion list is empty.`);
+    for (const forbidden of ['shoeOrder', 'cards', 'hiddenCard', 'cutThreshold'])
+      if (forbidden in profile) throw new Error(`Canonical profile exposes ${forbidden}.`);
+  }
+  return value as AnalysisOutput;
+};
+
+const metricEntries = (metrics: ProfileMetrics): readonly (readonly [string, MetricStatistics])[] => [
+  ['returnedPerTotalStake', metrics.returnedPerTotalStake],
+  ['profitPerTotalStake', metrics.profitPerTotalStake],
+  ['mainReturnedPerMainStake', metrics.mainReturnedPerMainStake],
+  ['mainProfitPerMainStake', metrics.mainProfitPerMainStake],
+  ...Object.entries(metrics.sideBets).flatMap(
+    ([sideBet, values]) =>
+      [
+        [`${sideBet}.returnedPerSideStake`, values.returnedPerSideStake],
+        [`${sideBet}.profitPerSideStake`, values.profitPerSideStake],
+      ] as const,
+  ),
+  ...Object.entries(metrics.seats).flatMap(
+    ([handId, values]) =>
+      [
+        [`${handId}.returnedPerSeatStake`, values.returnedPerSeatStake],
+        [`${handId}.profitPerSeatStake`, values.profitPerSeatStake],
+      ] as const,
+  ),
+];
+
+const profileLabel = (profile: { activeHands: number; name: string; strategy: string }, metricName: string): string =>
+  `${profile.name}, ${profile.activeHands} hands, ${profile.strategy}, metric ${metricName}`;
+
+const ciConfigFor = (activeHands: number): AnalysisConfig =>
+  parseConfig({
+    ...canonicalConfig,
+    configurationId: `${canonicalConfig.configurationId}-ci`,
+    seed: ciSeedBase + activeHands * 1_000,
+    shoes: ciSampleShoes,
+    rounds: undefined,
+    activeHands: [activeHands],
+    sideBetRatios: Object.fromEntries(
+      Object.entries(canonicalConfig.sideBetRatios).map(([sideBet, ratio]) => [sideBet, `${ratio.numerator}/${ratio.denominator}`]),
+    ),
+    matchPushRatios: canonicalConfig.matchPushRatios.map((ratio) => `${ratio.numerator}/${ratio.denominator}`),
+  });
+
+describe('Beat the House six-deck RTP guardrails', () => {
+  it('validates the canonical artifact contract and configuration identity', () => {
+    const canonicalValue: JsonValue = JSON.parse(readFileSync(canonicalResultsPath, 'utf8'));
+    validateArtifact(canonicalValue);
+  });
+
+  it('compares every canonical metric with independent persistent-shoe CI samples', () => {
+    const canonicalValue: JsonValue = JSON.parse(readFileSync(canonicalResultsPath, 'utf8'));
+    const canonical = validateArtifact(canonicalValue);
+    for (const activeHands of canonicalConfig.activeHands) {
+      const observed = simulate(ciConfigFor(activeHands));
+      const expected = canonical.result.profiles.filter((profile) => profile.activeHands === activeHands);
+      expect(observed).toHaveLength(expected.length);
+      for (const [index, profile] of observed.entries()) {
+        const canonicalProfile = expected[index];
+        if (!canonicalProfile) throw new Error(`Missing canonical profile ${profileLabel(profile, 'profile')}.`);
+        expect(`${profile.activeHands}:${profile.name}`).toBe(`${canonicalProfile.activeHands}:${canonicalProfile.name}`);
+        expect(profile.sideBets).toEqual(canonicalProfile.sideBets);
+        expect(profile.strategy).toBe(canonicalProfile.strategy);
+        expect(profile.sideBetRatios).toEqual(canonicalProfile.sideBetRatios);
+        expect(profile.strategyTable).toEqual(canonicalProfile.strategyTable);
+        expect(profile.assertedMetrics).toEqual(canonicalProfile.assertedMetrics);
+        for (const [metricName, metric] of metricEntries(profile.metrics)) {
+          const canonicalMetric = metricEntries(canonicalProfile.metrics).find(([name]) => name === metricName)?.[1];
+          if (!canonicalMetric) throw new Error(`Missing canonical metric ${profileLabel(profile, metricName)}.`);
+          const canonicalStatistics = canonicalMetric.statistics;
+          const ciStatistics = metric.statistics;
+          expect(metric.denominator, profileLabel(profile, metricName)).toBe(canonicalMetric.denominator);
+          expect(metric.observationUnit, profileLabel(profile, metricName)).toBe('shoe');
+          if (canonicalStatistics.standardDeviation === null || ciStatistics.standardDeviation === null)
+            throw new Error('A guardrail metric has no deviation.');
+          const differenceStandardError = Math.hypot(
+            canonicalStatistics.standardDeviation / Math.sqrt(canonicalStatistics.sampleSize),
+            ciStatistics.standardDeviation / Math.sqrt(ciStatistics.sampleSize),
+          );
+          const tolerance = Math.max(sigmaAllowance.value * differenceStandardError, numericalTolerance.value);
+          expect(Math.abs(canonicalStatistics.meanReturned - ciStatistics.meanReturned), profileLabel(profile, metricName)).toBeLessThanOrEqual(tolerance);
+        }
+      }
+    }
+  }, 60_000);
 });
-
-function profile(
-  name: string,
-  sideBets: readonly SideBet[],
-  expectedReturned: number,
-  expectedRtp: number,
-  roundStandardDeviationEnvelope: number,
-  strategy: StrategyRow,
-): WagerProfile {
-  return {
-    name,
-    sideBets,
-    stake: MAIN_STAKE + sideBets.length * SIDE_STAKE,
-    expectedReturned,
-    expectedRtp,
-    roundStandardDeviationEnvelope,
-    strategy,
-  };
-}
-
-function strategyAction(strategy: StrategyRow, cardCount: number, finalRankValue: number): BeatAction {
-  const hitThrough = cardCount === 1 ? strategy.oneCardHitThrough : cardCount === 2 ? strategy.twoCardHitThrough : strategy.threeCardHitThrough;
-  return finalRankValue <= hitThrough ? 'hit' : 'stick';
-}
-
-function simulateProductionProfile(wagerProfile: WagerProfile, seed: number): RoundStats {
-  const rng = mulberry32(seed);
-  const returned: number[] = [];
-  const game = new BeatTheHouseGame({ initialBankroll: wagerProfile.stake, rng });
-
-  for (let round = 0; round < RTP_SAMPLE_ROUNDS_PER_PROFILE; round += 1) {
-    game.placeBet('left', 'main', MAIN_STAKE);
-    for (const sideBet of wagerProfile.sideBets) {
-      game.placeBet('left', sideBet, SIDE_STAKE);
-    }
-
-    let snapshot = game.deal();
-    while (snapshot.phase === 'playing') {
-      const activeHand = snapshot.activeHand;
-      if (!activeHand) {
-        throw new Error('Missing activeHand.');
-      }
-      const cards = snapshot.hands[activeHand].cards;
-      const finalCard = cards.at(-1);
-      if (!finalCard) {
-        throw new Error('Missing finalCard.');
-      }
-      const finalRankValue = rankValues[finalCard.rank];
-      const action = strategyAction(wagerProfile.strategy, cards.length, finalRankValue);
-      snapshot = action === 'hit' ? game.hit() : game.stick();
-    }
-    const summary = snapshot.summaries[0];
-    if (!summary) {
-      throw new Error('Missing summary.');
-    }
-    returned.push(summary.returned);
-    if (round + 1 < RTP_SAMPLE_ROUNDS_PER_PROFILE) {
-      game.syncBankroll(wagerProfile.stake);
-      game.nextRound();
-    }
-  }
-
-  return sampleStats(returned);
-}
-
-function estimatedActionValue(wagerProfile: WagerProfile, visibleHand: readonly number[], firstAction: BeatAction, seed: number): RoundStats {
-  const rng = mulberry32(seed);
-  const returned: number[] = [];
-
-  for (let round = 0; round < ACTION_VALUE_SAMPLE_ROUNDS; round += 1) {
-    const counts = removeCards(initialCounts, visibleHand);
-    const firstVisible = visibleHand[0];
-    if (firstVisible === undefined) {
-      throw new Error('Missing firstVisible.');
-    }
-    const lastVisible = visibleHand.at(-1);
-    if (lastVisible === undefined) {
-      throw new Error('Missing lastVisible.');
-    }
-    returned.push(playPlayerContinuation(wagerProfile, counts, firstVisible, lastVisible, visibleHand.length, firstAction, rng));
-  }
-
-  return sampleStats(returned);
-}
-
-function playPlayerContinuation(
-  wagerProfile: WagerProfile,
-  counts: readonly number[],
-  playerFirst: number,
-  playerFinal: number,
-  playerCardCount: number,
-  action: BeatAction,
-  rng: () => number,
-): number {
-  if (action === 'stick') {
-    return simulateDealerAndSettle(wagerProfile, counts, playerFirst, requireKind(playerFinal).value, 'compare', rng);
-  }
-
-  const { drawn, nextCounts } = drawKind(counts, rng);
-  if (requireKind(drawn).value === TWO_VALUE) {
-    return simulateDealerAndSettle(wagerProfile, nextCounts, playerFirst, undefined, 'lose', rng);
-  }
-  if (playerCardCount + 1 >= MAX_PLAYER_CARDS) {
-    return simulateDealerAndSettle(wagerProfile, nextCounts, playerFirst, requireKind(drawn).value, 'compare', rng);
-  }
-
-  const nextAction = strategyAction(wagerProfile.strategy, playerCardCount + 1, requireKind(drawn).value);
-  return playPlayerContinuation(wagerProfile, nextCounts, playerFirst, drawn, playerCardCount + 1, nextAction, rng);
-}
-
-function simulateDealerAndSettle(
-  wagerProfile: WagerProfile,
-  counts: readonly number[],
-  playerFirst: number,
-  playerFinalValue: number | undefined,
-  mainMode: MainMode,
-  rng: () => number,
-): number {
-  const firstDraw = drawKind(counts, rng);
-  let nextCounts = firstDraw.nextCounts;
-  const first = firstDraw.drawn;
-  const firstKind = requireKind(first);
-  const dealer: DealerOutcome = {
-    first,
-    finalValue: firstKind.value,
-    bust: firstKind.value === TWO_VALUE,
-    blackAce: firstKind.blackAce,
-    sevenCount: firstKind.value === SEVEN_VALUE ? 1 : 0,
-  };
-
-  if (!dealer.blackAce && !dealer.bust) {
-    let dealerCardCount = 1;
-    while (dealer.finalValue !== undefined && dealer.finalValue <= beatTheHouseRules.dealerDrawMaximumRank && dealerCardCount < MAX_DEALER_CARDS) {
-      const dealerDraw = drawKind(nextCounts, rng);
-      nextCounts = dealerDraw.nextCounts;
-      const drawnKind = requireKind(dealerDraw.drawn);
-      dealerCardCount += 1;
-      dealer.finalValue = drawnKind.value;
-      dealer.sevenCount += drawnKind.value === SEVEN_VALUE ? 1 : 0;
-      if (drawnKind.value === TWO_VALUE) {
-        dealer.bust = true;
-        dealer.finalValue = undefined;
-        break;
-      }
-    }
-  }
-
-  return settleReturned(wagerProfile, playerFirst, playerFinalValue, mainMode, dealer);
-}
-
-function settleReturned(
-  wagerProfile: WagerProfile,
-  playerFirst: number,
-  playerFinalValue: number | undefined,
-  mainMode: MainMode,
-  dealer: DealerOutcome,
-): number {
-  const mainResult = mainResultFor(playerFinalValue, mainMode, dealer);
-  let returned = mainResult === 'win' ? MAIN_WIN_RETURNED : mainResult === 'push' ? MAIN_PUSH_RETURNED : 0;
-
-  if (wagerProfile.sideBets.includes('aceFlash')) {
-    const playerAce = requireKind(playerFirst).blackAce;
-    const dealerAce = requireKind(dealer.first).blackAce;
-    returned += playerAce && dealerAce ? ACE_FLASH_BOTH_RETURNED : playerAce || dealerAce ? ACE_FLASH_SINGLE_RETURNED : 0;
-  }
-  if (wagerProfile.sideBets.includes('dealerBust') && dealer.bust) {
-    returned += DEALER_BUST_RETURNED;
-  }
-  if (
-    wagerProfile.sideBets.includes('matchPush') &&
-    mainResult !== 'lose' &&
-    !dealer.bust &&
-    !dealer.blackAce &&
-    playerFinalValue !== undefined &&
-    dealer.finalValue !== undefined &&
-    playerFinalValue === dealer.finalValue
-  ) {
-    returned += MATCH_PUSH_RETURNED;
-  }
-  if (wagerProfile.sideBets.includes('dealerSevens')) {
-    returned += dealerSevensReturned(dealer.sevenCount);
-  }
-
-  return returned;
-}
-
-function mainResultFor(playerFinalValue: number | undefined, mainMode: MainMode, dealer: DealerOutcome): 'lose' | 'push' | 'win' {
-  if (mainMode === 'lose') {
-    return 'lose';
-  }
-  if (mainMode === 'automaticWin') {
-    return 'win';
-  }
-  if (dealer.blackAce) {
-    return 'lose';
-  }
-  if (dealer.bust) {
-    return 'win';
-  }
-  if (playerFinalValue === undefined || dealer.finalValue === undefined) {
-    return 'lose';
-  }
-  if (playerFinalValue > dealer.finalValue) {
-    return 'win';
-  }
-  if (playerFinalValue === dealer.finalValue) {
-    return 'push';
-  }
-  return 'lose';
-}
-
-function dealerSevensReturned(sevenCount: number): number {
-  if (sevenCount === 1) {
-    return DEALER_SEVENS_RETURNED.oneSeven;
-  }
-  if (sevenCount === 2) {
-    return DEALER_SEVENS_RETURNED.twoSevens;
-  }
-  if (sevenCount === THREE_SEVENS_COUNT) {
-    return DEALER_SEVENS_RETURNED.threeSevens;
-  }
-  if (sevenCount === FOUR_SEVENS_COUNT) {
-    return DEALER_SEVENS_RETURNED.fourSevens;
-  }
-  return 0;
-}
-
-function drawKind(counts: readonly number[], rng: () => number): { readonly drawn: number; readonly nextCounts: readonly number[] } {
-  let draw = Math.floor(rng() * totalCards(counts));
-  for (const [index, count] of counts.entries()) {
-    if (draw >= count) {
-      draw -= count;
-      continue;
-    }
-    const nextCounts = [...counts];
-    const current = nextCounts[index];
-    if (current === undefined) {
-      throw new Error(`Missing count at index ${index}.`);
-    }
-    nextCounts[index] = current - 1;
-    return { drawn: index, nextCounts };
-  }
-  throw new Error('Card draw failed.');
-}
-
-function removeCards(counts: readonly number[], cardIndexes: readonly number[]): readonly number[] {
-  const nextCounts = [...counts];
-  for (const cardIndex of cardIndexes) {
-    const current = nextCounts[cardIndex];
-    if (current === undefined) {
-      throw new Error(`Missing count at card index ${cardIndex}.`);
-    }
-    nextCounts[cardIndex] = current - 1;
-  }
-  return nextCounts;
-}
-
-function totalCards(counts: readonly number[]): number {
-  return counts.reduce((total, count) => total + count, 0);
-}
-
-function kindIndex(label: CardKind['label']): number {
-  const index = cardKinds.findIndex((kind) => kind.label === label);
-  if (index < 0) {
-    throw new Error(`Unknown card kind ${label}.`);
-  }
-  return index;
-}
-
-function sampleStats(values: readonly number[]): RoundStats {
-  const mean = values.reduce((total, value) => total + value, 0) / values.length;
-  const variance = values.reduce((total, value) => total + (value - mean) * (value - mean), 0) / values.length;
-  return { mean, standardDeviation: Math.sqrt(variance) };
-}
-
-function mulberry32(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state |= 0;
-    state = (state + MULBERRY_INCREMENT) | 0;
-    let value = Math.imul(state ^ (state >>> MULBERRY_FIRST_SHIFT), 1 | state);
-    value = (value + Math.imul(value ^ (value >>> MULBERRY_SECOND_SHIFT), MULBERRY_SECOND_MULTIPLIER | value)) ^ value;
-    return ((value ^ (value >>> MULBERRY_FINAL_SHIFT)) >>> 0) / UNSIGNED_32BIT_RANGE;
-  };
-}

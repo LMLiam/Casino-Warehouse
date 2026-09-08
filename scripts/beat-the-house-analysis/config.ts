@@ -9,6 +9,7 @@ export type SideBet = Exclude<BetType, 'main'>;
 export type Ratio = { readonly numerator: number; readonly denominator: number };
 type StrategyRow = { readonly oneCardHitThrough: number; readonly twoCardHitThrough: number; readonly threeCardHitThrough: number };
 export type AnalysisConfig = {
+  readonly configurationId: string;
   readonly seed: number;
   readonly path: AnalysisPath;
   readonly shoes?: number;
@@ -48,6 +49,7 @@ const requireCount = (value: unknown, name: string): number => {
 export const parseConfig = (value: unknown): AnalysisConfig => {
   if (!value || typeof value !== 'object') throw new Error('Analysis configuration must be an object.');
   const input = value as Record<string, unknown>;
+  if (typeof input.configurationId !== 'string' || input.configurationId.length === 0) throw new Error('configurationId is required.');
   if (typeof input.seed !== 'number' || !Number.isSafeInteger(input.seed) || input.seed < 0 || input.seed > 4_294_967_295)
     throw new Error('seed must be an unsigned 32-bit integer.');
   const seed = input.seed;
@@ -110,6 +112,7 @@ export const parseConfig = (value: unknown): AnalysisConfig => {
   if (!Array.isArray(rawSweep) || rawSweep.length === 0) throw new Error('matchPushRatios must be a non-empty ratio array.');
   const countConfig = shoes === undefined ? { rounds: rounds as number } : { shoes };
   return {
+    configurationId: input.configurationId,
     seed,
     path,
     ...countConfig,

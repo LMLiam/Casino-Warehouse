@@ -1,7 +1,8 @@
 {
+  "configurationId": "beat-the-house-six-deck-canonical",
   "seed": 171171,
   "path": "production",
-  "shoes": 2,
+  "shoes": 20,
   "activeHands": [1, 2, 3],
   "cutRange": { "minimum": 219, "maximum": 234 },
   "analysisOnly": false,
