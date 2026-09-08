@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-server/
+dist-beat-the-house-analysis/
 coverage/
 playwright-report/
 test-results/

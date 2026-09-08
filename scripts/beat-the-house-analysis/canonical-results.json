@@ -1,0 +1,2118 @@
+{
+  "result": {
+    "seed": 171171,
+    "path": "production",
+    "profiles": [
+      {
+        "name": "main-only",
+        "activeHands": 1,
+        "sideBets": [],
+        "statistics": {
+          "meanReturned": 1.1947439353099731,
+          "meanProfit": 0.19474393530997303,
+          "standardDeviation": 0.12865150331561176,
+          "standardError": 0.09097035040431267,
+          "sampleSize": 2,
+          "totalRounds": 102,
+          "totalHands": 102
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.1911764705882353,
+            "meanProfit": 0.19117647058823528,
+            "standardDeviation": 0.9901597972021181,
+            "standardError": 0.09804042903539593,
+            "sampleSize": 102,
+            "totalRounds": 102,
+            "totalHands": 102
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash",
+        "activeHands": 1,
+        "sideBets": ["aceFlash"],
+        "statistics": {
+          "meanReturned": 1.0340166908563135,
+          "meanProfit": 0.03401669085631351,
+          "standardDeviation": 0.25207997551370936,
+          "standardError": 0.17824746008708273,
+          "sampleSize": 2,
+          "totalRounds": 105,
+          "totalHands": 105
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0357142857142858,
+            "meanProfit": 0.03571428571428571,
+            "standardDeviation": 1.682213432643741,
+            "standardError": 0.16416722116320293,
+            "sampleSize": 105,
+            "totalRounds": 105,
+            "totalHands": 105
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust",
+        "activeHands": 1,
+        "sideBets": ["dealerBust"],
+        "statistics": {
+          "meanReturned": 0.946078431372549,
+          "meanProfit": -0.053921568627450976,
+          "standardDeviation": 0.04159451654038516,
+          "standardError": 0.02941176470588236,
+          "sampleSize": 2,
+          "totalRounds": 105,
+          "totalHands": 105
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9452380952380952,
+            "meanProfit": -0.05476190476190476,
+            "standardDeviation": 1.3710524419345875,
+            "standardError": 0.13380101781002285,
+            "sampleSize": 105,
+            "totalRounds": 105,
+            "totalHands": 105
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "dealerBust"],
+        "statistics": {
+          "meanReturned": 0.9598902454063387,
+          "meanProfit": -0.04010975459366137,
+          "standardDeviation": 0.003357209406299408,
+          "standardError": 0.0023739055370575746,
+          "sampleSize": 2,
+          "totalRounds": 104,
+          "totalHands": 104
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9599358974358978,
+            "meanProfit": -0.04006410256410255,
+            "standardDeviation": 1.4198270843538567,
+            "standardError": 0.1392255001739974,
+            "sampleSize": 104,
+            "totalRounds": 104,
+            "totalHands": 104
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "matchPush",
+        "activeHands": 1,
+        "sideBets": ["matchPush"],
+        "statistics": {
+          "meanReturned": 0.8829982517482518,
+          "meanProfit": -0.11700174825174825,
+          "standardDeviation": 0.1268959984069915,
+          "standardError": 0.08972902097902102,
+          "sampleSize": 2,
+          "totalRounds": 107,
+          "totalHands": 107
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.8855140186915887,
+            "meanProfit": -0.11448598130841121,
+            "standardDeviation": 1.32344621152566,
+            "standardError": 0.12794237439711012,
+            "sampleSize": 107,
+            "totalRounds": 107,
+            "totalHands": 107
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+matchPush",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "matchPush"],
+        "statistics": {
+          "meanReturned": 1.109906462585034,
+          "meanProfit": 0.109906462585034,
+          "standardDeviation": 0.025554454252064856,
+          "standardError": 0.018069727891156462,
+          "sampleSize": 2,
+          "totalRounds": 105,
+          "totalHands": 105
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.1111111111111118,
+            "meanProfit": 0.11111111111111116,
+            "standardDeviation": 1.54312416666067,
+            "standardError": 0.15059349868127925,
+            "sampleSize": 105,
+            "totalRounds": 105,
+            "totalHands": 105
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust+matchPush",
+        "activeHands": 1,
+        "sideBets": ["dealerBust", "matchPush"],
+        "statistics": {
+          "meanReturned": 1.095649895178197,
+          "meanProfit": 0.09564989517819705,
+          "standardDeviation": 0.09598566893465194,
+          "standardError": 0.06787211740041932,
+          "sampleSize": 2,
+          "totalRounds": 107,
+          "totalHands": 107
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0950155763239882,
+            "meanProfit": 0.09501557632398752,
+            "standardDeviation": 1.408292331198136,
+            "standardError": 0.13614475838124188,
+            "sampleSize": 107,
+            "totalRounds": 107,
+            "totalHands": 107
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+matchPush",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "dealerBust", "matchPush"],
+        "statistics": {
+          "meanReturned": 1.0224056603773586,
+          "meanProfit": 0.02240566037735849,
+          "standardDeviation": 0.02501557008914662,
+          "standardError": 0.017688679245282942,
+          "sampleSize": 2,
+          "totalRounds": 106,
+          "totalHands": 106
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0224056603773586,
+            "meanProfit": 0.02240566037735849,
+            "standardDeviation": 1.2741473771249232,
+            "standardError": 0.12375613339610272,
+            "sampleSize": 106,
+            "totalRounds": 106,
+            "totalHands": 106
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.0195367132867132,
+          "meanProfit": 0.019536713286713286,
+          "standardDeviation": 0.07522281055105144,
+          "standardError": 0.05319055944055945,
+          "sampleSize": 2,
+          "totalRounds": 107,
+          "totalHands": 107
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0210280373831775,
+            "meanProfit": 0.02102803738317757,
+            "standardDeviation": 1.5722090783349858,
+            "standardError": 0.15199118844352827,
+            "sampleSize": 107,
+            "totalRounds": 107,
+            "totalHands": 107
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.8477564102564102,
+          "meanProfit": -0.15224358974358973,
+          "standardDeviation": 0.0974538192019921,
+          "standardError": 0.06891025641025639,
+          "sampleSize": 2,
+          "totalRounds": 100,
+          "totalHands": 100
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.8450000000000002,
+            "meanProfit": -0.155,
+            "standardDeviation": 1.3457450508410114,
+            "standardError": 0.13457450508410113,
+            "sampleSize": 100,
+            "totalRounds": 100,
+            "totalHands": 100
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["dealerBust", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.4856351981351983,
+          "meanProfit": 0.4856351981351981,
+          "standardDeviation": 0.2968117800050525,
+          "standardError": 0.2098776223776223,
+          "sampleSize": 2,
+          "totalRounds": 107,
+          "totalHands": 107
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.4797507788161994,
+            "meanProfit": 0.4797507788161994,
+            "standardDeviation": 4.985813747160029,
+            "standardError": 0.481996807696509,
+            "sampleSize": 107,
+            "totalRounds": 107,
+            "totalHands": 107
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "dealerBust", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9447222222222222,
+          "meanProfit": -0.05527777777777777,
+          "standardDeviation": 0.1763838581959777,
+          "standardError": 0.12472222222222223,
+          "sampleSize": 2,
+          "totalRounds": 104,
+          "totalHands": 104
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9495192307692307,
+            "meanProfit": -0.05048076923076923,
+            "standardDeviation": 1.2204665507781576,
+            "standardError": 0.11967659150202126,
+            "sampleSize": 104,
+            "totalRounds": 104,
+            "totalHands": 104
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "matchPush+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.8297169811320755,
+          "meanProfit": -0.17028301886792452,
+          "standardDeviation": 0.018455931710214955,
+          "standardError": 0.013050314465408828,
+          "sampleSize": 2,
+          "totalRounds": 103,
+          "totalHands": 103
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.8300970873786411,
+            "meanProfit": -0.16990291262135915,
+            "standardDeviation": 1.1622185471183735,
+            "standardError": 0.11451679621013006,
+            "sampleSize": 103,
+            "totalRounds": 103,
+            "totalHands": 103
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+matchPush+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9945690883190883,
+          "meanProfit": -0.0054309116809116795,
+          "standardDeviation": 0.03487688361621675,
+          "standardError": 0.024661680911680858,
+          "sampleSize": 2,
+          "totalRounds": 106,
+          "totalHands": 106
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9941037735849056,
+            "meanProfit": -0.00589622641509434,
+            "standardDeviation": 1.1981362107893534,
+            "standardError": 0.11637327627180019,
+            "sampleSize": 106,
+            "totalRounds": 106,
+            "totalHands": 106
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust+matchPush+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["dealerBust", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.1752450980392157,
+          "meanProfit": 0.17524509803921567,
+          "standardDeviation": 0.6013873849797353,
+          "standardError": 0.4252450980392157,
+          "sampleSize": 2,
+          "totalRounds": 102,
+          "totalHands": 102
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.1752450980392157,
+            "meanProfit": 0.17524509803921567,
+            "standardDeviation": 4.051923964071796,
+            "standardError": 0.4012002557353995,
+            "sampleSize": 102,
+            "totalRounds": 102,
+            "totalHands": 102
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+matchPush+dealerSevens",
+        "activeHands": 1,
+        "sideBets": ["aceFlash", "dealerBust", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.763095238095238,
+          "meanProfit": -0.2369047619047619,
+          "standardDeviation": 0.2407530231182769,
+          "standardError": 0.17023809523809522,
+          "sampleSize": 2,
+          "totalRounds": 107,
+          "totalHands": 107
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.7551401869158879,
+            "meanProfit": -0.24485981308411225,
+            "standardDeviation": 1.0696705227929029,
+            "standardError": 0.10340895256404503,
+            "sampleSize": 107,
+            "totalRounds": 107,
+            "totalHands": 107
+          },
+          "centre": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "main-only",
+        "activeHands": 2,
+        "sideBets": [],
+        "statistics": {
+          "meanReturned": 1.0708705357142856,
+          "meanProfit": 0.07087053571428571,
+          "standardDeviation": 0.0007891816754313923,
+          "standardError": 0.0005580357142856984,
+          "sampleSize": 2,
+          "totalRounds": 67,
+          "totalHands": 134
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0522388059701493,
+            "meanProfit": 0.05223880597014925,
+            "standardDeviation": 0.9967155469348229,
+            "standardError": 0.12176818455031817,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "centre": {
+            "meanReturned": 1.0895522388059702,
+            "meanProfit": 0.08955223880597014,
+            "standardDeviation": 1.0072666777515016,
+            "standardError": 0.1230572103395225,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash",
+        "activeHands": 2,
+        "sideBets": ["aceFlash"],
+        "statistics": {
+          "meanReturned": 1.0137589126559714,
+          "meanProfit": 0.013758912655971484,
+          "standardDeviation": 0.28730151860375874,
+          "standardError": 0.20315285204991082,
+          "sampleSize": 2,
+          "totalRounds": 67,
+          "totalHands": 134
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9925373134328358,
+            "meanProfit": -0.007462686567164179,
+            "standardDeviation": 1.6433809784262678,
+            "standardError": 0.20077094100005835,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "centre": {
+            "meanReturned": 1.041044776119403,
+            "meanProfit": 0.041044776119402986,
+            "standardDeviation": 1.8563960966511663,
+            "standardError": 0.22679487963308687,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust",
+        "activeHands": 2,
+        "sideBets": ["dealerBust"],
+        "statistics": {
+          "meanReturned": 0.7383578431372549,
+          "meanProfit": -0.2616421568627451,
+          "standardDeviation": 0.04246106896830985,
+          "standardError": 0.030024509803921573,
+          "sampleSize": 2,
+          "totalRounds": 70,
+          "totalHands": 140
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.7321428571428571,
+            "meanProfit": -0.26785714285714285,
+            "standardDeviation": 1.1635476645594989,
+            "standardError": 0.13907054570057314,
+            "sampleSize": 70,
+            "totalRounds": 70,
+            "totalHands": 70
+          },
+          "centre": {
+            "meanReturned": 0.7428571428571429,
+            "meanProfit": -0.2571428571428571,
+            "standardDeviation": 1.1570291077184105,
+            "standardError": 0.138291429137769,
+            "sampleSize": 70,
+            "totalRounds": 70,
+            "totalHands": 70
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "dealerBust"],
+        "statistics": {
+          "meanReturned": 1.2132352941176472,
+          "meanProfit": 0.21323529411764708,
+          "standardDeviation": 0.6551136355110662,
+          "standardError": 0.4632352941176471,
+          "sampleSize": 2,
+          "totalRounds": 68,
+          "totalHands": 136
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.1176470588235294,
+            "meanProfit": 0.11764705882352938,
+            "standardDeviation": 1.6459052219401324,
+            "standardError": 0.19959532587690718,
+            "sampleSize": 68,
+            "totalRounds": 68,
+            "totalHands": 68
+          },
+          "centre": {
+            "meanReturned": 1.308823529411765,
+            "meanProfit": 0.308823529411765,
+            "standardDeviation": 2.835931601431058,
+            "standardError": 0.34390722175668514,
+            "sampleSize": 68,
+            "totalRounds": 68,
+            "totalHands": 68
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "matchPush",
+        "activeHands": 2,
+        "sideBets": ["matchPush"],
+        "statistics": {
+          "meanReturned": 1.0709263392857142,
+          "meanProfit": 0.07092633928571429,
+          "standardDeviation": 0.05989888916524445,
+          "standardError": 0.042354910714285765,
+          "sampleSize": 2,
+          "totalRounds": 67,
+          "totalHands": 134
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.8992537313432836,
+            "meanProfit": -0.10074626865671642,
+            "standardDeviation": 1.5727675986913776,
+            "standardError": 0.19214414363372603,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "centre": {
+            "meanReturned": 1.2388059701492538,
+            "meanProfit": 0.23880597014925373,
+            "standardDeviation": 1.924440510892403,
+            "standardError": 0.23510782791248902,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+matchPush",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "matchPush"],
+        "statistics": {
+          "meanReturned": 0.9156746031746033,
+          "meanProfit": -0.08432539682539683,
+          "standardDeviation": 0.45316565540328346,
+          "standardError": 0.3204365079365079,
+          "sampleSize": 2,
+          "totalRounds": 71,
+          "totalHands": 142
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9389671361502346,
+            "meanProfit": -0.06103286384976537,
+            "standardDeviation": 1.448655489575064,
+            "standardError": 0.17192377640695228,
+            "sampleSize": 71,
+            "totalRounds": 71,
+            "totalHands": 71
+          },
+          "centre": {
+            "meanReturned": 0.901408450704225,
+            "meanProfit": -0.09859154929577464,
+            "standardDeviation": 1.662035820099148,
+            "standardError": 0.1972473626554848,
+            "sampleSize": 71,
+            "totalRounds": 71,
+            "totalHands": 71
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust+matchPush",
+        "activeHands": 2,
+        "sideBets": ["dealerBust", "matchPush"],
+        "statistics": {
+          "meanReturned": 1.1091386554621847,
+          "meanProfit": 0.10913865546218487,
+          "standardDeviation": 0.31032480376023064,
+          "standardError": 0.2194327731092437,
+          "sampleSize": 2,
+          "totalRounds": 69,
+          "totalHands": 138
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.2826086956521736,
+            "meanProfit": 0.28260869565217384,
+            "standardDeviation": 1.4160334074339582,
+            "standardError": 0.17047038975188566,
+            "sampleSize": 69,
+            "totalRounds": 69,
+            "totalHands": 69
+          },
+          "centre": {
+            "meanReturned": 0.9420289855072461,
+            "meanProfit": -0.05797101449275373,
+            "standardDeviation": 1.2791777916602907,
+            "standardError": 0.15399490969739443,
+            "sampleSize": 69,
+            "totalRounds": 69,
+            "totalHands": 69
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+matchPush",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "dealerBust", "matchPush"],
+        "statistics": {
+          "meanReturned": 0.8989715818759937,
+          "meanProfit": -0.10102841812400637,
+          "standardDeviation": 0.05209853718698579,
+          "standardError": 0.03683922893481717,
+          "sampleSize": 2,
+          "totalRounds": 71,
+          "totalHands": 142
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9119718309859155,
+            "meanProfit": -0.0880281690140845,
+            "standardDeviation": 1.0747496315997236,
+            "standardError": 0.1275493149933153,
+            "sampleSize": 71,
+            "totalRounds": 71,
+            "totalHands": 71
+          },
+          "centre": {
+            "meanReturned": 0.8890845070422535,
+            "meanProfit": -0.11091549295774648,
+            "standardDeviation": 1.1679402840223698,
+            "standardError": 0.1386090106943468,
+            "sampleSize": 71,
+            "totalRounds": 71,
+            "totalHands": 71
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.992578125,
+          "meanProfit": -0.0074218749999999944,
+          "standardDeviation": 0.41376795242869074,
+          "standardError": 0.292578125,
+          "sampleSize": 2,
+          "totalRounds": 67,
+          "totalHands": 134
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9552238805970149,
+            "meanProfit": -0.04477611940298507,
+            "standardDeviation": 1.4917229800194296,
+            "standardError": 0.1822429676025055,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "centre": {
+            "meanReturned": 1.0037313432835822,
+            "meanProfit": 0.0037313432835820895,
+            "standardDeviation": 1.557297421838012,
+            "standardError": 0.19025416072345658,
+            "sampleSize": 67,
+            "totalRounds": 67,
+            "totalHands": 67
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.5717592592592593,
+          "meanProfit": 0.5717592592592593,
+          "standardDeviation": 0.9820927516479827,
+          "standardError": 0.6944444444444444,
+          "sampleSize": 2,
+          "totalRounds": 72,
+          "totalHands": 144
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.5069444444444444,
+            "meanProfit": 0.5069444444444444,
+            "standardDeviation": 6.067205613732852,
+            "standardError": 0.7150270387205981,
+            "sampleSize": 72,
+            "totalRounds": 72,
+            "totalHands": 72
+          },
+          "centre": {
+            "meanReturned": 1.6365740740740737,
+            "meanProfit": 0.6365740740740741,
+            "standardDeviation": 6.007515271800365,
+            "standardError": 0.707992464461964,
+            "sampleSize": 72,
+            "totalRounds": 72,
+            "totalHands": 72
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["dealerBust", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.755787037037037,
+          "meanProfit": 0.7557870370370371,
+          "standardDeviation": 1.1572326256918728,
+          "standardError": 0.8182870370370369,
+          "sampleSize": 2,
+          "totalRounds": 72,
+          "totalHands": 144
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.745370370370371,
+            "meanProfit": 0.7453703703703702,
+            "standardDeviation": 5.926187355670489,
+            "standardError": 0.6984078776294296,
+            "sampleSize": 72,
+            "totalRounds": 72,
+            "totalHands": 72
+          },
+          "centre": {
+            "meanReturned": 1.7662037037037042,
+            "meanProfit": 0.7662037037037035,
+            "standardDeviation": 6.004410202482262,
+            "standardError": 0.7076265285334832,
+            "sampleSize": 72,
+            "totalRounds": 72,
+            "totalHands": 72
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "dealerBust", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.12234477124183,
+          "meanProfit": 0.12234477124183007,
+          "standardDeviation": 0.08954375088555136,
+          "standardError": 0.06331699346405228,
+          "sampleSize": 2,
+          "totalRounds": 70,
+          "totalHands": 140
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0946428571428573,
+            "meanProfit": 0.09464285714285714,
+            "standardDeviation": 1.430046954085868,
+            "standardError": 0.17092330322149374,
+            "sampleSize": 70,
+            "totalRounds": 70,
+            "totalHands": 70
+          },
+          "centre": {
+            "meanReturned": 1.1464285714285714,
+            "meanProfit": 0.14642857142857144,
+            "standardDeviation": 1.538452107193579,
+            "standardError": 0.1838801972608549,
+            "sampleSize": 70,
+            "totalRounds": 70,
+            "totalHands": 70
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "matchPush+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.0032617845117846,
+          "meanProfit": 0.0032617845117845112,
+          "standardDeviation": 0.011755352633362316,
+          "standardError": 0.008312289562289632,
+          "sampleSize": 2,
+          "totalRounds": 69,
+          "totalHands": 138
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0144927536231885,
+            "meanProfit": 0.014492753623188432,
+            "standardDeviation": 1.5489663247442842,
+            "standardError": 0.18647363240546927,
+            "sampleSize": 69,
+            "totalRounds": 69,
+            "totalHands": 69
+          },
+          "centre": {
+            "meanReturned": 0.9927536231884055,
+            "meanProfit": -0.007246376811594209,
+            "standardDeviation": 1.3411032133764622,
+            "standardError": 0.16144985441839177,
+            "sampleSize": 69,
+            "totalRounds": 69,
+            "totalHands": 69
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+matchPush+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.15625,
+          "meanProfit": 0.15625,
+          "standardDeviation": 0.04679383110793344,
+          "standardError": 0.03308823529411775,
+          "sampleSize": 2,
+          "totalRounds": 68,
+          "totalHands": 136
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.2941176470588236,
+            "meanProfit": 0.29411764705882354,
+            "standardDeviation": 1.8009332036094616,
+            "standardError": 0.21839523009305314,
+            "sampleSize": 68,
+            "totalRounds": 68,
+            "totalHands": 68
+          },
+          "centre": {
+            "meanReturned": 1.0183823529411764,
+            "meanProfit": 0.01838235294117647,
+            "standardDeviation": 1.4866107504205748,
+            "standardError": 0.18027803376949306,
+            "sampleSize": 68,
+            "totalRounds": 68,
+            "totalHands": 68
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "dealerBust+matchPush+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["dealerBust", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.8464285714285714,
+          "meanProfit": -0.15357142857142855,
+          "standardDeviation": 0.14394673759868998,
+          "standardError": 0.10178571428571424,
+          "sampleSize": 2,
+          "totalRounds": 70,
+          "totalHands": 140
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.6892857142857143,
+            "meanProfit": -0.3107142857142857,
+            "standardDeviation": 0.8509220428343403,
+            "standardError": 0.10170463699088698,
+            "sampleSize": 70,
+            "totalRounds": 70,
+            "totalHands": 70
+          },
+          "centre": {
+            "meanReturned": 1.0035714285714286,
+            "meanProfit": 0.0035714285714285713,
+            "standardDeviation": 1.1525356867866483,
+            "standardError": 0.13775436261262658,
+            "sampleSize": 70,
+            "totalRounds": 70,
+            "totalHands": 70
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+matchPush+dealerSevens",
+        "activeHands": 2,
+        "sideBets": ["aceFlash", "dealerBust", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9207575757575758,
+          "meanProfit": -0.07924242424242424,
+          "standardDeviation": 0.23934493169253754,
+          "standardError": 0.1692424242424243,
+          "sampleSize": 2,
+          "totalRounds": 68,
+          "totalHands": 136
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.8955882352941175,
+            "meanProfit": -0.10441176470588234,
+            "standardDeviation": 1.1020244361038345,
+            "standardError": 0.13364009270787794,
+            "sampleSize": 68,
+            "totalRounds": 68,
+            "totalHands": 68
+          },
+          "centre": {
+            "meanReturned": 0.9558823529411763,
+            "meanProfit": -0.04411764705882347,
+            "standardDeviation": 1.078193950506037,
+            "standardError": 0.13075022184818735,
+            "sampleSize": 68,
+            "totalRounds": 68,
+            "totalHands": 68
+          },
+          "right": {
+            "meanReturned": 0,
+            "meanProfit": 0,
+            "standardDeviation": null,
+            "standardError": null,
+            "sampleSize": 0,
+            "totalRounds": 0,
+            "totalHands": 0
+          }
+        }
+      },
+      {
+        "name": "main-only",
+        "activeHands": 3,
+        "sideBets": [],
+        "statistics": {
+          "meanReturned": 1.1304166666666666,
+          "meanProfit": 0.13041666666666665,
+          "standardDeviation": 0.1549742362100517,
+          "standardError": 0.10958333333333337,
+          "sampleSize": 2,
+          "totalRounds": 49,
+          "totalHands": 147
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.2244897959183674,
+            "meanProfit": 0.22448979591836735,
+            "standardDeviation": 0.9739375861772188,
+            "standardError": 0.13913394088245984,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "centre": {
+            "meanReturned": 1.1734693877551021,
+            "meanProfit": 0.17346938775510204,
+            "standardDeviation": 1.0485655897073711,
+            "standardError": 0.14979508424391016,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "right": {
+            "meanReturned": 1,
+            "meanProfit": 0,
+            "standardDeviation": 0.9736101204623269,
+            "standardError": 0.13908716006604668,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          }
+        }
+      },
+      {
+        "name": "aceFlash",
+        "activeHands": 3,
+        "sideBets": ["aceFlash"],
+        "statistics": {
+          "meanReturned": 0.9659722222222222,
+          "meanProfit": -0.03402777777777778,
+          "standardDeviation": 0.2347201676438678,
+          "standardError": 0.16597222222222216,
+          "sampleSize": 2,
+          "totalRounds": 49,
+          "totalHands": 147
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9387755102040817,
+            "meanProfit": -0.061224489795918366,
+            "standardDeviation": 1.9267379953488983,
+            "standardError": 0.2752482850498426,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "centre": {
+            "meanReturned": 1.2448979591836735,
+            "meanProfit": 0.24489795918367346,
+            "standardDeviation": 2.348808317041661,
+            "standardError": 0.33554404529166587,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "right": {
+            "meanReturned": 0.7040816326530612,
+            "meanProfit": -0.29591836734693877,
+            "standardDeviation": 1.2906650713994752,
+            "standardError": 0.1843807244856393,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          }
+        }
+      },
+      {
+        "name": "dealerBust",
+        "activeHands": 3,
+        "sideBets": ["dealerBust"],
+        "statistics": {
+          "meanReturned": 0.5516666666666666,
+          "meanProfit": -0.44833333333333336,
+          "standardDeviation": 0.11549410759380276,
+          "standardError": 0.08166666666666665,
+          "sampleSize": 2,
+          "totalRounds": 50,
+          "totalHands": 150
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.545,
+            "meanProfit": -0.455,
+            "standardDeviation": 0.9618885547903844,
+            "standardError": 0.13603158396760173,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          },
+          "centre": {
+            "meanReturned": 0.505,
+            "meanProfit": -0.495,
+            "standardDeviation": 0.8548928802690393,
+            "standardError": 0.12090011056526738,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          },
+          "right": {
+            "meanReturned": 0.605,
+            "meanProfit": -0.395,
+            "standardDeviation": 0.8587633491223984,
+            "standardError": 0.12144747751978369,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "dealerBust"],
+        "statistics": {
+          "meanReturned": 0.9291452991452991,
+          "meanProfit": -0.07085470085470084,
+          "standardDeviation": 0.39634241632661354,
+          "standardError": 0.28025641025641024,
+          "sampleSize": 2,
+          "totalRounds": 51,
+          "totalHands": 153
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.7189542483660131,
+            "meanProfit": -0.28104575163398693,
+            "standardDeviation": 1.191399828436389,
+            "standardError": 0.1668293451873863,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "centre": {
+            "meanReturned": 0.9346405228758168,
+            "meanProfit": -0.06535947712418301,
+            "standardDeviation": 1.4201245764496033,
+            "standardError": 0.19885721612410923,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "right": {
+            "meanReturned": 1.1503267973856208,
+            "meanProfit": 0.1503267973856209,
+            "standardDeviation": 3.108457084571556,
+            "standardError": 0.43527105475813205,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          }
+        }
+      },
+      {
+        "name": "matchPush",
+        "activeHands": 3,
+        "sideBets": ["matchPush"],
+        "statistics": {
+          "meanReturned": 1.0144230769230769,
+          "meanProfit": 0.014423076923076927,
+          "standardDeviation": 0.25156683561444476,
+          "standardError": 0.17788461538461536,
+          "sampleSize": 2,
+          "totalRounds": 52,
+          "totalHands": 156
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.2788461538461537,
+            "meanProfit": 0.27884615384615385,
+            "standardDeviation": 1.879099339792457,
+            "standardError": 0.2605841931273936,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          },
+          "centre": {
+            "meanReturned": 1.1057692307692308,
+            "meanProfit": 0.10576923076923077,
+            "standardDeviation": 1.6747447521688323,
+            "standardError": 0.23224531066380602,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          },
+          "right": {
+            "meanReturned": 0.6586538461538461,
+            "meanProfit": -0.34134615384615385,
+            "standardDeviation": 1.0981589385415222,
+            "standardError": 0.15228724467386795,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          }
+        }
+      },
+      {
+        "name": "aceFlash+matchPush",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "matchPush"],
+        "statistics": {
+          "meanReturned": 0.9448896011396011,
+          "meanProfit": -0.05511039886039886,
+          "standardDeviation": 0.02354504417412476,
+          "standardError": 0.016648860398860432,
+          "sampleSize": 2,
+          "totalRounds": 50,
+          "totalHands": 150
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.033333333333333,
+            "meanProfit": 0.03333333333333338,
+            "standardDeviation": 1.4174167682035446,
+            "standardError": 0.2004530017128494,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          },
+          "centre": {
+            "meanReturned": 0.8033333333333331,
+            "meanProfit": -0.19666666666666666,
+            "standardDeviation": 1.2588417452891132,
+            "standardError": 0.1780271069069281,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          },
+          "right": {
+            "meanReturned": 0.9999999999999996,
+            "meanProfit": 1.2212453270876722e-17,
+            "standardDeviation": 1.647852997428408,
+            "standardError": 0.23304160577604113,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          }
+        }
+      },
+      {
+        "name": "dealerBust+matchPush",
+        "activeHands": 3,
+        "sideBets": ["dealerBust", "matchPush"],
+        "statistics": {
+          "meanReturned": 0.833119658119658,
+          "meanProfit": -0.1668803418803419,
+          "standardDeviation": 0.01541130164124529,
+          "standardError": 0.010897435897435912,
+          "sampleSize": 2,
+          "totalRounds": 51,
+          "totalHands": 153
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.7385620915032679,
+            "meanProfit": -0.2614379084967321,
+            "standardDeviation": 1.179573794008659,
+            "standardError": 0.16517336913916833,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "centre": {
+            "meanReturned": 0.7254901960784312,
+            "meanProfit": -0.27450980392156865,
+            "standardDeviation": 1.1184431289429684,
+            "standardError": 0.156613363857681,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "right": {
+            "meanReturned": 1.0359477124183005,
+            "meanProfit": 0.03594771241830064,
+            "standardDeviation": 1.3901693443966525,
+            "standardError": 0.19466264463849078,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+matchPush",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "dealerBust", "matchPush"],
+        "statistics": {
+          "meanReturned": 1.0183333333333333,
+          "meanProfit": 0.018333333333333333,
+          "standardDeviation": 0.04714045207910324,
+          "standardError": 0.03333333333333338,
+          "sampleSize": 2,
+          "totalRounds": 50,
+          "totalHands": 150
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.98,
+            "meanProfit": -0.02,
+            "standardDeviation": 1.3865148644669318,
+            "standardError": 0.19608281257610286,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          },
+          "centre": {
+            "meanReturned": 1.14,
+            "meanProfit": 0.14,
+            "standardDeviation": 2.412187380611978,
+            "standardError": 0.341134810864669,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          },
+          "right": {
+            "meanReturned": 0.935,
+            "meanProfit": -0.065,
+            "standardDeviation": 1.3496598210856912,
+            "standardError": 0.19087072235694294,
+            "sampleSize": 50,
+            "totalRounds": 50,
+            "totalHands": 50
+          }
+        }
+      },
+      {
+        "name": "dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.0030128205128206,
+          "meanProfit": 0.0030128205128205077,
+          "standardDeviation": 0.6076585582427472,
+          "standardError": 0.4296794871794871,
+          "sampleSize": 2,
+          "totalRounds": 51,
+          "totalHands": 153
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9411764705882353,
+            "meanProfit": -0.058823529411764705,
+            "standardDeviation": 1.6774893705282599,
+            "standardError": 0.23489549567194049,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "centre": {
+            "meanReturned": 1.1225490196078431,
+            "meanProfit": 0.12254901960784313,
+            "standardDeviation": 1.553522247201184,
+            "standardError": 0.21753662628502565,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "right": {
+            "meanReturned": 0.9705882352941176,
+            "meanProfit": -0.029411764705882353,
+            "standardDeviation": 1.6982690149263213,
+            "standardError": 0.23780522789231945,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9626495726495726,
+          "meanProfit": -0.037350427350427345,
+          "standardDeviation": 0.2583055028026755,
+          "standardError": 0.1826495726495726,
+          "sampleSize": 2,
+          "totalRounds": 51,
+          "totalHands": 153
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.0098039215686272,
+            "meanProfit": 0.009803921568627492,
+            "standardDeviation": 1.1899634750257775,
+            "standardError": 0.1666282154799358,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "centre": {
+            "meanReturned": 0.9901960784313723,
+            "meanProfit": -0.009803921568627385,
+            "standardDeviation": 1.27209877529917,
+            "standardError": 0.17812945799678498,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "right": {
+            "meanReturned": 0.8986928104575163,
+            "meanProfit": -0.10130718954248366,
+            "standardDeviation": 1.2802249938422494,
+            "standardError": 0.17926735619521833,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          }
+        }
+      },
+      {
+        "name": "dealerBust+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["dealerBust", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.8835390946502057,
+          "meanProfit": -0.11646090534979425,
+          "standardDeviation": 0.03899271962098656,
+          "standardError": 0.027572016460905343,
+          "sampleSize": 2,
+          "totalRounds": 52,
+          "totalHands": 156
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9166666666666666,
+            "meanProfit": -0.08333333333333331,
+            "standardDeviation": 1.1464162213199214,
+            "standardError": 0.15897932573048654,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          },
+          "centre": {
+            "meanReturned": 0.8910256410256412,
+            "meanProfit": -0.10897435897435896,
+            "standardDeviation": 1.1593536510567153,
+            "standardError": 0.16077342443389894,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          },
+          "right": {
+            "meanReturned": 0.8397435897435896,
+            "meanProfit": -0.1602564102564103,
+            "standardDeviation": 1.1074915907565381,
+            "standardError": 0.15358145067761073,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "dealerBust", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.2586728395061728,
+          "meanProfit": 0.2586728395061728,
+          "standardDeviation": 0.1819708747386863,
+          "standardError": 0.1286728395061729,
+          "sampleSize": 2,
+          "totalRounds": 52,
+          "totalHands": 156
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.1274038461538463,
+            "meanProfit": 0.12740384615384615,
+            "standardDeviation": 1.4373114506812454,
+            "standardError": 0.1993192359324139,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          },
+          "centre": {
+            "meanReturned": 1.1923076923076923,
+            "meanProfit": 0.19230769230769232,
+            "standardDeviation": 1.6990953364342474,
+            "standardError": 0.23562212913136218,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          },
+          "right": {
+            "meanReturned": 1.4711538461538463,
+            "meanProfit": 0.47115384615384615,
+            "standardDeviation": 2.5646798935265633,
+            "standardError": 0.35565711004852113,
+            "sampleSize": 52,
+            "totalRounds": 52,
+            "totalHands": 52
+          }
+        }
+      },
+      {
+        "name": "matchPush+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9683333333333333,
+          "meanProfit": -0.03166666666666667,
+          "standardDeviation": 0.16263455967290583,
+          "standardError": 0.11499999999999992,
+          "sampleSize": 2,
+          "totalRounds": 49,
+          "totalHands": 147
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.9931972789115644,
+            "meanProfit": -0.006802721088435404,
+            "standardDeviation": 1.2701884446046798,
+            "standardError": 0.18145549208638284,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "centre": {
+            "meanReturned": 0.9557823129251698,
+            "meanProfit": -0.04421768707482994,
+            "standardDeviation": 1.1515767724021728,
+            "standardError": 0.1645109674860247,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "right": {
+            "meanReturned": 0.9489795918367345,
+            "meanProfit": -0.051020408163265314,
+            "standardDeviation": 1.0908945963786614,
+            "standardError": 0.1558420851969516,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          }
+        }
+      },
+      {
+        "name": "aceFlash+matchPush+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9997916666666666,
+          "meanProfit": -0.00020833333333333294,
+          "standardDeviation": 0.014436763449225325,
+          "standardError": 0.01020833333333332,
+          "sampleSize": 2,
+          "totalRounds": 49,
+          "totalHands": 147
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 0.8061224489795918,
+            "meanProfit": -0.19387755102040816,
+            "standardDeviation": 1.3130111168711445,
+            "standardError": 0.18757301669587778,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "centre": {
+            "meanReturned": 1.1045918367346939,
+            "meanProfit": 0.10459183673469388,
+            "standardDeviation": 1.4445810511235797,
+            "standardError": 0.20636872158908282,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          },
+          "right": {
+            "meanReturned": 1.0892857142857142,
+            "meanProfit": 0.08928571428571429,
+            "standardDeviation": 1.4637548035787957,
+            "standardError": 0.2091078290826851,
+            "sampleSize": 49,
+            "totalRounds": 49,
+            "totalHands": 49
+          }
+        }
+      },
+      {
+        "name": "dealerBust+matchPush+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["dealerBust", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 1.1745607787274452,
+          "meanProfit": 0.1745607787274454,
+          "standardDeviation": 0.12028537718902216,
+          "standardError": 0.08505460588793921,
+          "sampleSize": 2,
+          "totalRounds": 53,
+          "totalHands": 159
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.2712264150943395,
+            "meanProfit": 0.27122641509433965,
+            "standardDeviation": 1.3511337495928464,
+            "standardError": 0.18559249381418017,
+            "sampleSize": 53,
+            "totalRounds": 53,
+            "totalHands": 53
+          },
+          "centre": {
+            "meanReturned": 1.1084905660377358,
+            "meanProfit": 0.10849056603773585,
+            "standardDeviation": 1.4388659346144461,
+            "standardError": 0.19764343622519784,
+            "sampleSize": 53,
+            "totalRounds": 53,
+            "totalHands": 53
+          },
+          "right": {
+            "meanReturned": 1.1391509433962264,
+            "meanProfit": 0.1391509433962264,
+            "standardDeviation": 1.2499183572757309,
+            "standardError": 0.17168949044521337,
+            "sampleSize": 53,
+            "totalRounds": 53,
+            "totalHands": 53
+          }
+        }
+      },
+      {
+        "name": "aceFlash+dealerBust+matchPush+dealerSevens",
+        "activeHands": 3,
+        "sideBets": ["aceFlash", "dealerBust", "matchPush", "dealerSevens"],
+        "statistics": {
+          "meanReturned": 0.9090769230769231,
+          "meanProfit": -0.09092307692307693,
+          "standardDeviation": 0.0889866687708609,
+          "standardError": 0.06292307692307691,
+          "sampleSize": 2,
+          "totalRounds": 51,
+          "totalHands": 153
+        },
+        "seatResults": {
+          "left": {
+            "meanReturned": 1.037254901960784,
+            "meanProfit": 0.037254901960784306,
+            "standardDeviation": 1.1798238486000738,
+            "standardError": 0.16520838378559613,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "centre": {
+            "meanReturned": 0.7745098039215683,
+            "meanProfit": -0.22549019607843127,
+            "standardDeviation": 0.982413993641154,
+            "standardError": 0.13756547495661278,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          },
+          "right": {
+            "meanReturned": 0.9117647058823527,
+            "meanProfit": -0.08823529411764709,
+            "standardDeviation": 0.99551937375895,
+            "standardError": 0.1394005952338694,
+            "sampleSize": 51,
+            "totalRounds": 51,
+            "totalHands": 51
+          }
+        }
+      }
+    ],
+    "matchPushPolicy": [
+      {
+        "ratio": "0/1",
+        "action": "hit"
+      },
+      {
+        "ratio": "1/10",
+        "action": "hit"
+      },
+      {
+        "ratio": "1/5",
+        "action": "hit"
+      },
+      {
+        "ratio": "3/10",
+        "action": "hit"
+      },
+      {
+        "ratio": "2/5",
+        "action": "hit"
+      },
+      {
+        "ratio": "1/2",
+        "action": "stick"
+      },
+      {
+        "ratio": "3/5",
+        "action": "stick"
+      },
+      {
+        "ratio": "7/10",
+        "action": "stick"
+      },
+      {
+        "ratio": "4/5",
+        "action": "stick"
+      },
+      {
+        "ratio": "9/10",
+        "action": "stick"
+      },
+      {
+        "ratio": "1/1",
+        "action": "stick"
+      }
+    ]
+  }
+}

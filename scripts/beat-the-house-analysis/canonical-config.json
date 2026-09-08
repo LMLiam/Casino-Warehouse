@@ -1,0 +1,75 @@
+{
+  "seed": 171171,
+  "path": "production",
+  "shoes": 2,
+  "activeHands": [1, 2, 3],
+  "cutRange": { "minimum": 219, "maximum": 234 },
+  "analysisOnly": false,
+  "sideBetRatios": {
+    "aceFlash": "1/1",
+    "dealerBust": "1/1",
+    "matchPush": "1/1",
+    "dealerSevens": "1/1"
+  },
+  "strategy": "simple",
+  "strategyTable": {
+    "oneCardHitThrough": 11,
+    "twoCardHitThrough": 10,
+    "threeCardHitThrough": 10
+  },
+  "matchPushRatios": [
+    "0/1",
+    "1/10",
+    "1/5",
+    "3/10",
+    "2/5",
+    "1/2",
+    "3/5",
+    "7/10",
+    "4/5",
+    "9/10",
+    "1/1"
+  ],
+  "sideBetProfiles": [
+    { "name": "main-only", "sideBets": [] },
+    { "name": "aceFlash", "sideBets": ["aceFlash"] },
+    { "name": "dealerBust", "sideBets": ["dealerBust"] },
+    { "name": "aceFlash+dealerBust", "sideBets": ["aceFlash", "dealerBust"] },
+    { "name": "matchPush", "sideBets": ["matchPush"] },
+    { "name": "aceFlash+matchPush", "sideBets": ["aceFlash", "matchPush"] },
+    { "name": "dealerBust+matchPush", "sideBets": ["dealerBust", "matchPush"] },
+    {
+      "name": "aceFlash+dealerBust+matchPush",
+      "sideBets": ["aceFlash", "dealerBust", "matchPush"]
+    },
+    { "name": "dealerSevens", "sideBets": ["dealerSevens"] },
+    {
+      "name": "aceFlash+dealerSevens",
+      "sideBets": ["aceFlash", "dealerSevens"]
+    },
+    {
+      "name": "dealerBust+dealerSevens",
+      "sideBets": ["dealerBust", "dealerSevens"]
+    },
+    {
+      "name": "aceFlash+dealerBust+dealerSevens",
+      "sideBets": ["aceFlash", "dealerBust", "dealerSevens"]
+    },
+    {
+      "name": "matchPush+dealerSevens",
+      "sideBets": ["matchPush", "dealerSevens"]
+    },
+    {
+      "name": "aceFlash+matchPush+dealerSevens",
+      "sideBets": ["aceFlash", "matchPush", "dealerSevens"]
+    },
+    {
+      "name": "dealerBust+matchPush+dealerSevens",
+      "sideBets": ["dealerBust", "matchPush", "dealerSevens"]
+    },
+    {
+      "name": "aceFlash+dealerBust+matchPush+dealerSevens",
+      "sideBets": ["aceFlash", "dealerBust", "matchPush", "dealerSevens"]
+    }
+  ]
+}
