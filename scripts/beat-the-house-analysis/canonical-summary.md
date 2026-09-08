@@ -1,0 +1,56 @@
+# Beat the House Analysis
+
+- Seed: 171171
+- Path: production
+- Profiles: 48
+- Match Push policy points: 11
+- Runtime: 77 ms
+
+- 1 hands, main-only: returned 1.194744, profit 0.194744, shoes 2
+- 1 hands, aceFlash: returned 1.034017, profit 0.034017, shoes 2
+- 1 hands, dealerBust: returned 0.946078, profit -0.053922, shoes 2
+- 1 hands, aceFlash+dealerBust: returned 0.959890, profit -0.040110, shoes 2
+- 1 hands, matchPush: returned 0.882998, profit -0.117002, shoes 2
+- 1 hands, aceFlash+matchPush: returned 1.109906, profit 0.109906, shoes 2
+- 1 hands, dealerBust+matchPush: returned 1.095650, profit 0.095650, shoes 2
+- 1 hands, aceFlash+dealerBust+matchPush: returned 1.022406, profit 0.022406, shoes 2
+- 1 hands, dealerSevens: returned 1.019537, profit 0.019537, shoes 2
+- 1 hands, aceFlash+dealerSevens: returned 0.847756, profit -0.152244, shoes 2
+- 1 hands, dealerBust+dealerSevens: returned 1.485635, profit 0.485635, shoes 2
+- 1 hands, aceFlash+dealerBust+dealerSevens: returned 0.944722, profit -0.055278, shoes 2
+- 1 hands, matchPush+dealerSevens: returned 0.829717, profit -0.170283, shoes 2
+- 1 hands, aceFlash+matchPush+dealerSevens: returned 0.994569, profit -0.005431, shoes 2
+- 1 hands, dealerBust+matchPush+dealerSevens: returned 1.175245, profit 0.175245, shoes 2
+- 1 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 0.763095, profit -0.236905, shoes 2
+- 2 hands, main-only: returned 1.070871, profit 0.070871, shoes 2
+- 2 hands, aceFlash: returned 1.013759, profit 0.013759, shoes 2
+- 2 hands, dealerBust: returned 0.738358, profit -0.261642, shoes 2
+- 2 hands, aceFlash+dealerBust: returned 1.213235, profit 0.213235, shoes 2
+- 2 hands, matchPush: returned 1.070926, profit 0.070926, shoes 2
+- 2 hands, aceFlash+matchPush: returned 0.915675, profit -0.084325, shoes 2
+- 2 hands, dealerBust+matchPush: returned 1.109139, profit 0.109139, shoes 2
+- 2 hands, aceFlash+dealerBust+matchPush: returned 0.898972, profit -0.101028, shoes 2
+- 2 hands, dealerSevens: returned 0.992578, profit -0.007422, shoes 2
+- 2 hands, aceFlash+dealerSevens: returned 1.571759, profit 0.571759, shoes 2
+- 2 hands, dealerBust+dealerSevens: returned 1.755787, profit 0.755787, shoes 2
+- 2 hands, aceFlash+dealerBust+dealerSevens: returned 1.122345, profit 0.122345, shoes 2
+- 2 hands, matchPush+dealerSevens: returned 1.003262, profit 0.003262, shoes 2
+- 2 hands, aceFlash+matchPush+dealerSevens: returned 1.156250, profit 0.156250, shoes 2
+- 2 hands, dealerBust+matchPush+dealerSevens: returned 0.846429, profit -0.153571, shoes 2
+- 2 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 0.920758, profit -0.079242, shoes 2
+- 3 hands, main-only: returned 1.130417, profit 0.130417, shoes 2
+- 3 hands, aceFlash: returned 0.965972, profit -0.034028, shoes 2
+- 3 hands, dealerBust: returned 0.551667, profit -0.448333, shoes 2
+- 3 hands, aceFlash+dealerBust: returned 0.929145, profit -0.070855, shoes 2
+- 3 hands, matchPush: returned 1.014423, profit 0.014423, shoes 2
+- 3 hands, aceFlash+matchPush: returned 0.944890, profit -0.055110, shoes 2
+- 3 hands, dealerBust+matchPush: returned 0.833120, profit -0.166880, shoes 2
+- 3 hands, aceFlash+dealerBust+matchPush: returned 1.018333, profit 0.018333, shoes 2
+- 3 hands, dealerSevens: returned 1.003013, profit 0.003013, shoes 2
+- 3 hands, aceFlash+dealerSevens: returned 0.962650, profit -0.037350, shoes 2
+- 3 hands, dealerBust+dealerSevens: returned 0.883539, profit -0.116461, shoes 2
+- 3 hands, aceFlash+dealerBust+dealerSevens: returned 1.258673, profit 0.258673, shoes 2
+- 3 hands, matchPush+dealerSevens: returned 0.968333, profit -0.031667, shoes 2
+- 3 hands, aceFlash+matchPush+dealerSevens: returned 0.999792, profit -0.000208, shoes 2
+- 3 hands, dealerBust+matchPush+dealerSevens: returned 1.174561, profit 0.174561, shoes 2
+- 3 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 0.909077, profit -0.090923, shoes 2

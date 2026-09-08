@@ -12,6 +12,8 @@
     "dev": "vite --host 127.0.0.1",
     "dev:client": "vite --host 127.0.0.1",
     "build:server": "vite build --ssr src/multiplayer/serverEntry.ts --outDir dist-server",
+    "build:beat-the-house-analysis": "vite build --config scripts/beat-the-house-analysis/vite.config.ts",
+    "analyze:beat-the-house": "npm run build:beat-the-house-analysis && node dist-beat-the-house-analysis/index.js",
     "dev:server": "npm run build:server && node dist-server/serverEntry.js",
     "dev:full": "npm run build && npm run build:server && node dist-server/serverEntry.js",
     "dev:public": "npm run dev:ngrok",

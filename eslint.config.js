@@ -41,7 +41,7 @@ const globals = {
 
 export default [
   {
-    ignores: ['coverage/**', 'dist/**', 'dist-server/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
+    ignores: ['coverage/**', 'dist/**', 'dist-server/**', 'dist-beat-the-house-analysis/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
   },
   js.configs.recommended,
   {
