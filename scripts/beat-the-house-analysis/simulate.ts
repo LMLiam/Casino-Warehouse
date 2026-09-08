@@ -8,10 +8,30 @@ import { createSeededRng } from './rng';
 import { createAnalysisShoe } from './shoe';
 import { calculateStatistics, type Sample, type SummaryStatistics } from './statistics';
 
+export type MetricStatistics = {
+  readonly observationUnit: 'shoe';
+  readonly denominator: string;
+  readonly statistics: SummaryStatistics;
+};
+
+export type ProfileMetrics = {
+  readonly returnedPerTotalStake: MetricStatistics;
+  readonly profitPerTotalStake: MetricStatistics;
+  readonly mainReturnedPerMainStake: MetricStatistics;
+  readonly mainProfitPerMainStake: MetricStatistics;
+  readonly sideBets: Readonly<Record<SideBet, { readonly returnedPerSideStake: MetricStatistics; readonly profitPerSideStake: MetricStatistics }>>;
+  readonly seats: Readonly<Record<HandId, { readonly returnedPerSeatStake: MetricStatistics; readonly profitPerSeatStake: MetricStatistics }>>;
+};
+
 export type ProfileResult = {
   readonly name: string;
   readonly activeHands: number;
   readonly sideBets: readonly SideBet[];
+  readonly strategy: AnalysisConfig['strategy'];
+  readonly sideBetRatios: Readonly<Record<SideBet, string>>;
+  readonly strategyTable: AnalysisConfig['strategyTable'];
+  readonly assertedMetrics: readonly string[];
+  readonly metrics: ProfileMetrics;
   readonly statistics: SummaryStatistics;
   readonly seatResults: Readonly<Record<HandId, SummaryStatistics>>;
 };
@@ -21,6 +41,29 @@ const action = (config: AnalysisConfig, count: number, value: number): 'hit' | '
   const limit =
     count === 1 ? config.strategyTable.oneCardHitThrough : count === 2 ? config.strategyTable.twoCardHitThrough : config.strategyTable.threeCardHitThrough;
   return value <= limit ? 'hit' : 'stick';
+};
+
+type MetricName =
+  | 'returnedPerTotalStake'
+  | 'profitPerTotalStake'
+  | 'mainReturnedPerMainStake'
+  | 'mainProfitPerMainStake'
+  | `${SideBet}ReturnedPerSideStake`
+  | `${SideBet}ProfitPerSideStake`
+  | `${HandId}ReturnedPerSeatStake`
+  | `${HandId}ProfitPerSeatStake`;
+
+const metricDenominator = (name: MetricName): string =>
+  name.includes('Total')
+    ? 'totalStakeHalfUnits'
+    : name.includes('Main')
+      ? 'mainStakeHalfUnits'
+      : name.includes('Side')
+        ? 'sideBetStakeHalfUnits'
+        : 'seatStakeHalfUnits';
+
+const addMetricSample = (samples: Record<MetricName, Sample[]>, name: MetricName, sample: Sample): void => {
+  samples[name].push(sample);
 };
 
 const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHands: readonly HandId[]): ProfileResult => {
@@ -35,6 +78,19 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
   });
   const samples: Sample[] = [];
   const seatSamples = Object.fromEntries(handIds.map((handId) => [handId, [] as Sample[]])) as Record<HandId, Sample[]>;
+  const metricNames: MetricName[] = [
+    'returnedPerTotalStake',
+    'profitPerTotalStake',
+    'mainReturnedPerMainStake',
+    'mainProfitPerMainStake',
+    ...profile.sideBets.flatMap((sideBet) => [`${sideBet}ReturnedPerSideStake`, `${sideBet}ProfitPerSideStake`] as const),
+    ...activeHands.flatMap((handId) => [`${handId}ReturnedPerSeatStake`, `${handId}ProfitPerSeatStake`] as const),
+  ];
+  const metricSamples = Object.fromEntries(metricNames.map((name) => [name, [] as Sample[]])) as Record<MetricName, Sample[]>;
+  const shoeMetrics = Object.fromEntries(metricNames.map((name) => [name, { returnedHalfUnits: 0, profitHalfUnits: 0, stakeHalfUnits: 0 }])) as Record<
+    MetricName,
+    { returnedHalfUnits: number; profitHalfUnits: number; stakeHalfUnits: number }
+  >;
   const target = config.rounds ?? Number.MAX_SAFE_INTEGER;
   let rounds = 0;
   let shoeReturned = 0;
@@ -65,18 +121,51 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
     shoeStake += stakeHalfUnits;
     shoeRounds += 1;
     shoeHands += snapshot.summaries.length;
-    for (const summary of snapshot.summaries)
+    const mainStakeHalfUnits = beatTheHouseRules.halfUnitsPerWholeChip;
+    const sideStakeHalfUnits = beatTheHouseRules.halfUnitsPerWholeChip;
+    const seatStakeHalfUnits = (1 + profile.sideBets.length) * mainStakeHalfUnits;
+    const addRoundMetric = (name: MetricName, returnedHalfUnits: number, profitHalfUnits: number, stakeHalfUnits: number): void => {
+      shoeMetrics[name].returnedHalfUnits += name.includes('Profit') ? profitHalfUnits : returnedHalfUnits;
+      shoeMetrics[name].profitHalfUnits += profitHalfUnits;
+      shoeMetrics[name].stakeHalfUnits += stakeHalfUnits;
+    };
+    addRoundMetric('returnedPerTotalStake', roundReturned, roundProfit, stakeHalfUnits);
+    for (const summary of snapshot.summaries) {
+      const mainReturnedHalfUnits = summary.mainProfitHalfUnits + mainStakeHalfUnits;
+      addRoundMetric('mainReturnedPerMainStake', mainReturnedHalfUnits, summary.mainProfitHalfUnits, mainStakeHalfUnits);
+      for (const sideBet of profile.sideBets) {
+        const sideWin = summary.sideWins.find((win) => win.betType === sideBet);
+        addRoundMetric(`${sideBet}ReturnedPerSideStake`, sideWin?.returnedHalfUnits ?? 0, sideWin?.profitHalfUnits ?? -sideStakeHalfUnits, sideStakeHalfUnits);
+        addRoundMetric(
+          `${sideBet}ProfitPerSideStake`,
+          sideWin?.profitHalfUnits ?? -sideStakeHalfUnits,
+          sideWin?.profitHalfUnits ?? -sideStakeHalfUnits,
+          sideStakeHalfUnits,
+        );
+      }
+      addRoundMetric(`${summary.handId}ReturnedPerSeatStake`, summary.returnedHalfUnits, summary.profitHalfUnits, seatStakeHalfUnits);
+      addRoundMetric(`${summary.handId}ProfitPerSeatStake`, summary.returnedHalfUnits - seatStakeHalfUnits, summary.profitHalfUnits, seatStakeHalfUnits);
       seatSamples[summary.handId]?.push({
         returnedHalfUnits: summary.returnedHalfUnits,
         profitHalfUnits: summary.profitHalfUnits,
-        stakeHalfUnits: (1 + profile.sideBets.length) * 2,
+        stakeHalfUnits: seatStakeHalfUnits,
         rounds: 1,
         hands: 1,
       });
+    }
+    addRoundMetric('profitPerTotalStake', roundProfit, roundProfit, stakeHalfUnits);
+    addRoundMetric('mainProfitPerMainStake', roundProfit, roundProfit, stakeHalfUnits);
     rounds += 1;
     const cutReached = snapshot.shoe.cutCardReached;
-    if (cutReached) {
+    if (cutReached || (config.rounds !== undefined && rounds === target)) {
       samples.push({ returnedHalfUnits: shoeReturned, profitHalfUnits: shoeProfit, stakeHalfUnits: shoeStake, rounds: shoeRounds, hands: shoeHands });
+      for (const name of metricNames) {
+        const metric = shoeMetrics[name];
+        addMetricSample(metricSamples, name, { ...metric, rounds: shoeRounds, hands: shoeHands });
+        metric.returnedHalfUnits = 0;
+        metric.profitHalfUnits = 0;
+        metric.stakeHalfUnits = 0;
+      }
       shoeReturned = 0;
       shoeProfit = 0;
       shoeStake = 0;
@@ -86,12 +175,62 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
     game.syncBankroll(100);
     game.nextRound();
   }
-  if (config.rounds !== undefined && shoeRounds > 0)
+  if (config.rounds !== undefined && shoeRounds > 0) {
     samples.push({ returnedHalfUnits: shoeReturned, profitHalfUnits: shoeProfit, stakeHalfUnits: shoeStake, rounds: shoeRounds, hands: shoeHands });
+    for (const name of metricNames) addMetricSample(metricSamples, name, { ...shoeMetrics[name], rounds: shoeRounds, hands: shoeHands });
+  }
+  const metric = (name: MetricName): MetricStatistics => ({
+    observationUnit: 'shoe',
+    denominator: metricDenominator(name),
+    statistics: calculateStatistics(metricSamples[name]),
+  });
+  const metricKey = (name: MetricName): string =>
+    name.includes('ReturnedPerTotalStake')
+      ? 'returnedPerTotalStake'
+      : name.includes('ProfitPerTotalStake')
+        ? 'profitPerTotalStake'
+        : name.includes('MainReturnedPerMainStake')
+          ? 'mainReturnedPerMainStake'
+          : name.includes('MainProfitPerMainStake')
+            ? 'mainProfitPerMainStake'
+            : name.includes('ReturnedPerSideStake')
+              ? `${name.replace('ReturnedPerSideStake', '')}.returnedPerSideStake`
+              : name.includes('ProfitPerSideStake')
+                ? `${name.replace('ProfitPerSideStake', '')}.profitPerSideStake`
+                : name.includes('ReturnedPerSeatStake')
+                  ? `${name.replace('ReturnedPerSeatStake', '')}.returnedPerSeatStake`
+                  : `${name.replace('ProfitPerSeatStake', '')}.profitPerSeatStake`;
+  const sideBets = Object.fromEntries(
+    profile.sideBets.map((sideBet) => [
+      sideBet,
+      { returnedPerSideStake: metric(`${sideBet}ReturnedPerSideStake`), profitPerSideStake: metric(`${sideBet}ProfitPerSideStake`) },
+    ]),
+  ) as ProfileMetrics['sideBets'];
+  const seats = Object.fromEntries(
+    activeHands.map((handId) => [
+      handId,
+      { returnedPerSeatStake: metric(`${handId}ReturnedPerSeatStake`), profitPerSeatStake: metric(`${handId}ProfitPerSeatStake`) },
+    ]),
+  ) as ProfileMetrics['seats'];
   return {
     name: profile.name,
     activeHands: activeHands.length,
     sideBets: profile.sideBets,
+    strategy: config.strategy,
+    sideBetRatios: Object.fromEntries(Object.entries(config.sideBetRatios).map(([name, ratio]) => [name, `${ratio.numerator}/${ratio.denominator}`])) as Record<
+      SideBet,
+      string
+    >,
+    strategyTable: config.strategyTable,
+    assertedMetrics: metricNames.map(metricKey),
+    metrics: {
+      returnedPerTotalStake: metric('returnedPerTotalStake'),
+      profitPerTotalStake: metric('profitPerTotalStake'),
+      mainReturnedPerMainStake: metric('mainReturnedPerMainStake'),
+      mainProfitPerMainStake: metric('mainProfitPerMainStake'),
+      sideBets,
+      seats,
+    },
     statistics: calculateStatistics(samples),
     seatResults: Object.fromEntries(handIds.map((handId) => [handId, calculateStatistics(seatSamples[handId] ?? [])])) as Record<HandId, SummaryStatistics>,
   };
