@@ -12,7 +12,16 @@ export default defineConfig({
     environment: 'node',
     exclude: ['node_modules/**', 'dist/**', '.opencode/**', 'tests/e2e/**'],
     coverage: {
-      exclude: ['coverage/**', 'dist/**', 'dist-server/**', 'node_modules/**', '.opencode/**', 'src/multiplayer/serverEntry.ts', 'tests/e2e/**'],
+      exclude: [
+        'coverage/**',
+        'dist/**',
+        'dist-server/**',
+        'node_modules/**',
+        '.opencode/**',
+        'scripts/beat-the-house-analysis/**',
+        'src/multiplayer/serverEntry.ts',
+        'tests/e2e/**',
+      ],
       thresholds: {
         statements: 90,
         branches: 85,
