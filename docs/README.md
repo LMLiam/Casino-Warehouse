@@ -22,6 +22,7 @@ truth. Update the relevant document when those sources change.
 - [Supply-chain security](supply-chain-security.md): Workflow pinning, dependency controls, CodeQL, and Scorecard.
 - [CodeQL Autofix](codeql-autofix-prs.md): Guardrails and operation of the Autofix draft pull request workflow.
 - [Beat the House rules](beat-the-house-rules.md): Current six-deck rules, shoe limits, main settlement, and side-bet payouts.
+- [Beat the House mathematics](beat-the-house-mathematics.md): Frozen rules, canonical production measurements, statistical methods, and privacy boundaries.
 - [Beat the House version 2.1 rules](Beat_the_House_Official_Casino_Rules_v2_1.docx): Preserved older one-deck reference. It is not the current six-deck rules source.
 
 Version-controlled repository documentation is the current navigation source.
