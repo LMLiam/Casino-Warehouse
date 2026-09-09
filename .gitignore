@@ -10,7 +10,9 @@ tmp/
 .env
 .env.*
 .idea/
-.agents/
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 .opencode/
 opencode-rag.json
 AGENTS.override.md

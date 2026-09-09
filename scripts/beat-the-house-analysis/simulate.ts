@@ -1,12 +1,17 @@
 import { BeatTheHouseGame } from '../../src/game/engine/BeatTheHouseGame';
+import type { Card } from '../../src/game/cards/Card';
+import { isBlackAce } from '../../src/game/cards/isBlackAce';
+import { suits } from '../../src/game/cards/suits';
 import { beatTheHouseRules } from '../../src/game/beatTheHouse/beatTheHouseRules';
 import { handIds } from '../../src/game/types/handIds';
 import type { HandId } from '../../src/game/types/HandId';
+import type { GameSnapshot } from '../../src/game/types/GameSnapshot';
+import type { BeatTheHouseShoeSnapshot } from '../../src/game/beatTheHouse/shoe/BeatTheHouseShoeSnapshot';
 import type { SideBet } from './config';
 import type { AnalysisConfig } from './config';
 import { createSeededRng } from './rng';
 import { createAnalysisShoe } from './shoe';
-import { calculateStatistics, type Sample, type SummaryStatistics } from './statistics';
+import { calculateStatistics, calculateValueStatistics, type Sample, type SummaryStatistics, type ValueStatistics } from './statistics';
 
 export type MetricStatistics = {
   readonly observationUnit: 'shoe';
@@ -23,6 +28,24 @@ export type ProfileMetrics = {
   readonly seats: Readonly<Record<HandId, { readonly returnedPerSeatStake: MetricStatistics; readonly profitPerSeatStake: MetricStatistics }>>;
 };
 
+type DensityTarget = 'blackAces' | 'twos' | 'sevens';
+export type DensityBin = 'below-0.75' | '0.75-through-1.25' | 'above-1.25';
+type DensityBinResult = {
+  readonly observationUnit: 'round';
+  readonly denominator: 'roundStakeHalfUnits';
+  readonly totals: {
+    readonly returnedHalfUnits: number;
+    readonly profitHalfUnits: number;
+    readonly stakeHalfUnits: number;
+  };
+  readonly statistics: SummaryStatistics;
+};
+type PersistentShoeEvidence = {
+  readonly penetrationAtShuffle: ValueStatistics;
+  readonly completedRoundsPerShoe: ValueStatistics;
+  readonly density: Readonly<Record<DensityTarget, Readonly<Record<DensityBin, DensityBinResult>>>>;
+};
+
 export type ProfileResult = {
   readonly name: string;
   readonly activeHands: number;
@@ -34,9 +57,21 @@ export type ProfileResult = {
   readonly metrics: ProfileMetrics;
   readonly statistics: SummaryStatistics;
   readonly seatResults: Readonly<Record<HandId, SummaryStatistics>>;
+  readonly persistentShoeEvidence: PersistentShoeEvidence;
 };
 
 const rankValue: Record<string, number> = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13, A: 14 };
+const densityTargets: readonly DensityTarget[] = ['blackAces', 'twos', 'sevens'];
+const densityBins: readonly DensityBin[] = ['below-0.75', '0.75-through-1.25', 'above-1.25'];
+const lowerDensityBoundary = 0.75;
+const upperDensityBoundary = 1.25;
+const cardsPerRank = suits.length;
+const blackAcesPerDeck = suits.filter((suit) => suit === 'spades' || suit === 'clubs').length;
+const initialDensityTargets: Readonly<Record<DensityTarget, number>> = {
+  blackAces: beatTheHouseRules.deckCount * blackAcesPerDeck,
+  twos: beatTheHouseRules.deckCount * cardsPerRank,
+  sevens: beatTheHouseRules.deckCount * cardsPerRank,
+};
 const action = (config: AnalysisConfig, count: number, value: number): 'hit' | 'stick' => {
   const limit =
     count === 1 ? config.strategyTable.oneCardHitThrough : count === 2 ? config.strategyTable.twoCardHitThrough : config.strategyTable.threeCardHitThrough;
@@ -65,6 +100,93 @@ const metricDenominator = (name: MetricName): string =>
 const addMetricSample = (samples: Record<MetricName, Sample[]>, name: MetricName, sample: Sample): void => {
   samples[name].push(sample);
 };
+
+type DensityCounts = Record<DensityTarget, number>;
+type DensitySamples = Record<DensityTarget, Record<DensityBin, Sample[]>>;
+export type PublicShoeMetadata = Pick<BeatTheHouseShoeSnapshot, 'cardsRemaining' | 'totalCards'>;
+
+const emptyDensityCounts = (): DensityCounts => ({ blackAces: 0, twos: 0, sevens: 0 });
+
+const emptyDensitySamples = (): DensitySamples => ({
+  blackAces: { 'below-0.75': [], '0.75-through-1.25': [], 'above-1.25': [] },
+  twos: { 'below-0.75': [], '0.75-through-1.25': [], 'above-1.25': [] },
+  sevens: { 'below-0.75': [], '0.75-through-1.25': [], 'above-1.25': [] },
+});
+
+export const calculateRelativeDensity = (remainingTarget: number, initialTarget: number, shoe: PublicShoeMetadata): number =>
+  remainingTarget / initialTarget / (shoe.cardsRemaining / shoe.totalCards);
+
+export const densityBinFor = (relativeDensity: number): DensityBin =>
+  relativeDensity < lowerDensityBoundary ? 'below-0.75' : relativeDensity <= upperDensityBoundary ? '0.75-through-1.25' : 'above-1.25';
+
+const densityTargetForCard = (card: Card): DensityTarget | undefined => {
+  if (isBlackAce(card)) return 'blackAces';
+  if (card.rank === '2') return 'twos';
+  if (card.rank === '7') return 'sevens';
+  return undefined;
+};
+
+const countRevealedTargets = (snapshot: GameSnapshot): DensityCounts => {
+  const counts = emptyDensityCounts();
+  const cards = [...handIds.flatMap((handId) => snapshot.hands[handId].cards), ...snapshot.dealer.cards];
+  for (const card of cards) {
+    const target = densityTargetForCard(card);
+    if (target) counts[target] += 1;
+  }
+  return counts;
+};
+
+const addDensityCounts = (current: DensityCounts, revealed: DensityCounts): DensityCounts => ({
+  blackAces: current.blackAces + revealed.blackAces,
+  twos: current.twos + revealed.twos,
+  sevens: current.sevens + revealed.sevens,
+});
+
+const roundStartShoe = (snapshot: GameSnapshot): PublicShoeMetadata =>
+  snapshot.shoe.cutCardReached ? { cardsRemaining: snapshot.shoe.totalCards, totalCards: snapshot.shoe.totalCards } : snapshot.shoe;
+
+const densityBinsAtRoundStart = (snapshot: GameSnapshot, revealed: DensityCounts): Record<DensityTarget, DensityBin> => {
+  const shoe = roundStartShoe(snapshot);
+  return {
+    blackAces: densityBinFor(calculateRelativeDensity(initialDensityTargets.blackAces - revealed.blackAces, initialDensityTargets.blackAces, shoe)),
+    twos: densityBinFor(calculateRelativeDensity(initialDensityTargets.twos - revealed.twos, initialDensityTargets.twos, shoe)),
+    sevens: densityBinFor(calculateRelativeDensity(initialDensityTargets.sevens - revealed.sevens, initialDensityTargets.sevens, shoe)),
+  };
+};
+
+const densityBinResult = (samples: readonly Sample[]): DensityBinResult => {
+  const totals = samples.reduce(
+    (current, sample) => ({
+      returnedHalfUnits: current.returnedHalfUnits + sample.returnedHalfUnits,
+      profitHalfUnits: current.profitHalfUnits + sample.profitHalfUnits,
+      stakeHalfUnits: current.stakeHalfUnits + sample.stakeHalfUnits,
+    }),
+    { returnedHalfUnits: 0, profitHalfUnits: 0, stakeHalfUnits: 0 },
+  );
+  return {
+    observationUnit: 'round',
+    denominator: 'roundStakeHalfUnits',
+    totals,
+    statistics: {
+      meanReturned: totals.stakeHalfUnits === 0 ? 0 : totals.returnedHalfUnits / totals.stakeHalfUnits,
+      meanProfit: totals.stakeHalfUnits === 0 ? 0 : totals.profitHalfUnits / totals.stakeHalfUnits,
+      standardDeviation: null,
+      standardError: null,
+      sampleSize: samples.length,
+      totalRounds: samples.reduce((total, sample) => total + sample.rounds, 0),
+      totalHands: samples.reduce((total, sample) => total + sample.hands, 0),
+    },
+  };
+};
+
+const densityResultsForTarget = (samples: DensitySamples, target: DensityTarget): Record<DensityBin, DensityBinResult> =>
+  Object.fromEntries(densityBins.map((bin) => [bin, densityBinResult(samples[target][bin])])) as Record<DensityBin, DensityBinResult>;
+
+const densityResults = (samples: DensitySamples): Readonly<Record<DensityTarget, Readonly<Record<DensityBin, DensityBinResult>>>> => ({
+  blackAces: densityResultsForTarget(samples, 'blackAces'),
+  twos: densityResultsForTarget(samples, 'twos'),
+  sevens: densityResultsForTarget(samples, 'sevens'),
+});
 
 const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHands: readonly HandId[]): ProfileResult => {
   const profile = config.sideBetProfiles[profileIndex];
@@ -98,7 +220,14 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
   let shoeStake = 0;
   let shoeRounds = 0;
   let shoeHands = 0;
+  let revealedCounts = emptyDensityCounts();
+  const densitySamples = emptyDensitySamples();
+  const penetrationSamples: number[] = [];
+  const completedRoundSamples: number[] = [];
   while (samples.length < (config.shoes ?? Number.MAX_SAFE_INTEGER) && rounds < target) {
+    const roundStartSnapshot = game.snapshot();
+    if (roundStartSnapshot.shoe.cutCardReached) revealedCounts = emptyDensityCounts();
+    const roundDensityBins = densityBinsAtRoundStart(roundStartSnapshot, revealedCounts);
     for (const handId of activeHands) {
       game.placeBet(handId, 'main', 1);
       for (const sideBet of profile.sideBets) game.placeBet(handId, sideBet, 1);
@@ -121,6 +250,15 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
     shoeStake += stakeHalfUnits;
     shoeRounds += 1;
     shoeHands += snapshot.summaries.length;
+    const roundSample: Sample = {
+      returnedHalfUnits: roundReturned,
+      profitHalfUnits: roundProfit,
+      stakeHalfUnits,
+      rounds: 1,
+      hands: snapshot.summaries.length,
+    };
+    for (const targetName of densityTargets) densitySamples[targetName][roundDensityBins[targetName]].push(roundSample);
+    revealedCounts = addDensityCounts(revealedCounts, countRevealedTargets(snapshot));
     const mainStakeHalfUnits = beatTheHouseRules.halfUnitsPerWholeChip;
     const sideStakeHalfUnits = beatTheHouseRules.halfUnitsPerWholeChip;
     const seatStakeHalfUnits = (1 + profile.sideBets.length) * mainStakeHalfUnits;
@@ -157,6 +295,10 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
     addRoundMetric('mainProfitPerMainStake', roundProfit, roundProfit, stakeHalfUnits);
     rounds += 1;
     const cutReached = snapshot.shoe.cutCardReached;
+    if (cutReached) {
+      penetrationSamples.push(snapshot.shoe.cardsDealt / snapshot.shoe.totalCards);
+      completedRoundSamples.push(shoeRounds);
+    }
     if (cutReached || (config.rounds !== undefined && rounds === target)) {
       samples.push({ returnedHalfUnits: shoeReturned, profitHalfUnits: shoeProfit, stakeHalfUnits: shoeStake, rounds: shoeRounds, hands: shoeHands });
       for (const name of metricNames) {
@@ -233,6 +375,11 @@ const simulateProfile = (config: AnalysisConfig, profileIndex: number, activeHan
     },
     statistics: calculateStatistics(samples),
     seatResults: Object.fromEntries(handIds.map((handId) => [handId, calculateStatistics(seatSamples[handId] ?? [])])) as Record<HandId, SummaryStatistics>,
+    persistentShoeEvidence: {
+      penetrationAtShuffle: calculateValueStatistics(penetrationSamples),
+      completedRoundsPerShoe: calculateValueStatistics(completedRoundSamples),
+      density: densityResults(densitySamples),
+    },
   };
 };
 

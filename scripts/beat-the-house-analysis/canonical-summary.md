@@ -4,53 +4,54 @@
 - Path: production
 - Profiles: 48
 - Match Push policy points: 11
-- Runtime: 677 ms
+- Density bins: below-0.75, 0.75-through-1.25, above-1.25 for black Aces, rank 2s, and rank 7s
+- Runtime: 740 ms
 
-- 1 hands, main-only: returned 1.091035, profit 0.091035, shoes 20
-- 1 hands, aceFlash: returned 1.039325, profit 0.039325, shoes 20
-- 1 hands, dealerBust: returned 0.965366, profit -0.034634, shoes 20
-- 1 hands, aceFlash+dealerBust: returned 1.041287, profit 0.041287, shoes 20
-- 1 hands, matchPush: returned 0.996837, profit -0.003163, shoes 20
-- 1 hands, aceFlash+matchPush: returned 1.032971, profit 0.032971, shoes 20
-- 1 hands, dealerBust+matchPush: returned 1.081017, profit 0.081017, shoes 20
-- 1 hands, aceFlash+dealerBust+matchPush: returned 1.025159, profit 0.025159, shoes 20
-- 1 hands, dealerSevens: returned 1.077824, profit 0.077824, shoes 20
-- 1 hands, aceFlash+dealerSevens: returned 1.086245, profit 0.086245, shoes 20
-- 1 hands, dealerBust+dealerSevens: returned 1.067704, profit 0.067704, shoes 20
-- 1 hands, aceFlash+dealerBust+dealerSevens: returned 1.056251, profit 0.056251, shoes 20
-- 1 hands, matchPush+dealerSevens: returned 1.063086, profit 0.063086, shoes 20
-- 1 hands, aceFlash+matchPush+dealerSevens: returned 1.174845, profit 0.174845, shoes 20
-- 1 hands, dealerBust+matchPush+dealerSevens: returned 1.030453, profit 0.030453, shoes 20
-- 1 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 1.002225, profit 0.002225, shoes 20
-- 2 hands, main-only: returned 0.980494, profit -0.019506, shoes 20
-- 2 hands, aceFlash: returned 1.020481, profit 0.020481, shoes 20
-- 2 hands, dealerBust: returned 0.957003, profit -0.042997, shoes 20
-- 2 hands, aceFlash+dealerBust: returned 1.041600, profit 0.041600, shoes 20
-- 2 hands, matchPush: returned 1.008559, profit 0.008559, shoes 20
-- 2 hands, aceFlash+matchPush: returned 0.930372, profit -0.069628, shoes 20
-- 2 hands, dealerBust+matchPush: returned 1.041876, profit 0.041876, shoes 20
-- 2 hands, aceFlash+dealerBust+matchPush: returned 0.951356, profit -0.048644, shoes 20
-- 2 hands, dealerSevens: returned 1.179560, profit 0.179560, shoes 20
-- 2 hands, aceFlash+dealerSevens: returned 1.180996, profit 0.180996, shoes 20
-- 2 hands, dealerBust+dealerSevens: returned 1.144105, profit 0.144105, shoes 20
-- 2 hands, aceFlash+dealerBust+dealerSevens: returned 1.041082, profit 0.041082, shoes 20
-- 2 hands, matchPush+dealerSevens: returned 1.072173, profit 0.072173, shoes 20
-- 2 hands, aceFlash+matchPush+dealerSevens: returned 1.017508, profit 0.017508, shoes 20
-- 2 hands, dealerBust+matchPush+dealerSevens: returned 0.980333, profit -0.019667, shoes 20
-- 2 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 1.048312, profit 0.048312, shoes 20
-- 3 hands, main-only: returned 1.058294, profit 0.058294, shoes 20
-- 3 hands, aceFlash: returned 1.025942, profit 0.025942, shoes 20
-- 3 hands, dealerBust: returned 1.084864, profit 0.084864, shoes 20
-- 3 hands, aceFlash+dealerBust: returned 1.047411, profit 0.047411, shoes 20
-- 3 hands, matchPush: returned 0.994830, profit -0.005170, shoes 20
-- 3 hands, aceFlash+matchPush: returned 0.928291, profit -0.071709, shoes 20
-- 3 hands, dealerBust+matchPush: returned 1.025488, profit 0.025488, shoes 20
-- 3 hands, aceFlash+dealerBust+matchPush: returned 1.068956, profit 0.068956, shoes 20
-- 3 hands, dealerSevens: returned 1.043892, profit 0.043892, shoes 20
-- 3 hands, aceFlash+dealerSevens: returned 1.161097, profit 0.161097, shoes 20
-- 3 hands, dealerBust+dealerSevens: returned 0.979325, profit -0.020675, shoes 20
-- 3 hands, aceFlash+dealerBust+dealerSevens: returned 1.054294, profit 0.054294, shoes 20
-- 3 hands, matchPush+dealerSevens: returned 0.907867, profit -0.092133, shoes 20
-- 3 hands, aceFlash+matchPush+dealerSevens: returned 1.000614, profit 0.000614, shoes 20
-- 3 hands, dealerBust+matchPush+dealerSevens: returned 1.147256, profit 0.147256, shoes 20
-- 3 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 1.041475, profit 0.041475, shoes 20
+- 1 hands, main-only: returned 1.091035, profit 0.091035, shoes 20, penetration 0.725000, completed rounds/shoe 51.950
+- 1 hands, aceFlash: returned 1.039325, profit 0.039325, shoes 20, penetration 0.730929, completed rounds/shoe 52.550
+- 1 hands, dealerBust: returned 0.965366, profit -0.034634, shoes 20, penetration 0.734776, completed rounds/shoe 52.600
+- 1 hands, aceFlash+dealerBust: returned 1.041287, profit 0.041287, shoes 20, penetration 0.731891, completed rounds/shoe 52.750
+- 1 hands, matchPush: returned 0.996837, profit -0.003163, shoes 20, penetration 0.733494, completed rounds/shoe 52.650
+- 1 hands, aceFlash+matchPush: returned 1.032971, profit 0.032971, shoes 20, penetration 0.729006, completed rounds/shoe 52.900
+- 1 hands, dealerBust+matchPush: returned 1.081017, profit 0.081017, shoes 20, penetration 0.735417, completed rounds/shoe 52.600
+- 1 hands, aceFlash+dealerBust+matchPush: returned 1.025159, profit 0.025159, shoes 20, penetration 0.732372, completed rounds/shoe 52.400
+- 1 hands, dealerSevens: returned 1.077824, profit 0.077824, shoes 20, penetration 0.735096, completed rounds/shoe 52.450
+- 1 hands, aceFlash+dealerSevens: returned 1.086245, profit 0.086245, shoes 20, penetration 0.728846, completed rounds/shoe 51.800
+- 1 hands, dealerBust+dealerSevens: returned 1.067704, profit 0.067704, shoes 20, penetration 0.731410, completed rounds/shoe 52.200
+- 1 hands, aceFlash+dealerBust+dealerSevens: returned 1.056251, profit 0.056251, shoes 20, penetration 0.729006, completed rounds/shoe 52.050
+- 1 hands, matchPush+dealerSevens: returned 1.063086, profit 0.063086, shoes 20, penetration 0.727564, completed rounds/shoe 52.250
+- 1 hands, aceFlash+matchPush+dealerSevens: returned 1.174845, profit 0.174845, shoes 20, penetration 0.734455, completed rounds/shoe 52.900
+- 1 hands, dealerBust+matchPush+dealerSevens: returned 1.030453, profit 0.030453, shoes 20, penetration 0.732051, completed rounds/shoe 51.050
+- 1 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 1.002225, profit 0.002225, shoes 20, penetration 0.731410, completed rounds/shoe 51.100
+- 2 hands, main-only: returned 0.980494, profit -0.019506, shoes 20, penetration 0.733333, completed rounds/shoe 33.700
+- 2 hands, aceFlash: returned 1.020481, profit 0.020481, shoes 20, penetration 0.735897, completed rounds/shoe 33.850
+- 2 hands, dealerBust: returned 0.957003, profit -0.042997, shoes 20, penetration 0.730769, completed rounds/shoe 34.150
+- 2 hands, aceFlash+dealerBust: returned 1.041600, profit 0.041600, shoes 20, penetration 0.733173, completed rounds/shoe 34.200
+- 2 hands, matchPush: returned 1.008559, profit 0.008559, shoes 20, penetration 0.735417, completed rounds/shoe 34.250
+- 2 hands, aceFlash+matchPush: returned 0.930372, profit -0.069628, shoes 20, penetration 0.740545, completed rounds/shoe 34.500
+- 2 hands, dealerBust+matchPush: returned 1.041876, profit 0.041876, shoes 20, penetration 0.731731, completed rounds/shoe 33.600
+- 2 hands, aceFlash+dealerBust+matchPush: returned 0.951356, profit -0.048644, shoes 20, penetration 0.736378, completed rounds/shoe 33.550
+- 2 hands, dealerSevens: returned 1.179560, profit 0.179560, shoes 20, penetration 0.731090, completed rounds/shoe 34.200
+- 2 hands, aceFlash+dealerSevens: returned 1.180996, profit 0.180996, shoes 20, penetration 0.738141, completed rounds/shoe 34.200
+- 2 hands, dealerBust+dealerSevens: returned 1.144105, profit 0.144105, shoes 20, penetration 0.743109, completed rounds/shoe 34.200
+- 2 hands, aceFlash+dealerBust+dealerSevens: returned 1.041082, profit 0.041082, shoes 20, penetration 0.737981, completed rounds/shoe 33.750
+- 2 hands, matchPush+dealerSevens: returned 1.072173, profit 0.072173, shoes 20, penetration 0.736699, completed rounds/shoe 33.950
+- 2 hands, aceFlash+matchPush+dealerSevens: returned 1.017508, profit 0.017508, shoes 20, penetration 0.738141, completed rounds/shoe 34.050
+- 2 hands, dealerBust+matchPush+dealerSevens: returned 0.980333, profit -0.019667, shoes 20, penetration 0.731410, completed rounds/shoe 33.750
+- 2 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 1.048312, profit 0.048312, shoes 20, penetration 0.738622, completed rounds/shoe 34.350
+- 3 hands, main-only: returned 1.058294, profit 0.058294, shoes 20, penetration 0.737179, completed rounds/shoe 25.200
+- 3 hands, aceFlash: returned 1.025942, profit 0.025942, shoes 20, penetration 0.737500, completed rounds/shoe 25.350
+- 3 hands, dealerBust: returned 1.084864, profit 0.084864, shoes 20, penetration 0.741346, completed rounds/shoe 25.100
+- 3 hands, aceFlash+dealerBust: returned 1.047411, profit 0.047411, shoes 20, penetration 0.746154, completed rounds/shoe 25.600
+- 3 hands, matchPush: returned 0.994830, profit -0.005170, shoes 20, penetration 0.737179, completed rounds/shoe 25.400
+- 3 hands, aceFlash+matchPush: returned 0.928291, profit -0.071709, shoes 20, penetration 0.736058, completed rounds/shoe 25.600
+- 3 hands, dealerBust+matchPush: returned 1.025488, profit 0.025488, shoes 20, penetration 0.743590, completed rounds/shoe 25.550
+- 3 hands, aceFlash+dealerBust+matchPush: returned 1.068956, profit 0.068956, shoes 20, penetration 0.734615, completed rounds/shoe 24.800
+- 3 hands, dealerSevens: returned 1.043892, profit 0.043892, shoes 20, penetration 0.735737, completed rounds/shoe 24.600
+- 3 hands, aceFlash+dealerSevens: returned 1.161097, profit 0.161097, shoes 20, penetration 0.743429, completed rounds/shoe 25.550
+- 3 hands, dealerBust+dealerSevens: returned 0.979325, profit -0.020675, shoes 20, penetration 0.742788, completed rounds/shoe 25.400
+- 3 hands, aceFlash+dealerBust+dealerSevens: returned 1.054294, profit 0.054294, shoes 20, penetration 0.747917, completed rounds/shoe 26.050
+- 3 hands, matchPush+dealerSevens: returned 0.907867, profit -0.092133, shoes 20, penetration 0.737981, completed rounds/shoe 25.500
+- 3 hands, aceFlash+matchPush+dealerSevens: returned 1.000614, profit 0.000614, shoes 20, penetration 0.745192, completed rounds/shoe 25.200
+- 3 hands, dealerBust+matchPush+dealerSevens: returned 1.147256, profit 0.147256, shoes 20, penetration 0.745513, completed rounds/shoe 25.550
+- 3 hands, aceFlash+dealerBust+matchPush+dealerSevens: returned 1.041475, profit 0.041475, shoes 20, penetration 0.738301, completed rounds/shoe 24.850

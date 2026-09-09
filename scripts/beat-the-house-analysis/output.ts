@@ -39,10 +39,11 @@ export const formatOutput = (output: AnalysisOutput, format: 'json' | 'markdown'
         `- Path: ${output.result.path}`,
         `- Profiles: ${output.result.profiles.length}`,
         `- Match Push policy points: ${output.result.matchPushPolicy.length}`,
+        `- Density bins: below-0.75, 0.75-through-1.25, above-1.25 for black Aces, rank 2s, and rank 7s`,
         `- Runtime: ${output.execution.runtimeMs} ms`,
         ``,
         ...output.result.profiles.map(
           (profile) =>
-            `- ${profile.activeHands} hands, ${profile.name}: returned ${profile.statistics.meanReturned.toFixed(6)}, profit ${profile.statistics.meanProfit.toFixed(6)}, shoes ${profile.statistics.sampleSize}`,
+            `- ${profile.activeHands} hands, ${profile.name}: returned ${profile.statistics.meanReturned.toFixed(6)}, profit ${profile.statistics.meanProfit.toFixed(6)}, shoes ${profile.statistics.sampleSize}, penetration ${profile.persistentShoeEvidence.penetrationAtShuffle.mean.toFixed(6)}, completed rounds/shoe ${profile.persistentShoeEvidence.completedRoundsPerShoe.mean.toFixed(3)}`,
         ),
       ].join('\n');
