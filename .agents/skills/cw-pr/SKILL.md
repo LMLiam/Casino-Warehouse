@@ -94,6 +94,9 @@ Set the conventional title, body, base branch, and required labels.
 
 Inspect the resulting pull request with `gh pr view` and confirm that the
 title, labels, sections, checkboxes, and commands match the local validator.
+Inspect the live `labels` field. Confirm that it contains at least one
+`type:*` label and one `area:*` label. Do not infer labels from the create
+command or from the pull request body.
 
 ## CI Monitoring
 
