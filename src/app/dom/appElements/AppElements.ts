@@ -1,117 +1,27 @@
-export interface AppElements {
-  readonly setup: HTMLElement;
-  readonly shell: HTMLElement;
-  readonly connectionOverlay: HTMLElement;
-  readonly profileNameInput: HTMLInputElement;
-  readonly createProfileButton: HTMLButtonElement;
-  readonly profileList: HTMLDivElement;
-  readonly startSessionButton: HTMLButtonElement;
-  readonly saveStatus: HTMLElement;
-  readonly muteToggle: HTMLInputElement;
-  readonly masterVolume: HTMLInputElement;
-  readonly musicVolume: HTMLInputElement;
-  readonly effectsVolume: HTMLInputElement;
-  readonly dealingVolume: HTMLInputElement;
-  readonly chipsVolume: HTMLInputElement;
-  readonly slotsVolume: HTMLInputElement;
-  readonly winsVolume: HTMLInputElement;
-  readonly bonusVolume: HTMLInputElement;
-  readonly uiVolume: HTMLInputElement;
-  readonly ambienceVolume: HTMLInputElement;
-  readonly gameTabs: HTMLButtonElement[];
-  readonly playerStrip: HTMLDivElement;
-  readonly gameLobby: HTMLDivElement;
-  readonly houseAdvancePanel: HTMLDivElement;
-  readonly houseAdvanceButton: HTMLButtonElement;
-  readonly gameLobbyTiles: HTMLDivElement;
-  readonly roomLobby: HTMLDivElement;
-  readonly roomGameTitle: HTMLElement;
-  readonly roomGameDescription: HTMLElement;
-  readonly backToLobbyButton: HTMLButtonElement;
-  readonly switchProfileButton: HTMLButtonElement;
-  readonly sessionLimitInput: HTMLInputElement;
-  readonly sessionNotice: HTMLElement;
-  readonly roomNameInput: HTMLInputElement;
-  readonly roomMaxPlayersInput: HTMLInputElement;
-  readonly roomRefreshButton: HTMLButtonElement;
-  readonly hostRoomButton: HTMLButtonElement;
-  readonly leaveRoomButton: HTMLButtonElement;
-  readonly roomStatus: HTMLElement;
-  readonly roomMenu: HTMLDetailsElement;
-  readonly roomSeats: HTMLElement;
-  readonly roomBrowser: HTMLDivElement;
-  readonly tableHost: HTMLDivElement;
-  readonly beatSettlementAnnouncement: HTMLElement;
-  readonly beatSeatStatus: HTMLDivElement;
-  readonly beatShoeStatus: HTMLDivElement;
-  readonly beatShoeLabel: HTMLElement;
-  readonly beatShoeCounts: HTMLElement;
-  readonly beatShoeMeter: HTMLMeterElement;
-  readonly beatShoeCut: HTMLElement;
-  readonly beatShoeCue: HTMLElement;
-  readonly beatTableStatus: HTMLElement;
-  readonly blackjackView: HTMLDivElement;
-  readonly slotsView: HTMLDivElement;
-  readonly gameHud: HTMLDivElement;
-  readonly hudOverflowMenu: HTMLDetailsElement;
-  readonly walletStack: HTMLDivElement;
-  readonly moneyPill: HTMLDivElement;
-  readonly beatHalfChipIndicator: HTMLElement;
-  readonly actionDock: HTMLDivElement;
-  readonly bankroll: HTMLElement;
-  readonly bankrollDelta: HTMLElement;
-  readonly houseAdvancePill: HTMLElement;
-  readonly profileStats: HTMLElement;
-  readonly auditLog: HTMLDivElement;
-  readonly onTable: HTMLElement;
-  readonly log: HTMLDivElement;
-  readonly chipRail: HTMLDivElement;
-  readonly chipButtons: HTMLButtonElement[];
-  readonly beatControls: HTMLDivElement;
-  readonly blackjackControls: HTMLDivElement;
-  readonly slotsControls: HTMLDivElement;
-  readonly beatRules: HTMLElement;
-  readonly beatPaytable: HTMLElement;
-  readonly blackjackRules: HTMLElement;
-  readonly blackjackPaytable: HTMLElement;
-  readonly slotsRules: HTMLElement;
-  readonly slotsPaytable: HTMLElement;
-  readonly dealButton: HTMLButtonElement;
-  readonly nextButton: HTMLButtonElement;
-  readonly hitButton: HTMLButtonElement;
-  readonly stickButton: HTMLButtonElement;
-  readonly rebetButton: HTMLButtonElement;
-  readonly clearButton: HTMLButtonElement;
-  readonly addMoneyButton: HTMLButtonElement;
-  readonly subtractMoneyButton: HTMLButtonElement;
-  readonly resetMoneyButton: HTMLButtonElement;
-  readonly resetAllButton: HTMLButtonElement;
-  readonly clearSavesButton: HTMLButtonElement;
-  readonly layoutOverlayButton: HTMLButtonElement;
-  readonly adminTokenInput: HTMLInputElement;
-  readonly authorizeAdminButton: HTMLButtonElement;
-  readonly moneyInput: HTMLInputElement;
-  readonly blackjackWager: HTMLInputElement;
-  readonly blackjackDealButton: HTMLButtonElement;
-  readonly blackjackHitButton: HTMLButtonElement;
-  readonly blackjackStandButton: HTMLButtonElement;
-  readonly blackjackDoubleButton: HTMLButtonElement;
-  readonly blackjackSplitButton: HTMLButtonElement;
-  readonly blackjackInsuranceButton: HTMLButtonElement;
-  readonly blackjackNewButton: HTMLButtonElement;
-  readonly blackjackStatus: HTMLElement;
-  readonly blackjackPlayerCards: HTMLElement;
-  readonly blackjackDealerCards: HTMLElement;
-  readonly blackjackResult: HTMLElement;
-  readonly blackjackSeats: HTMLElement;
-  readonly slotsTitle: HTMLElement;
-  readonly slotsWager: HTMLInputElement;
-  readonly slotsWagerButton: HTMLButtonElement;
-  readonly slotsReadyButton: HTMLButtonElement;
-  readonly slotsSpinButton: HTMLButtonElement;
-  readonly bonusPickButtons: HTMLButtonElement[];
-  readonly slotsStatus: HTMLElement;
-  readonly slotReels: HTMLElement;
-  readonly slotsResult: HTMLElement;
-  readonly slotsRoomPlayers: HTMLElement;
-}
+import type { AudioElements } from './AudioElements';
+import type { BeatTableElements } from './BeatTableElements';
+import type { BlackjackElements } from './BlackjackElements';
+import type { DebugElements } from './DebugElements';
+import type { LayoutElements } from './LayoutElements';
+import type { ProfileElements } from './ProfileElements';
+import type { RoomElements } from './RoomElements';
+import type { SlotsElements } from './SlotsElements';
+import type { WalletElements } from './WalletElements';
+
+/**
+ * Complete typed DOM element interface for the Casino Warehouse app.
+ *
+ * This interface composes domain-focused element groups:
+ * - Layout elements for main shell and navigation
+ * - Profile elements for account management
+ * - Audio elements for sound settings
+ * - Room elements for multiplayer
+ * - Wallet elements for bankroll display
+ * - Game-specific elements (Beat, Blackjack, Slots)
+ * - Debug elements for admin functions
+ *
+ * Access elements through AppElements type-safe properties.
+ * This ensures type-safe DOM queries and guarantees element existence at runtime.
+ */
+export interface AppElements
+  extends AudioElements, BeatTableElements, BlackjackElements, DebugElements, LayoutElements, ProfileElements, RoomElements, SlotsElements, WalletElements {}
