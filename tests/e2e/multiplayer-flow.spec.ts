@@ -1,22 +1,18 @@
 import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { AddressInfo } from 'node:net';
-import type { Card } from '../../src/game/cards/Card';
 import type { JsonValue } from '../../src/schemas/casinoSchemas/JsonValue';
 import type { ProfileId } from '../../src/schemas/casinoSchemas/ProfileId';
-import { connectionIdSchema } from '../../src/schemas/casinoSchemas/connectionIdSchema';
 import { profileIdSchema } from '../../src/schemas/casinoSchemas/profileIdSchema';
 import { createCasinoServer, type CasinoRoomAuthority, type CasinoServer } from '../../src/multiplayer/serverEntry';
-import { RoomAuthority } from '../../src/multiplayer/roomAuthority';
-import type { ClientMessage } from '../../src/multiplayer/protocol/ClientMessage';
-import type { AuthorityResult } from '../../src/multiplayer/roomAuthorityModel/AuthorityResult';
-import type { RoomState } from '../../src/multiplayer/roomAuthorityModel/RoomState';
-import { handIds } from '../../src/game/types/handIds';
-import { totalBeatStake } from '../../src/multiplayer/roomAuthorityModel/totalBeatStake';
 import { createMemoryServerDataStore } from '../../src/state/serverDataStore/createMemoryServerDataStore';
 import type { ServerDataStore } from '../../src/state/serverDataStore/ServerDataStore';
 import { createSessionState } from '../../src/state/session/createSessionState';
 import { profileTokenAuth } from '../../src/state/serverDataStore/profileTokenAuth';
-import { createDeterministicBeatTheHouseShoe } from '../unit/game/createDeterministicBeatTheHouseShoe';
+import { BeatTheHouseE2EAuthority } from './support/beatTheHouseE2eFixture';
+
+const beatMainLeftXPercent = 19.25;
+const beatTableYPercent = 70.55;
+const beatMainRightXPercent = 80.85;
 
 // Every test owns a realtime server on an ephemeral port plus fresh browser contexts,
 // so tests are isolation-safe across parallel workers (#88).
@@ -262,7 +258,7 @@ test('Beat the House multiplayer waits for player readiness before deal and next
     await expect(alice.locator('#roomSeats')).toContainText('Centre: Ready Bob', { timeout: 10_000 });
 
     await alice.getByLabel('£25 chip').click();
-    await dropChipPercent(alice, 19.25, 70.55, 25);
+    await dropChipPercent(alice, beatMainLeftXPercent, beatTableYPercent, 25);
     await expect.poll(async () => (await parsedDataset(alice, 'activeMainBets')).includes('left'), { timeout: 10_000 }).toBe(true);
 
     await alice.locator('#dealBtn').click();
@@ -313,7 +309,7 @@ test('Beat the House side-bet cap blocks oversized drops and shows stale rejecti
     await expect(page.locator('#beatTableStatus')).toBeHidden();
 
     await page.getByLabel('£25 chip').click();
-    await dropChipPercent(page, 19.25, 70.55, 25);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 25);
     await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left'), { timeout: 10_000 }).toBe(true);
 
     await dropChipPercent(page, 29.7, 44.2, 25);
@@ -324,7 +320,7 @@ test('Beat the House side-bet cap blocks oversized drops and shows stale rejecti
     await page.waitForTimeout(500);
     expect(await tableAmount(page)).toBe(bankrollAfterFullSide);
 
-    await dropChipPercent(page, 19.25, 70.55, 5);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 5);
     await expect.poll(() => tableAmount(page), { timeout: 10_000 }).toBeGreaterThan(bankrollAfterFullSide);
 
     await dropChipPercent(page, 29.7, 44.2, 5);
@@ -361,8 +357,8 @@ test('Beat the House side-bet cap blocks oversized drops and shows stale rejecti
 });
 
 const beatActionDockSeatScenarios = [
-  { seatLabel: 'Left', activeMainBet: 'left', chipXPercent: 19.25 },
-  { seatLabel: 'Right', activeMainBet: 'right', chipXPercent: 80.85 },
+  { seatLabel: 'Left', activeMainBet: 'left', chipXPercent: beatMainLeftXPercent },
+  { seatLabel: 'Right', activeMainBet: 'right', chipXPercent: beatMainRightXPercent },
 ] as const;
 
 for (const scenario of beatActionDockSeatScenarios) {
@@ -380,7 +376,7 @@ for (const scenario of beatActionDockSeatScenarios) {
       await claimRoomSeat(page, scenario.seatLabel);
 
       await page.getByLabel('£25 chip').click();
-      await dropChipPercent(page, scenario.chipXPercent, 70.55, 25);
+      await dropChipPercent(page, scenario.chipXPercent, beatTableYPercent, 25);
       await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes(scenario.activeMainBet), { timeout: 10_000 }).toBe(true);
       await expectActionDockAnchoredToMineSeat(page, '#dealBtn');
       await expectActionDockAnchoredToMineSeat(page, '#clearBtn');
@@ -431,7 +427,7 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
 
     await page.getByLabel('£25 chip').click();
     await expect(page.getByLabel('£25 chip')).toHaveClass(/selected/);
-    await dropChipPercent(page, 19.25, 70.55, 25);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 25);
     await expect(page.locator('.seat-status-pill.mine')).toContainText('£975 (-£25)');
     await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left')).toBe(true);
     await dropChipPercent(page, 26.25, 71.6, 25);
@@ -499,7 +495,7 @@ test('Beat the House table keeps per-hand popups, side-bet labels, deal order, a
     await expect.poll(async () => (await parsedDataset(page, 'dealerThanksRewards')).length).toBe(0);
     await expect(page.locator('#chipRail')).toBeVisible();
 
-    await dropChipPercent(page, 19.25, 70.55, 25);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 25);
     await dropChipPercent(page, 29.7, 44.2, 25);
     await page.locator('#dealBtn').click();
     for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -536,9 +532,13 @@ test('Beat the House win popup includes House Advance repayment from authoritati
   const profileId = profileIdSchema.parse(profileAuth.profileId);
   dataStore.setProfileBankroll(profileId, 0);
   dataStore.acceptHouseAdvance(profileId);
-  const authority = new RiggedBeatRoundAuthority(dataStore, [
-    { rank: 'A', suit: 'spades' },
-    { rank: 'A', suit: 'hearts' },
+  const authority = new BeatTheHouseE2EAuthority(dataStore, [
+    {
+      dealOrder: [
+        { rank: 'A', suit: 'spades' },
+        { rank: 'A', suit: 'hearts' },
+      ],
+    },
   ]);
   const wsUrl = await startRealtimeServerWithStore(dataStore, 0, authority);
   const context = await newPlayerContext(browser, wsUrl, profileAuth);
@@ -553,7 +553,7 @@ test('Beat the House win popup includes House Advance repayment from authoritati
     await claimRoomSeat(page, 'Left');
 
     await page.getByLabel('£25 chip').click();
-    await dropChipPercent(page, 19.25, 70.55, 25);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 25);
     await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left')).toBe(true);
     await page.locator('#dealBtn').click();
 
@@ -576,9 +576,13 @@ test('Beat the House displays exact half credits and consolidates the profile re
   if (!profileAuth) {
     throw new Error('Expected seeded half-credit profile auth.');
   }
-  const authority = new RiggedBeatRoundAuthority(dataStore, [
-    { rank: 'A', suit: 'spades' },
-    { rank: 'K', suit: 'hearts' },
+  const authority = new BeatTheHouseE2EAuthority(dataStore, [
+    {
+      dealOrder: [
+        { rank: 'A', suit: 'spades' },
+        { rank: 'K', suit: 'hearts' },
+      ],
+    },
   ]);
   const wsUrl = await startRealtimeServerWithStore(dataStore, 0, authority);
   const context = await newPlayerContext(browser, wsUrl, profileAuth);
@@ -592,7 +596,7 @@ test('Beat the House displays exact half credits and consolidates the profile re
     await claimRoomSeat(page, 'Left');
 
     await page.getByLabel('£1 chip').click();
-    await dropChipPercent(page, 19.25, 70.55, 1);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 1);
     await expect.poll(async () => (await parsedDataset(page, 'activeMainBets')).includes('left')).toBe(true);
     await page.locator('#dealBtn').click();
 
@@ -606,7 +610,7 @@ test('Beat the House displays exact half credits and consolidates the profile re
     await page.locator('#nextBtn').click();
     await expect(page.locator('#chipRail')).toBeVisible();
     await page.getByLabel('£1 chip').click();
-    await dropChipPercent(page, 19.25, 70.55, 1);
+    await dropChipPercent(page, beatMainLeftXPercent, beatTableYPercent, 1);
     await page.locator('#dealBtn').click();
 
     await expect.poll(() => page.locator('#tableHost').evaluate((element) => element.dataset.settlementVisible), { timeout: 10_000 }).toBe('true');
@@ -958,42 +962,3 @@ const expectSlotReelsUseSymbolImages = async (page: Page): Promise<void> => {
       ]),
     );
 };
-
-class RiggedBeatRoundAuthority extends RoomAuthority {
-  public constructor(
-    dataStore: ServerDataStore,
-    private readonly dealOrder: readonly Card[],
-  ) {
-    super(dataStore);
-  }
-
-  public override handle(connectionId: string, message: ClientMessage): AuthorityResult {
-    if (message.type !== 'start-round') {
-      return super.handle(connectionId, message);
-    }
-    const room = this.roomForConnection(connectionId);
-    if (room?.model.kind !== 'beat-the-house') {
-      return super.handle(connectionId, message);
-    }
-    const before = room.model.game.snapshot();
-    room.model.game.restoreState({
-      ...room.model.game.saveState(),
-      shoe: createDeterministicBeatTheHouseShoe({ dealOrder: this.dealOrder }).saveState(),
-    });
-    room.beatHandOwners = {};
-    for (const handId of handIds) {
-      const ownerProfileId = room.seats.get(handId);
-      if (ownerProfileId && totalBeatStake(before, handId) > 0) {
-        room.beatHandOwners[handId] = ownerProfileId;
-      }
-    }
-    const snapshot = room.model.game.deal();
-    room.lastBeatEvents = snapshot.lastEvents;
-    const settlements = snapshot.phase === 'roundOver' && before.phase !== 'roundOver' ? this.settleBeat(room, snapshot) : [];
-    return this.broadcast(room, settlements);
-  }
-
-  private roomForConnection(connectionId: string): RoomState | undefined {
-    return [...this.rooms.values()].find((room) => room.connectionToMember.has(connectionIdSchema.parse(connectionId)));
-  }
-}
