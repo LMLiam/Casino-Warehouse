@@ -152,6 +152,7 @@ export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
 
   private resetServerManagedRoomState(room: RoomState): void {
     room.seats.clear();
+    room.socialEvents = [];
     room.settledSessionIds.clear();
     room.lastBeatEvents = [];
     room.lastBeatBetOwners = {};

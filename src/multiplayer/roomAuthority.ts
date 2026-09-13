@@ -8,8 +8,10 @@ import type { RoomGameId } from './protocol/RoomGameId';
 import type { RoomPlayer } from './protocol/RoomPlayer';
 import type { RoomRole } from './protocol/RoomRole';
 import type { RoomSeatId } from './protocol/RoomSeatId';
+import type { RoomSocialEvent } from './protocol/RoomSocialEvent';
 import type { RoomSnapshot } from './protocol/RoomSnapshot';
 import type { RoomSummary } from './protocol/RoomSummary';
+import { maxRoomSocialEvents } from './protocol/maxRoomSocialEvents';
 import { normalizeRoomMaxPlayers } from './roomLimits/normalizeRoomMaxPlayers';
 import { RoomAuthorityBeat } from './roomAuthorityBeat';
 import type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
@@ -52,6 +54,10 @@ export class RoomAuthority extends RoomAuthorityBeat {
         return this.leaveRoom(room, connectionId);
       case 'resync':
         return { broadcasts: [], settlements: [], direct: this.snapshot(room) };
+      case 'send-room-chat':
+        return this.appendSocialEvent(room, member, { kind: 'chat', text: message.text });
+      case 'send-room-reaction':
+        return this.appendSocialEvent(room, member, { kind: 'reaction', reaction: message.reaction });
       case 'assign-seat':
         return this.assignSeat(room, member.profileId, message.seatId);
       case 'place-chip':
@@ -117,6 +123,39 @@ export class RoomAuthority extends RoomAuthorityBeat {
 
   public clearRooms(reason: string): AuthorityResult {
     return this.clearAllRooms(reason);
+  }
+
+  private appendSocialEvent(
+    room: RoomState,
+    member: { readonly profileId: ProfileId; readonly role: RoomRole },
+    content:
+      | Pick<Extract<RoomSocialEvent, { readonly kind: 'chat' }>, 'kind' | 'text'>
+      | Pick<Extract<RoomSocialEvent, { readonly kind: 'reaction' }>, 'kind' | 'reaction'>,
+  ): AuthorityResult {
+    const player = room.players.get(member.profileId) ?? room.spectators.get(member.profileId);
+    if (!player) {
+      return this.error('Connection is not a room member.');
+    }
+    const event = {
+      ...content,
+      profileId: member.profileId,
+      profileName: player.profileName,
+      role: member.role,
+      createdAt: Date.now(),
+    } satisfies RoomSocialEvent;
+    room.socialEvents.push(event);
+    if (room.socialEvents.length > maxRoomSocialEvents) {
+      room.socialEvents.splice(0, room.socialEvents.length - maxRoomSocialEvents);
+    }
+    return {
+      broadcasts: [],
+      settlements: [],
+      socialEvent: {
+        roomId: room.roomId,
+        event,
+        connectionIds: [...room.connectionToMember.keys()],
+      },
+    };
   }
 
   private createRoom(connectionId: ConnectionId, message: Extract<ClientMessage, { type: 'create-room' }>): AuthorityResult {

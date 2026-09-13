@@ -7,6 +7,7 @@ import { parseClientMessage } from '../../../src/multiplayer/protocol/parseClien
 import type { AuthorityResult } from '../../../src/multiplayer/roomAuthorityModel/AuthorityResult';
 import type { RoomGameId } from '../../../src/multiplayer/protocol/RoomGameId';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import { maxRoomSocialEvents } from '../../../src/multiplayer/protocol/maxRoomSocialEvents';
 import type { RoomState } from '../../../src/multiplayer/roomAuthorityModel/RoomState';
 import { serverMessageSchema } from '../../../src/schemas/protocol/serverMessageSchema';
 import { createMemoryServerDataStore } from '../../../src/state/serverDataStore/createMemoryServerDataStore';
@@ -78,6 +79,12 @@ const join = (gameId: RoomGameId, roomId: string, profileId: string, bankroll = 
 });
 
 const claimSeat = (seatId: string): ClientMessage => ({ type: 'assign-seat', seatId: testRoomSeatId(seatId) });
+const sendChat = (text: string): ClientMessage => ({ type: 'send-room-chat', text });
+const sendReaction = (reaction: Extract<ClientMessage, { type: 'send-room-reaction' }>['reaction']): ClientMessage => ({
+  type: 'send-room-reaction',
+  reaction,
+});
+const roomReactions = ['nice', 'cheer', 'laugh', 'wow', 'ouch', 'gg'] as const;
 
 const beat = (room: RoomSnapshot): GameSnapshot => room.game as GameSnapshot;
 const blackjack = (room: RoomSnapshot): BlackjackTableSnapshot => room.game as BlackjackTableSnapshot;
@@ -245,6 +252,8 @@ describe('per-game room authority', () => {
     const joined = requireBroadcast(authority.handle('a', join('beat-the-house', mainBeatRoomId, 'alice', 500)));
     expect(joined.players).toEqual([]);
     expect(joined.spectators.map((player) => player.profileId)).toEqual(['alice']);
+    const temporaryEvent = authority.handle('a', sendChat('Temporary main-room history'));
+    expect(temporaryEvent.socialEvent?.event).toMatchObject({ kind: 'chat', text: 'Temporary main-room history' });
     const seated = requireBroadcast(authority.handle('a', claimSeat('left')));
     expect(seated.players.map((player) => player.profileId)).toEqual(['alice']);
     expect(seated.seats.find((seat) => seat.seatId === 'left')?.profileId).toBe('alice');
@@ -263,6 +272,7 @@ describe('per-game room authority', () => {
     expect(afterLeave.spectators).toEqual([]);
     expect(afterLeave.status).toBe('waiting');
     expect(afterLeave.seats.every((seat) => !seat.profileId)).toBe(true);
+    expect(afterLeave.socialEvents).toEqual([]);
     expect(beat(afterLeave).bets.left.main).toBe(0);
     const resetState = roomStateForTest(authority, mainBeatRoomId);
     if (resetState.model.kind !== 'beat-the-house') {
@@ -275,6 +285,122 @@ describe('per-game room authority', () => {
     authority.handle('b', join('beat-the-house', mainBeatRoomId, 'bob', 500));
     const rejoined = requireBroadcast(authority.handle('b', claimSeat('left')));
     expect(rejoined.seats.find((seat) => seat.seatId === 'left')?.profileId).toBe('bob');
+  });
+
+  it('authorises chat and reactions for current players and spectators', () => {
+    const authority = new RoomAuthority();
+    const roomId = requireDirect(authority.handle('host', create('beat-the-house', 'host'))).roomId;
+    authority.handle('player', join('beat-the-house', roomId, 'player'));
+    authority.handle('spectator', join('beat-the-house', roomId, 'spectator', 500, 'spectator'));
+    authority.handle('host', claimSeat('left'));
+    const otherRoomId = requireDirect(authority.handle('other', create('beat-the-house', 'other'))).roomId;
+    authority.handle('other-player', join('beat-the-house', otherRoomId, 'other-player'));
+
+    const before = requireDirect(authority.handle('host', { type: 'resync' }));
+    const expectedConnectionIds = ['host', 'player', 'spectator'];
+    const now = vi.spyOn(Date, 'now').mockReturnValue(123_456);
+    try {
+      const playerChat = authority.handle('host', sendChat('Player chat'));
+      expect(playerChat).toEqual({
+        broadcasts: [],
+        settlements: [],
+        socialEvent: {
+          roomId,
+          event: { kind: 'chat', profileId: 'host', profileName: 'HOST', role: 'player', createdAt: 123_456, text: 'Player chat' },
+          connectionIds: expectedConnectionIds,
+        },
+      });
+
+      const spectatorChat = authority.handle('spectator', sendChat('Spectator chat'));
+      expect(spectatorChat.socialEvent).toEqual({
+        roomId,
+        event: { kind: 'chat', profileId: 'spectator', profileName: 'SPECTATOR', role: 'spectator', createdAt: 123_456, text: 'Spectator chat' },
+        connectionIds: expectedConnectionIds,
+      });
+
+      for (const reaction of roomReactions) {
+        const result = authority.handle('host', sendReaction(reaction));
+        expect(result.broadcasts).toEqual([]);
+        expect(result.settlements).toEqual([]);
+        expect(result.direct).toBeUndefined();
+        expect(result.socialEvent).toEqual({
+          roomId,
+          event: { kind: 'reaction', profileId: 'host', profileName: 'HOST', role: 'player', createdAt: 123_456, reaction },
+          connectionIds: expectedConnectionIds,
+        });
+      }
+
+      const spectatorReaction = authority.handle('spectator', sendReaction('gg'));
+      expect(spectatorReaction.socialEvent).toEqual({
+        roomId,
+        event: { kind: 'reaction', profileId: 'spectator', profileName: 'SPECTATOR', role: 'spectator', createdAt: 123_456, reaction: 'gg' },
+        connectionIds: expectedConnectionIds,
+      });
+
+      const after = requireDirect(authority.handle('host', { type: 'resync' }));
+      expect(after.revision).toBe(before.revision);
+      expect(after.updatedAt).toBe(before.updatedAt);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('uses current member identity without rewriting historical events', () => {
+    const store = createMemoryServerDataStore();
+    const authority = new RoomAuthority(store);
+    const roomId = requireDirect(authority.handle('host', create('beat-the-house', 'host'))).roomId;
+
+    const beforeRoleChange = authority.handle('host', sendChat('Before role change'));
+    expect(beforeRoleChange.socialEvent?.event).toMatchObject({ profileId: 'host', profileName: 'HOST', role: 'spectator' });
+
+    authority.handle('host', claimSeat('left'));
+    store.renameProfile(testProfileId('host'), 'Renamed Host');
+    authority.reconcileProfiles('profile renamed');
+
+    const afterRoleChange = authority.handle('host', sendChat('After role change'));
+    expect(afterRoleChange.socialEvent?.event).toMatchObject({ profileId: 'host', profileName: 'Renamed Host', role: 'player' });
+
+    const snapshot = requireDirect(authority.handle('host', { type: 'resync' }));
+    expect(snapshot.roomId).toBe(roomId);
+    expect(snapshot.socialEvents).toEqual([beforeRoleChange.socialEvent?.event, afterRoleChange.socialEvent?.event]);
+  });
+
+  it('rejects social actions from lobby and stale room connections', () => {
+    const authority = new RoomAuthority();
+    expect(authority.handle('lobby', sendChat('Not in a room'))).toEqual({ broadcasts: [], settlements: [], error: 'Join a game room first.' });
+    expect(authority.handle('lobby', sendReaction('nice'))).toEqual({ broadcasts: [], settlements: [], error: 'Join a game room first.' });
+
+    const roomId = requireDirect(authority.handle('stale', create('beat-the-house', 'stale'))).roomId;
+    expect(authority.handle('stale', { type: 'leave-room' })).toEqual({ broadcasts: [], settlements: [] });
+    expect(authority.listRooms('beat-the-house').some((room) => room.roomId === roomId)).toBe(false);
+    expect(authority.handle('stale', sendChat('No longer in a room'))).toEqual({ broadcasts: [], settlements: [], error: 'Join a game room first.' });
+  });
+
+  it('keeps only the newest 50 social events in state and snapshots', () => {
+    const authority = new RoomAuthority();
+    const roomId = requireDirect(authority.handle('host', create('beat-the-house', 'host'))).roomId;
+
+    for (let index = 0; index <= maxRoomSocialEvents; index += 1) {
+      expect(authority.handle('host', sendChat(`Event ${index}`)).socialEvent).toBeDefined();
+    }
+
+    const state = roomStateForTest(authority, roomId);
+    expect(state.socialEvents).toHaveLength(maxRoomSocialEvents);
+    expect(state.socialEvents.map((event) => (event.kind === 'chat' ? event.text : event.reaction))).toEqual(
+      Array.from({ length: maxRoomSocialEvents }, (_, index) => `Event ${index + 1}`),
+    );
+
+    const snapshot = requireDirect(authority.handle('host', { type: 'resync' }));
+    expect(snapshot.socialEvents).toEqual(state.socialEvents);
+  });
+
+  it('removes social history when a user-managed room is destroyed', () => {
+    const authority = new RoomAuthority();
+    const roomId = requireDirect(authority.handle('host', create('beat-the-house', 'host'))).roomId;
+    expect(authority.handle('host', sendChat('Room history'))).toMatchObject({ socialEvent: { roomId } });
+
+    expect(authority.handle('host', { type: 'leave-room' })).toEqual({ broadcasts: [], settlements: [] });
+    expect(authority.listRooms().some((room) => room.roomId === roomId)).toBe(false);
   });
 
   it('does not clear a server-managed room before unresolved settlement recovery succeeds', () => {
@@ -715,6 +841,8 @@ describe('per-game room authority', () => {
     authority.handle('a', claimSeat('left'));
     authority.handle('a', { type: 'place-chip', seatId: 'left', betType: 'main', amount: 25 });
     authority.handle('a', { type: 'start-round' });
+    const social = authority.handle('a', sendChat('Keep this history'));
+    expect(social.socialEvent?.event).toMatchObject({ kind: 'chat', text: 'Keep this history' });
 
     const consumedState = roomStateForTest(authority, roomId);
     if (consumedState.model.kind !== 'beat-the-house') {
@@ -731,6 +859,7 @@ describe('per-game room authority', () => {
     expect(beat(reset).shoe).toEqual({ cardsRemaining: 312, cardsDealt: 0, totalCards: 312, cutCardReached: false });
     expect(resetState.model.game.saveState().shoe.remainingCards).toHaveLength(312);
     expect(resetState.model.game.saveState().shoe.shufflePending).toBe(false);
+    expect(reset.socialEvents).toEqual([social.socialEvent?.event]);
   });
 
   it('covers Beat the House clear, rebet, turn, next-round, and wrong-game action branches', () => {
