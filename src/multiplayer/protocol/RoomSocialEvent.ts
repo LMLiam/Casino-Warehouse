@@ -1,6 +1,5 @@
-import type { z } from 'zod';
 import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
-import type { roomReactionSchema } from '../../schemas/casinoSchemas/roomReactionSchema';
+import type { RoomReaction } from './RoomReaction';
 import type { RoomRole } from './RoomRole';
 
 export type RoomSocialEvent =
@@ -18,5 +17,5 @@ export type RoomSocialEvent =
       readonly profileName: string;
       readonly role: RoomRole;
       readonly createdAt: number;
-      readonly reaction: z.infer<typeof roomReactionSchema>;
+      readonly reaction: RoomReaction;
     };

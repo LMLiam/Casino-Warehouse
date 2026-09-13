@@ -130,8 +130,27 @@ export const renderTemplate = (): string => `
                 <div id="playerStrip" class="player-strip" aria-label="Active profile"></div>
               </details>
               <details id="roomMenu" class="hud-overflow-section room-menu hidden" data-hud-section="room">
-                <summary>Room</summary>
+                <summary>
+                  <span class="room-menu-summary-label">Room</span>
+                  <span id="roomSocialUnread" class="room-social-unread" hidden aria-live="polite">0</span>
+                </summary>
                 <div id="roomSeats" class="room-seats">No active room.</div>
+                <section class="room-social" aria-label="Room social activity">
+                  <div id="roomSocialFeed" class="room-social-feed" role="log" aria-label="Room activity" aria-live="polite"></div>
+                  <div id="roomReactions" class="room-reactions" role="group" aria-label="Quick reactions">
+                    <button type="button" data-room-reaction="nice" aria-label="Nice" title="Nice">🔥</button>
+                    <button type="button" data-room-reaction="cheer" aria-label="Applause" title="Applause">👏</button>
+                    <button type="button" data-room-reaction="laugh" aria-label="Laugh" title="Laugh">😂</button>
+                    <button type="button" data-room-reaction="wow" aria-label="Wow" title="Wow">😮</button>
+                    <button type="button" data-room-reaction="ouch" aria-label="Ouch" title="Ouch">😬</button>
+                    <button type="button" data-room-reaction="gg" aria-label="Good game" title="Good game">🤝</button>
+                  </div>
+                  <form id="roomChatForm" class="room-chat-form" novalidate>
+                    <label class="sr-only" for="roomChatInput">Room message</label>
+                    <input id="roomChatInput" class="room-chat-input" type="text" maxlength="280" autocomplete="off" placeholder="Message the room" />
+                    <button type="submit">Send</button>
+                  </form>
+                </section>
               </details>
               <details class="hud-overflow-section stats-menu" data-hud-section="stats">
                 <summary>Stats</summary>

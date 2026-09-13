@@ -30,6 +30,7 @@ import { PlayerStripView } from '../views/PlayerStripView';
 import { ProfileSetupView } from '../views/ProfileSetupView';
 import { RoomBrowserView } from '../views/RoomBrowserView';
 import { RoomSeatsView } from '../views/RoomSeatsView';
+import { RoomSocialView } from '../views/RoomSocialView';
 import { RulesMenuView } from '../views/RulesMenuView';
 import { SlotsView } from '../views/SlotsView';
 import { WalletView } from '../views/WalletView';
@@ -47,6 +48,7 @@ export abstract class GameAppRendering {
   protected abstract readonly profileSetupView: ProfileSetupView;
   protected abstract readonly roomBrowserView: RoomBrowserView;
   protected abstract readonly roomSeatsView: RoomSeatsView;
+  protected abstract readonly roomSocialView: RoomSocialView;
   protected abstract readonly rulesMenuView: RulesMenuView;
   protected abstract readonly slotsView: SlotsView;
   protected abstract readonly walletView: WalletView;
@@ -77,6 +79,7 @@ export abstract class GameAppRendering {
   protected renderMultiplayerRoom(): void {
     const room = this.multiplayer.room;
     if (!room) {
+      this.roomSocialView.clear();
       this.roomSeatsView.clear();
       this.beatControlsView.clearPending();
       this.beatSeatStatusView.clear();
@@ -84,6 +87,7 @@ export abstract class GameAppRendering {
       this.beatTableStatusView.clear();
       return;
     }
+    this.roomSocialView.render(room.roomId, room.socialEvents);
     this.roomSeatsView.render(room, this.currentPlayer?.profileId, (seatId) => this.claimRoomSeat(seatId));
     if (room.gameId === 'beat-the-house' && isBeatSnapshot(room.game)) {
       const profileId = this.currentPlayer?.profileId;
@@ -126,6 +130,7 @@ export abstract class GameAppRendering {
   protected renderCasino(): void {
     const player = this.currentPlayer;
     if (!player) {
+      this.roomSocialView.clear();
       this.walletView.clear();
       this.elements.beatSettlementAnnouncement.textContent = '';
       this.beatShoeStatusView.hide();
@@ -140,6 +145,9 @@ export abstract class GameAppRendering {
     const isBlackjack = activeCatalogGame.kind === 'blackjack';
     const isSlots = activeCatalogGame.kind === 'slots';
     const activeRoom = this.activeRoomForGame();
+    if (!activeRoom) {
+      this.roomSocialView.clear();
+    }
     const roomPlayer = activeRoom?.players.find((candidate) => candidate.profileId === player.profileId);
     const roomMember = roomPlayer ?? activeRoom?.spectators.find((candidate) => candidate.profileId === player.profileId);
     const hasActiveRoomSeat = Boolean(activeRoom?.seats.some((seat) => seat.profileId === player.profileId));

@@ -5,6 +5,9 @@ import { defaultRealtimeUrl } from '../../../src/multiplayer/client/defaultRealt
 import { MultiplayerClient } from '../../../src/multiplayer/client/MultiplayerClient';
 import type { MultiplayerClientEvents } from '../../../src/multiplayer/client/MultiplayerClientEvents';
 import { profileTokensStorageKey } from '../../../src/multiplayer/client/profileTokensStorageKey';
+import { maxRoomSocialEvents } from '../../../src/multiplayer/protocol/maxRoomSocialEvents';
+import type { RoomReaction } from '../../../src/multiplayer/protocol/RoomReaction';
+import type { RoomSocialEvent } from '../../../src/multiplayer/protocol/RoomSocialEvent';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 import { profileStoreContractFixtures } from '../schemas/schema-contract-fixtures';
@@ -269,6 +272,14 @@ describe('multiplayer realtime client reconnect reloads', () => {
     socket.serverMessage({ type: 'admin-access', authorized: true });
     socket.rawMessage('{broken');
     expect(events.onError).toHaveBeenCalledWith('Received an invalid server message.');
+    socket.rawMessage(
+      JSON.stringify({
+        type: 'room-social-event',
+        roomId: room42,
+        event: { kind: 'chat', profileId: profileA, profileName: 'Alice', role: 'player', createdAt: 1, text: 'Hello', extra: 'reject' },
+      }),
+    );
+    expect(events.onError).toHaveBeenCalledWith('Received an invalid server message.');
 
     socket.serverMessage({ type: 'error', code: 'connected', message: 'Connected.' });
     expect(events.onStatus).toHaveBeenCalledWith('Connected.');
@@ -297,6 +308,11 @@ describe('multiplayer realtime client reconnect reloads', () => {
     client.joinRoom('beat-the-house', room42, 'player', profileA, 'Alice', 1000);
     client.deleteProfile(profileA);
     client.leaveRoom();
+    expect(client.sendRoomChat('Hello room')).toBe(true);
+    client.sendRoomReaction('nice');
+
+    expect(JSON.parse(socket.sent.at(-2) ?? '{}')).toEqual({ type: 'send-room-chat', text: 'Hello room' });
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({ type: 'send-room-reaction', reaction: 'nice' });
 
     expect(socket.sent.map((payload) => JSON.parse(payload).type)).toEqual(
       expect.arrayContaining([
@@ -313,8 +329,61 @@ describe('multiplayer realtime client reconnect reloads', () => {
         'create-room',
         'join-room',
         'leave-room',
+        'send-room-chat',
+        'send-room-reaction',
       ]),
     );
+  });
+
+  it('updates matching room social history, ignores other rooms, and replaces history from snapshots', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    vi.stubGlobal('window', {
+      clearInterval,
+      clearTimeout,
+      location: { href: 'http://casino.test/', host: 'casino.test', protocol: 'http:' },
+      setInterval,
+      setTimeout,
+    });
+
+    const events = createEvents();
+    const client = new MultiplayerClient(events);
+    client.connect('ws://casino.test/ws');
+    const socket = requireSocket(0);
+    socket.open();
+    const room = createRoomSnapshot();
+    socket.serverMessage({ type: 'room-created', room, invitePath: '/?game=beat-the-house&room=ROOM42' });
+    const initialRoom = client.room;
+    const firstEvent = createChatEvent('First message');
+
+    socket.serverMessage({ type: 'room-social-event', roomId: room.roomId, event: firstEvent });
+
+    expect(client.room).not.toBe(initialRoom);
+    expect(client.room?.socialEvents).toEqual([firstEvent]);
+    expect(events.onRoomSocialEvent).toHaveBeenCalledWith(room.roomId, firstEvent);
+
+    const otherRoomEvent = createReactionEvent('nice');
+    socket.serverMessage({ type: 'room-social-event', roomId: testRoomId('OTHER'), event: otherRoomEvent });
+
+    expect(client.room?.socialEvents).toEqual([firstEvent]);
+    expect(events.onRoomSocialEvent).toHaveBeenCalledOnce();
+
+    const overflowEvents = Array.from({ length: maxRoomSocialEvents + 1 }, (_, index) => createChatEvent(`Event ${index + 1}`));
+    overflowEvents.forEach((event) => {
+      socket.serverMessage({ type: 'room-social-event', roomId: room.roomId, event });
+    });
+
+    expect(client.room?.socialEvents).toEqual(overflowEvents.slice(-maxRoomSocialEvents));
+    expect(events.onRoomSocialEvent).toHaveBeenCalledTimes(maxRoomSocialEvents + 2);
+
+    const replacementEvent = createChatEvent('Snapshot history');
+    socket.serverMessage({
+      type: 'room-state',
+      room: { ...room, revision: 2, socialEvents: [replacementEvent] },
+    });
+
+    expect(client.room?.socialEvents).toEqual([replacementEvent]);
+    expect(events.onRoomSocialEvent).toHaveBeenCalledTimes(maxRoomSocialEvents + 2);
   });
 
   it('clears invalid saved realtime URLs before falling back to the current host', () => {
@@ -643,6 +712,7 @@ const createEvents = (): MultiplayerClientEvents => ({
   onDataState: vi.fn(),
   onError: vi.fn(),
   onRoom: vi.fn(),
+  onRoomSocialEvent: vi.fn(),
   onRoomCleared: vi.fn(),
   onRoomList: vi.fn(),
   onSettlement: vi.fn(),
@@ -681,4 +751,22 @@ const createRoomSnapshot = (): RoomSnapshot => ({
   seats: [{ seatId: 'left', profileId: aliceId }],
   socialEvents: [],
   game: new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot(),
+});
+
+const createChatEvent = (text: string): RoomSocialEvent => ({
+  kind: 'chat',
+  profileId: aliceId,
+  profileName: 'Alice',
+  role: 'player',
+  createdAt: 1,
+  text,
+});
+
+const createReactionEvent = (reaction: RoomReaction): RoomSocialEvent => ({
+  kind: 'reaction',
+  profileId: aliceId,
+  profileName: 'Alice',
+  role: 'player',
+  createdAt: 1,
+  reaction,
 });

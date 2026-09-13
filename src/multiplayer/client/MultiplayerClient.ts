@@ -5,6 +5,7 @@ import type { CasinoSessionState } from '../../state/session/CasinoSessionState'
 import { playerGameSnapshotsSchema } from '../../schemas/casinoSchemas/playerGameSnapshotsSchema';
 import type { RoomGameId } from '../protocol/RoomGameId';
 import type { RoomRole } from '../protocol/RoomRole';
+import type { RoomReaction } from '../protocol/RoomReaction';
 import type { RoomSeatId } from '../protocol/RoomSeatId';
 import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
 import { adminTokenStorageKey } from './adminTokenStorageKey';
@@ -84,6 +85,14 @@ export class MultiplayerClient extends MultiplayerClientConnection {
 
   public listRooms(gameId: RoomGameId): void {
     this.send({ type: 'list-rooms', gameId });
+  }
+
+  public sendRoomChat(text: string): boolean {
+    return this.send({ type: 'send-room-chat', text });
+  }
+
+  public sendRoomReaction(reaction: RoomReaction): void {
+    this.send({ type: 'send-room-reaction', reaction });
   }
 
   public createRoom(gameId: RoomGameId, roomName: string, maxPlayers: number, profileId: ProfileId, profileName: string, bankroll: number): void {

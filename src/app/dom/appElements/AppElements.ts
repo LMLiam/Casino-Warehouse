@@ -39,6 +39,11 @@ export interface AppElements {
   readonly roomStatus: HTMLElement;
   readonly roomMenu: HTMLDetailsElement;
   readonly roomSeats: HTMLElement;
+  readonly roomSocialUnread: HTMLSpanElement;
+  readonly roomSocialFeed: HTMLDivElement;
+  readonly roomReactions: HTMLDivElement;
+  readonly roomChatForm: HTMLFormElement;
+  readonly roomChatInput: HTMLInputElement;
   readonly roomBrowser: HTMLDivElement;
   readonly tableHost: HTMLDivElement;
   readonly beatSettlementAnnouncement: HTMLElement;

@@ -31,6 +31,7 @@ import { PlayerStripView } from '../views/PlayerStripView';
 import { ProfileSetupView } from '../views/ProfileSetupView';
 import { RoomBrowserView } from '../views/RoomBrowserView';
 import { RoomSeatsView } from '../views/RoomSeatsView';
+import { RoomSocialView } from '../views/RoomSocialView';
 import { RulesMenuView } from '../views/RulesMenuView';
 import { SlotsView } from '../views/SlotsView';
 import { WalletView } from '../views/WalletView';
@@ -63,6 +64,7 @@ export class GameApp extends GameAppProfileActions {
   protected readonly profileSetupView: ProfileSetupView;
   protected readonly roomBrowserView: RoomBrowserView;
   protected readonly roomSeatsView: RoomSeatsView;
+  protected readonly roomSocialView: RoomSocialView;
   protected readonly rulesMenuView: RulesMenuView;
   protected readonly slotsView: SlotsView;
   protected readonly walletView: WalletView;
@@ -100,6 +102,11 @@ export class GameApp extends GameAppProfileActions {
     this.profileSetupView = new ProfileSetupView(this.elements);
     this.roomBrowserView = new RoomBrowserView(this.elements);
     this.roomSeatsView = new RoomSeatsView(this.elements);
+    this.roomSocialView = new RoomSocialView(
+      this.elements,
+      (text) => this.multiplayer.sendRoomChat(text),
+      (reaction) => this.multiplayer.sendRoomReaction(reaction),
+    );
     this.rulesMenuView = new RulesMenuView(this.elements);
     this.slotsView = new SlotsView(this.elements);
     this.walletView = new WalletView(this.elements);
@@ -149,6 +156,7 @@ export class GameApp extends GameAppProfileActions {
         this.renderCasino();
         this.saveSession();
       },
+      onRoomSocialEvent: (roomId, event) => this.roomSocialView.append(roomId, event),
       onRoomCleared: () => this.returnHomeAfterRoomStateLoss(),
       onRoomList: (_gameId, rooms) => {
         this.multiplayerRooms = rooms;

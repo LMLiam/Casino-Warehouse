@@ -69,6 +69,7 @@ export abstract class GameAppSession extends GameAppRendering {
       this.multiplayerRooms = [];
       this.elements.shell.classList.add('hidden');
       this.elements.setup.classList.remove('hidden');
+      this.roomSocialView.clear();
       this.roomSeatsView.clear();
       this.beatControlsView.clearPending();
       this.beatSeatStatusView.clear();
@@ -116,6 +117,7 @@ export abstract class GameAppSession extends GameAppRendering {
     this.showingGameLobby = true;
     this.multiplayerRooms = [];
     this.elements.roomStatus.textContent = 'The room could not be restored. Choose a game to start or join a new room.';
+    this.roomSocialView.clear();
     this.roomSeatsView.clear();
     this.beatControlsView.clearPending();
     this.beatSeatStatusView.clear();
