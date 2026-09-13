@@ -110,6 +110,7 @@ export abstract class GameAppProfileActions extends GameAppRoomActions {
       return;
     }
     this.player = undefined;
+    this.roomSocialView.clear();
     this.walletView.clear();
     this.elements.beatSettlementAnnouncement.textContent = '';
     this.profileState = { profiles: [] };
@@ -128,6 +129,7 @@ export abstract class GameAppProfileActions extends GameAppRoomActions {
     ownedProfileIds.forEach((profileId) => this.ownedProfileIds.add(profileId));
     if (this.player && !this.ownedProfileIds.has(this.player.profileId)) {
       this.player = undefined;
+      this.roomSocialView.clear();
       this.walletView.clear();
       this.elements.beatSettlementAnnouncement.textContent = '';
     }

@@ -124,6 +124,7 @@ export abstract class GameAppRoomActions extends GameAppSession {
     }
     this.multiplayer.leaveRoom();
     this.elements.roomStatus.textContent = 'Left room. No active game room is connected.';
+    this.roomSocialView.clear();
     this.roomSeatsView.clear();
     this.beatControlsView.clearPending();
     this.beatSeatStatusView.clear();
@@ -137,6 +138,7 @@ export abstract class GameAppRoomActions extends GameAppSession {
   protected goHome(): void {
     if (this.activeRoomForGame() && this.multiplayer.connected) {
       this.multiplayer.leaveRoom();
+      this.roomSocialView.clear();
       this.roomSeatsView.clear();
       this.beatControlsView.clearPending();
       this.beatSeatStatusView.clear();
@@ -166,6 +168,7 @@ export abstract class GameAppRoomActions extends GameAppSession {
     this.multiplayerRooms = [];
     this.clearClientSession();
     this.profileSetupView.clearSelection();
+    this.roomSocialView.clear();
     this.roomSeatsView.clear();
     this.beatControlsView.clearPending();
     this.beatSeatStatusView.clear();

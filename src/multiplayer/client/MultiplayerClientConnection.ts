@@ -2,6 +2,7 @@ import type { ClientMessage } from '../protocol/ClientMessage';
 import { authTokenSchema } from '../../schemas/casinoSchemas/authTokenSchema';
 import { decodeServerMessage } from '../protocol/decodeServerMessage';
 import { encodeMessage } from '../protocol/encodeMessage';
+import { maxRoomSocialEvents } from '../protocol/maxRoomSocialEvents';
 import type { RoomSnapshot } from '../protocol/RoomSnapshot';
 import type { ServerInstanceId } from '../../schemas/casinoSchemas/ServerInstanceId';
 import { adminTokenStorageKey } from './adminTokenStorageKey';
@@ -213,6 +214,17 @@ export abstract class MultiplayerClientConnection extends MultiplayerClientStora
     if (message.type === 'room-state') {
       this.lastRoom = message.room;
       this.events.onRoom(message.room);
+      return;
+    }
+    if (message.type === 'room-social-event') {
+      if (this.lastRoom?.roomId !== message.roomId) {
+        return;
+      }
+      this.lastRoom = {
+        ...this.lastRoom,
+        socialEvents: [...this.lastRoom.socialEvents, message.event].slice(-maxRoomSocialEvents),
+      };
+      this.events.onRoomSocialEvent(message.roomId, message.event);
       return;
     }
     if (message.type === 'settlement') {
