@@ -136,6 +136,7 @@ export class RoomAuthority extends RoomAuthorityBeat {
       spectators: new Map(),
       connectionToMember: new Map(),
       seats: new Map(),
+      socialEvents: [],
       model: createGameModel(message.gameId, bankroll),
       createdAt: now,
       updatedAt: now,

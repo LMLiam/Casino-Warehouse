@@ -14,6 +14,7 @@ import type { ConnectionId } from '../schemas/casinoSchemas/ConnectionId';
 import type { ProfileId } from '../schemas/casinoSchemas/ProfileId';
 import type { RoomSeat } from './protocol/RoomSeat';
 import type { RoomSeatId } from './protocol/RoomSeatId';
+import { maxRoomSocialEvents } from './protocol/maxRoomSocialEvents';
 import type { RoomSnapshot } from './protocol/RoomSnapshot';
 import type { RoomSummary } from './protocol/RoomSummary';
 import type { AuthorityResult } from './roomAuthorityModel/AuthorityResult';
@@ -104,6 +105,7 @@ export abstract class RoomAuthorityBase extends RoomAuthorityMembership {
       players: [...room.players.values()],
       spectators: [...room.spectators.values()],
       seats: this.seatIds(room).map((seatId): RoomSeat => ({ seatId, profileId: room.seats.get(seatId) })),
+      socialEvents: room.socialEvents.slice(-maxRoomSocialEvents),
       game,
       beat,
       slots:

@@ -3,6 +3,7 @@ import { BeatTheHouseGame } from '../../../src/game/engine/BeatTheHouseGame';
 import type { GameSnapshot } from '../../../src/game/types/GameSnapshot';
 import type { ClientMessage } from '../../../src/multiplayer/protocol/ClientMessage';
 import type { RoomSnapshot } from '../../../src/multiplayer/protocol/RoomSnapshot';
+import type { RoomSocialEvent } from '../../../src/multiplayer/protocol/RoomSocialEvent';
 import type { RoomSummary } from '../../../src/multiplayer/protocol/RoomSummary';
 import type { ServerMessage } from '../../../src/multiplayer/protocol/ServerMessage';
 import type { CasinoSaveState } from '../../../src/state/profiles/CasinoSaveState';
@@ -115,6 +116,24 @@ const blackjackSnapshotFixture = {
 
 const beatSnapshotFixture = new BeatTheHouseGame({ initialBankroll: 500 }).snapshot() satisfies GameSnapshot;
 
+const chatSocialEventFixture = {
+  kind: 'chat',
+  profileId: profileAliceId,
+  profileName: 'Alice',
+  role: 'player',
+  createdAt: 1778407320000,
+  text: 'Hello, room.',
+} satisfies RoomSocialEvent;
+
+const reactionSocialEventFixture = {
+  kind: 'reaction',
+  profileId: profileSpectatorId,
+  profileName: 'Spectator',
+  role: 'spectator',
+  createdAt: 1778407321000,
+  reaction: 'cheer',
+} satisfies RoomSocialEvent;
+
 const sessionStateCurrentV2Fixture = {
   profileId: profileAliceId,
   activeGame: 'blackjack',
@@ -176,6 +195,7 @@ const roomSnapshotFixture = {
       seatId: blackjackSeat2,
     },
   ],
+  socialEvents: [],
   game: blackjackSnapshotFixture,
 } satisfies RoomSnapshot;
 
@@ -225,6 +245,7 @@ const beatRoomSnapshotFixture = {
       seatId: 'right',
     },
   ],
+  socialEvents: [],
   game: beatSnapshotFixture,
   beat: {
     rebetSeatIds: ['left'],
@@ -314,6 +335,8 @@ export const clientMessageContractFixtures = [
   { type: 'start-round' },
   { type: 'player-action', action: 'stick' },
   { type: 'next-round' },
+  { type: 'send-room-chat', text: 'Hello, room.' },
+  { type: 'send-room-reaction', reaction: 'nice' },
   { type: 'admin-debug', action: 'force-settle', reason: 'contract fixture' },
   { type: 'resync' },
 ] satisfies readonly ClientMessage[];
@@ -331,6 +354,8 @@ export const serverMessageContractFixtures = [
   { type: 'room-list', gameId: 'blackjack', rooms: [roomSummaryFixture] },
   { type: 'room-state', room: roomSnapshotFixture },
   { type: 'room-state', room: beatRoomSnapshotFixture },
+  { type: 'room-social-event', roomId: room42Id, event: chatSocialEventFixture },
+  { type: 'room-social-event', roomId: room42Id, event: reactionSocialEventFixture },
   {
     type: 'settlement',
     roomId: room42Id,
@@ -377,6 +402,10 @@ export const clientProtocolInvalidFixtures = [
   { label: 'unknown message type', value: { type: 'select-game', gameId: 'blackjack' } },
   { label: 'missing required field', value: { type: 'join-room', gameId: 'blackjack' } },
   { label: 'invalid game action payload', value: { type: 'blackjack-action', action: 'fold' } },
+  { label: 'whitespace-only room chat', value: { type: 'send-room-chat', text: '   \t\n' } },
+  { label: 'overlong room chat', value: { type: 'send-room-chat', text: '🙂'.repeat(281) } },
+  { label: 'unknown room reaction', value: { type: 'send-room-reaction', reaction: 'thumbs-up' } },
+  { label: 'room chat identity field', value: { type: 'send-room-chat', text: 'Hello, room.', profileId: profileAliceId } },
 ] as const;
 
 export const serverProtocolInvalidFixtures = [
@@ -389,6 +418,17 @@ export const serverProtocolInvalidFixtures = [
       type: 'room-list',
       gameId: 'slots:house-of-sevens',
       rooms: [],
+    },
+  },
+  {
+    label: 'extra room social event field',
+    value: {
+      type: 'room-social-event',
+      roomId: room42Id,
+      event: {
+        ...chatSocialEventFixture,
+        extra: true,
+      },
     },
   },
 ] as const;

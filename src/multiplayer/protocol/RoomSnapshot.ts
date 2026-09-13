@@ -8,6 +8,7 @@ import type { RoomPlayer } from './RoomPlayer';
 import type { RoomPhase } from './RoomPhase';
 import type { RoomReadyPhase } from './RoomReadyPhase';
 import type { RoomSeat } from './RoomSeat';
+import type { RoomSocialEvent } from './RoomSocialEvent';
 import type { RoomStatus } from './RoomStatus';
 
 export interface RoomSnapshot {
@@ -27,6 +28,7 @@ export interface RoomSnapshot {
   readonly players: readonly RoomPlayer[];
   readonly spectators: readonly RoomPlayer[];
   readonly seats: readonly RoomSeat[];
+  readonly socialEvents: readonly RoomSocialEvent[];
   readonly game: RoomGameSnapshot;
   readonly beat?:
     | {

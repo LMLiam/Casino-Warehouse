@@ -6,6 +6,8 @@ import { parseCasinoSaveState } from '../../../src/state/profiles/parseCasinoSav
 import { parseProfileStoreJson } from '../../../src/state/profiles/parseProfileStoreJson';
 import { parseSessionState } from '../../../src/state/session/parseSessionState';
 import { clientMessageSchema } from '../../../src/schemas/protocol/clientMessageSchema';
+import { roomChatTextSchema } from '../../../src/schemas/casinoSchemas/roomChatTextSchema';
+import { roomReactionSchema } from '../../../src/schemas/casinoSchemas/roomReactionSchema';
 import type { JsonValue } from '../../../src/schemas/casinoSchemas/JsonValue';
 import {
   clientMessageContractFixtures,
@@ -42,6 +44,24 @@ describe('schema contract fixtures', () => {
     for (const fixture of serverProtocolInvalidFixtures) {
       expect(decodeServerMessage(JSON.stringify(fixture.value)), fixture.label).toBeUndefined();
     }
+  });
+
+  it('counts room chat Unicode code points instead of UTF-16 code units', () => {
+    const accepted = '🙂'.repeat(280);
+    const rejected = `${accepted}🙂`;
+
+    expect(roomChatTextSchema.parse(`  ${accepted}  `)).toBe(accepted);
+    expect(roomChatTextSchema.safeParse(accepted).success).toBe(true);
+    expect(roomChatTextSchema.safeParse(rejected).success).toBe(false);
+  });
+
+  it('accepts only the fixed room reaction identifiers', () => {
+    const reactions = ['nice', 'cheer', 'laugh', 'wow', 'ouch', 'gg'] as const;
+
+    for (const reaction of reactions) {
+      expect(roomReactionSchema.safeParse(reaction).success).toBe(true);
+    }
+    expect(roomReactionSchema.safeParse('thumbs-up').success).toBe(false);
   });
 
   it('accepts only the current unversioned profile-store contract', () => {

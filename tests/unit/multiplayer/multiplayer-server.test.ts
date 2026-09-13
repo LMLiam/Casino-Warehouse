@@ -1558,5 +1558,6 @@ const createRoomSnapshot = (connectionId: string): RoomSnapshot => ({
   ],
   spectators: [],
   seats: [{ seatId: 'left', profileId: aliceId }, { seatId: 'centre' }, { seatId: 'right' }],
+  socialEvents: [],
   game: new BeatTheHouseGame({ initialBankroll: 0 }).snapshot(),
 });

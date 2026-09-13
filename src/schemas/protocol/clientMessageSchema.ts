@@ -9,9 +9,11 @@ import { positiveNetworkCreditSchema } from '../casinoSchemas/positiveNetworkCre
 import { profileIdSchema } from '../casinoSchemas/profileIdSchema';
 import { profileNameSchema } from '../casinoSchemas/profileNameSchema';
 import { profileTokenSchema } from '../casinoSchemas/profileTokenSchema';
+import { roomChatTextSchema } from '../casinoSchemas/roomChatTextSchema';
 import { roomGameIdSchema } from '../casinoSchemas/roomGameIdSchema';
 import { roomIdSchema } from '../casinoSchemas/roomIdSchema';
 import { roomNameSchema } from '../casinoSchemas/roomNameSchema';
+import { roomReactionSchema } from '../casinoSchemas/roomReactionSchema';
 import { roomRoleSchema } from '../casinoSchemas/roomRoleSchema';
 import { roomSeatIdSchema } from '../casinoSchemas/roomSeatIdSchema';
 
@@ -95,6 +97,8 @@ export const clientMessageSchema = (() => {
       })
       .merge(identitySchema),
     baseClientMessageSchema.extend({ type: z.literal('leave-room') }),
+    baseClientMessageSchema.extend({ type: z.literal('send-room-chat'), text: roomChatTextSchema }),
+    baseClientMessageSchema.extend({ type: z.literal('send-room-reaction'), reaction: roomReactionSchema }),
     baseClientMessageSchema.extend({ type: z.literal('assign-seat'), seatId: roomSeatIdSchema }),
     baseClientMessageSchema.extend({ type: z.literal('place-chip'), seatId: handIdSchema, betType: betTypeSchema, amount: positiveNetworkCreditSchema }),
     baseClientMessageSchema.extend({ type: z.literal('place-tip'), seatId: handIdSchema, amount: positiveNetworkCreditSchema }),

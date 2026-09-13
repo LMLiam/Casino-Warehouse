@@ -679,5 +679,6 @@ const createRoomSnapshot = (): RoomSnapshot => ({
   players: [{ connectionId: testConnectionId('conn-a'), profileId: aliceId, profileName: 'Alice', bankroll: 1000, sessionStartBankroll: 1000, role: 'player' }],
   spectators: [],
   seats: [{ seatId: 'left', profileId: aliceId }],
+  socialEvents: [],
   game: new BeatTheHouseGame({ initialBankroll: 1000 }).snapshot(),
 });
