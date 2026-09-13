@@ -544,6 +544,311 @@ describe('multiplayer WebSocket server', () => {
     expect(afterDisconnectPlayer.profileId).toBe(aliceProfile.id);
   });
 
+  it('delivers room social events only to current room members', async () => {
+    const baseUrl = await startServer();
+    const alice = await connect(baseUrl.ws);
+    const bob = await connect(baseUrl.ws);
+    const sue = await connect(baseUrl.ws);
+    const roomBPeer = await connect(baseUrl.ws);
+    const lobby = await connect(baseUrl.ws);
+    const { profile: aliceProfile, profileToken: aliceProfileToken } = await createServerProfileWithCredentials(alice, 'Room Alice');
+    const bobProfile = await createServerProfile(bob, 'Room Bob');
+    const sueProfile = await createServerProfile(sue, 'Room Sue');
+    const roomBProfile = await createServerProfile(roomBPeer, 'Room B Peer');
+
+    alice.send({ type: 'create-room', gameId: 'beat-the-house', profileId: aliceProfile.id, profileName: 'Spoof Alice', bankroll: 1 });
+    const created = await alice.waitFor((message) => message.type === 'room-created');
+    if (created.type !== 'room-created') {
+      throw new Error('Expected Room A to be created.');
+    }
+    const roomId = created.room.roomId;
+
+    alice.send({ type: 'assign-seat', seatId: 'left' });
+    await waitForRoom(alice, (room) => room.roomId === roomId && room.players.some((player) => player.profileId === aliceProfile.id));
+
+    bob.send({
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId,
+      role: 'player',
+      profileId: bobProfile.id,
+      profileName: 'Spoof Bob',
+      bankroll: 1,
+    });
+    await waitForRoom(bob, (room) => room.roomId === roomId && room.spectators.some((player) => player.profileId === bobProfile.id));
+    bob.send({ type: 'assign-seat', seatId: 'centre' });
+    await waitForRoom(alice, (room) => room.roomId === roomId && room.players.some((player) => player.profileId === bobProfile.id));
+
+    sue.send({
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId,
+      role: 'spectator',
+      profileId: sueProfile.id,
+      profileName: 'Spoof Sue',
+      bankroll: 1,
+    });
+    const roomA = await waitForRoom(sue, (room) => room.roomId === roomId && room.players.length === 2 && room.spectators.length === 1);
+    expect(roomA.players.map((player) => player.profileId)).toEqual(expect.arrayContaining([aliceProfile.id, bobProfile.id]));
+    expect(roomA.spectators.map((player) => player.profileId)).toEqual([sueProfile.id]);
+
+    roomBPeer.send({ type: 'create-room', gameId: 'beat-the-house', profileId: roomBProfile.id, profileName: 'Spoof Room B', bankroll: 1 });
+    const roomBCreated = await roomBPeer.waitFor((message) => message.type === 'room-created');
+    if (roomBCreated.type !== 'room-created') {
+      throw new Error('Expected Room B to be created.');
+    }
+    expect(roomBCreated.room.roomId).not.toBe(roomId);
+
+    lobby.send({ type: 'list-rooms', gameId: 'beat-the-house' });
+    await lobby.waitFor((message) => message.type === 'room-list' && message.gameId === 'beat-the-house');
+
+    const roomPeers = [alice, bob, sue] as const;
+    const observers = [roomBPeer, lobby] as const;
+    const allPeers = [...roomPeers, ...observers];
+    const checkpointFor = (checkpoints: ReadonlyMap<SocketProbe, number>, probe: SocketProbe): number => {
+      const checkpoint = checkpoints.get(probe);
+      if (checkpoint === undefined) {
+        throw new Error('Missing WebSocket checkpoint.');
+      }
+      return checkpoint;
+    };
+    const checkpointAll = (): ReadonlyMap<SocketProbe, number> => new Map(allPeers.map((probe) => [probe, probe.checkpoint()] as const));
+    const assertSocialDelivery = (checkpoints: ReadonlyMap<SocketProbe, number>, expected: ReturnType<typeof socialMessage>): void => {
+      for (const probe of roomPeers) {
+        const messages = probe.messagesSince(checkpointFor(checkpoints, probe)).filter((message) => message.type !== 'heartbeat');
+        expect(messages).toHaveLength(1);
+        const received = messages[0];
+        if (!received) {
+          throw new Error('Expected one room social event.');
+        }
+        expect(socialMessage(received)).toEqual(expected);
+      }
+    };
+    const assertNoSocialDelivery = async (checkpoints: ReadonlyMap<SocketProbe, number>): Promise<void> => {
+      await settleSocketMessages();
+      for (const probe of observers) {
+        expect(probe.messagesSince(checkpointFor(checkpoints, probe)).filter((message) => message.type !== 'heartbeat')).toEqual([]);
+      }
+    };
+
+    const malformedPayloads = [
+      JSON.stringify({ type: 'send-room-chat', text: '   ' }),
+      JSON.stringify({ type: 'send-room-reaction', reaction: 'not-a-reaction' }),
+      JSON.stringify({ type: 'send-room-chat', text: 'valid', unexpected: true }),
+    ];
+    for (const payload of malformedPayloads) {
+      const checkpoint = alice.checkpoint();
+      alice.sendRaw(payload);
+      await waitForMessageSince(alice, checkpoint, (message) => message.type === 'error' && message.code === 'bad-message');
+    }
+
+    const socialHistory: Array<ReturnType<typeof socialMessage>['event']> = [];
+
+    const chatCheckpoints = checkpointAll();
+    alice.send({ type: 'send-room-chat', text: 'Room A chat' });
+    const chatMessages = await Promise.all(
+      roomPeers.map((probe) =>
+        waitForMessageSince(probe, checkpointFor(chatCheckpoints, probe), (message) => message.type === 'room-social-event' && message.roomId === roomId),
+      ),
+    );
+    const firstChatMessage = chatMessages[0];
+    if (!firstChatMessage) {
+      throw new Error('Expected the chat event to reach Room A.');
+    }
+    const chat = socialMessage(firstChatMessage);
+    expect(chat).toMatchObject({
+      type: 'room-social-event',
+      roomId,
+      event: {
+        kind: 'chat',
+        profileId: aliceProfile.id,
+        profileName: aliceProfile.name,
+        role: 'player',
+        createdAt: expect.any(Number),
+        text: 'Room A chat',
+      },
+    });
+    expect(Object.keys(chat.event).sort()).toEqual(['createdAt', 'kind', 'profileId', 'profileName', 'role', 'text'].sort());
+    socialHistory.push(chat.event);
+    assertSocialDelivery(chatCheckpoints, chat);
+    await assertNoSocialDelivery(chatCheckpoints);
+
+    const spectatorChatCheckpoints = checkpointAll();
+    sue.send({ type: 'send-room-chat', text: 'Room A spectator chat' });
+    const spectatorChatMessages = await Promise.all(
+      roomPeers.map((probe) =>
+        waitForMessageSince(
+          probe,
+          checkpointFor(spectatorChatCheckpoints, probe),
+          (message) => message.type === 'room-social-event' && message.roomId === roomId,
+        ),
+      ),
+    );
+    const firstSpectatorChatMessage = spectatorChatMessages[0];
+    if (!firstSpectatorChatMessage) {
+      throw new Error('Expected the spectator chat event to reach Room A.');
+    }
+    const spectatorChat = socialMessage(firstSpectatorChatMessage);
+    expect(spectatorChat).toMatchObject({
+      type: 'room-social-event',
+      roomId,
+      event: {
+        kind: 'chat',
+        profileId: sueProfile.id,
+        profileName: sueProfile.name,
+        role: 'spectator',
+        createdAt: expect.any(Number),
+        text: 'Room A spectator chat',
+      },
+    });
+    expect(Object.keys(spectatorChat.event).sort()).toEqual(['createdAt', 'kind', 'profileId', 'profileName', 'role', 'text'].sort());
+    socialHistory.push(spectatorChat.event);
+    assertSocialDelivery(spectatorChatCheckpoints, spectatorChat);
+    await assertNoSocialDelivery(spectatorChatCheckpoints);
+
+    const reactionCases = [
+      { sender: alice, profileId: aliceProfile.id, profileName: aliceProfile.name, role: 'player' as const, reaction: 'nice' as const },
+      { sender: sue, profileId: sueProfile.id, profileName: sueProfile.name, role: 'spectator' as const, reaction: 'cheer' as const },
+    ];
+    for (const reactionCase of reactionCases) {
+      const reactionCheckpoints = checkpointAll();
+      reactionCase.sender.send({ type: 'send-room-reaction', reaction: reactionCase.reaction });
+      const reactionMessages = await Promise.all(
+        roomPeers.map((probe) =>
+          waitForMessageSince(probe, checkpointFor(reactionCheckpoints, probe), (message) => message.type === 'room-social-event' && message.roomId === roomId),
+        ),
+      );
+      const firstReactionMessage = reactionMessages[0];
+      if (!firstReactionMessage) {
+        throw new Error('Expected the reaction event to reach Room A.');
+      }
+      const reaction = socialMessage(firstReactionMessage);
+      expect(reaction).toMatchObject({
+        type: 'room-social-event',
+        roomId,
+        event: {
+          kind: 'reaction',
+          profileId: reactionCase.profileId,
+          profileName: reactionCase.profileName,
+          role: reactionCase.role,
+          createdAt: expect.any(Number),
+          reaction: reactionCase.reaction,
+        },
+      });
+      expect(Object.keys(reaction.event).sort()).toEqual(['createdAt', 'kind', 'profileId', 'profileName', 'reaction', 'role'].sort());
+      socialHistory.push(reaction.event);
+      assertSocialDelivery(reactionCheckpoints, reaction);
+      await assertNoSocialDelivery(reactionCheckpoints);
+    }
+
+    const resyncCheckpoint = alice.checkpoint();
+    alice.send({ type: 'resync' });
+    const resynced = await waitForMessageSince(alice, resyncCheckpoint, (message) => message.type === 'room-created' && message.room.roomId === roomId);
+    if (resynced.type !== 'room-created') {
+      throw new Error('Expected the room snapshot during resync.');
+    }
+    expect(resynced.room.socialEvents).toEqual(socialHistory);
+    expect(resynced.room.socialEvents.map((event) => event.createdAt)).toEqual(socialHistory.map((event) => event.createdAt));
+    expect(resynced.room.socialEvents.map((event) => event.kind)).toEqual(['chat', 'chat', 'reaction', 'reaction']);
+    expect(alice.messagesSince(resyncCheckpoint).filter((message) => message.type !== 'heartbeat')).toEqual([resynced]);
+
+    await alice.closeAndWait();
+    const reconnectedAlice = await connect(baseUrl.ws);
+    reconnectedAlice.send({
+      type: 'authorize-profiles',
+      profileTokens: [{ profileId: aliceProfile.id, profileToken: aliceProfileToken }],
+    });
+    await reconnectedAlice.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(aliceProfile.id));
+    const reconnectCheckpoint = reconnectedAlice.checkpoint();
+    reconnectedAlice.send({
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId,
+      role: 'player',
+      seatId: 'left',
+      profileId: aliceProfile.id,
+      profileName: 'Spoof Reconnected Alice',
+      bankroll: 1,
+    });
+    const restoredRoomState = await waitForMessageSince(
+      reconnectedAlice,
+      reconnectCheckpoint,
+      (message) => message.type === 'room-state' && message.room.roomId === roomId,
+    );
+    if (restoredRoomState.type !== 'room-state') {
+      throw new Error('Expected the reconnected member to receive Room A state.');
+    }
+    expect(restoredRoomState.room.players.some((player) => player.profileId === aliceProfile.id && player.role === 'player')).toBe(true);
+    expect(restoredRoomState.room.socialEvents).toEqual(socialHistory);
+  });
+
+  it('keeps profile data but loses room social history after a server restart', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'casino-room-social-restart-'));
+    tempDirs.push(dir);
+    const dbPath = join(dir, 'casino.sqlite');
+
+    let baseUrl = await startServer('.', undefined, { dataStore: new SqliteServerDataStore(dbPath) });
+    const alice = await connect(baseUrl.ws);
+    const { profile, profileToken } = await createServerProfileWithCredentials(alice, 'Restart Alice');
+    alice.send({
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId: mainBeatRoomId,
+      role: 'spectator',
+      profileId: profile.id,
+      profileName: 'Spoof Restart Alice',
+      bankroll: 1,
+    });
+    await waitForRoom(alice, (room) => room.roomId === mainBeatRoomId && room.spectators.some((member) => member.profileId === profile.id));
+
+    const socialCheckpoint = alice.checkpoint();
+    alice.send({ type: 'send-room-chat', text: 'This event is in memory only' });
+    const socialEvent = await waitForMessageSince(
+      alice,
+      socialCheckpoint,
+      (message) => message.type === 'room-social-event' && message.roomId === mainBeatRoomId,
+    );
+    const recordedSocialEvent = socialMessage(socialEvent);
+    if (recordedSocialEvent.event.kind !== 'chat') {
+      throw new Error('Expected the restart fixture to record a chat event.');
+    }
+    expect(recordedSocialEvent.event.text).toBe('This event is in memory only');
+
+    await closeCurrentServer();
+
+    baseUrl = await startServer('.', undefined, { dataStore: new SqliteServerDataStore(dbPath) });
+    const returning = await connect(baseUrl.ws);
+    const restoredData = await returning.waitFor(
+      (message) => message.type === 'data-state' && message.profileState.profiles.some((candidate) => candidate.id === profile.id),
+    );
+    expect(restoredData.type === 'data-state' ? restoredData.profileState.profiles.map((candidate) => candidate.id) : []).toContain(profile.id);
+
+    returning.send({ type: 'authorize-profiles', profileTokens: [{ profileId: profile.id, profileToken }] });
+    await returning.waitFor((message) => message.type === 'profile-access' && message.ownedProfileIds.includes(profile.id));
+    const restoredRoomCheckpoint = returning.checkpoint();
+    returning.send({
+      type: 'join-room',
+      gameId: 'beat-the-house',
+      roomId: mainBeatRoomId,
+      role: 'spectator',
+      profileId: profile.id,
+      profileName: 'Spoof Returning Alice',
+      bankroll: 1,
+    });
+    const restoredRoom = await waitForMessageSince(
+      returning,
+      restoredRoomCheckpoint,
+      (message) => message.type === 'room-state' && message.room.roomId === mainBeatRoomId,
+    );
+    if (restoredRoom.type !== 'room-state') {
+      throw new Error('Expected the restarted server to send the main room state.');
+    }
+    expect(restoredRoom.room.socialEvents).toEqual([]);
+    const restoredMessages = returning.messagesSince(restoredRoomCheckpoint).filter((message) => message.type !== 'heartbeat');
+    expect(restoredMessages[0]).toEqual(restoredRoom);
+    expect(restoredMessages.some((message) => message.type === 'room-social-event')).toBe(false);
+  });
+
   it('sends a saved private Beat shoe only to its authorised profile owner', async () => {
     const baseUrl = await startServer();
     const alice = await connect(baseUrl.ws);
@@ -1441,6 +1746,13 @@ const waitForReceivedCount = async (probe: SocketProbe, predicate: (message: Ser
 
 const roomMembers = (room: RoomSnapshot) => [...room.players, ...room.spectators];
 
+const socialMessage = (message: ServerMessage): Extract<ServerMessage, { readonly type: 'room-social-event' }> => {
+  if (message.type !== 'room-social-event') {
+    throw new Error('Expected a room-social-event message.');
+  }
+  return message;
+};
+
 interface MessageProbe {
   messagesSince(checkpoint: number): readonly ServerMessage[];
 }
@@ -1455,6 +1767,11 @@ const waitForMessageSince = async (probe: MessageProbe, checkpoint: number, pred
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   throw new Error('Timed out waiting for matching WebSocket message.');
+};
+
+const settleSocketMessages = async (): Promise<void> => {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await new Promise<void>((resolve) => setImmediate(resolve));
 };
 
 const waitForCloseCodeSince = async (probe: RawSocketProbe, checkpoint: number, code: number): Promise<void> => {
@@ -1486,6 +1803,25 @@ const createServerProfile = async (probe: SocketProbe, profileName: string): Pro
     throw new Error(`Expected profile ${profileName}.`);
   }
   return profile;
+};
+
+const createServerProfileWithCredentials = async (
+  probe: SocketProbe,
+  profileName: string,
+): Promise<{
+  readonly profile: CasinoProfile;
+  readonly profileToken: Extract<ServerMessage, { readonly type: 'profile-credentials' }>['profileToken'];
+}> => {
+  probe.send({ type: 'create-profile', profileName });
+  const credentials = await probe.waitFor((message) => message.type === 'profile-credentials');
+  const profileData = await probe.waitFor(
+    (message) => message.type === 'data-state' && message.profileState.profiles.some((profile) => profile.name === profileName),
+  );
+  const profile = profileData.type === 'data-state' ? profileData.profileState.profiles.find((candidate) => candidate.name === profileName) : undefined;
+  if (!profile || credentials.type !== 'profile-credentials') {
+    throw new Error(`Expected profile ${profileName} and credentials.`);
+  }
+  return { profile, profileToken: credentials.profileToken };
 };
 
 const authorizeAdmin = async (probe: SocketProbe, adminToken: string): Promise<void> => {

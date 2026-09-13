@@ -85,6 +85,9 @@ export class CasinoServerState {
         invitePath: this.createInvitePath(result.direct.gameId, result.direct.roomId),
       });
     }
+    if (result.socialEvent) {
+      this.broadcast({ type: 'room-social-event', roomId: result.socialEvent.roomId, event: result.socialEvent.event }, result.socialEvent.connectionIds);
+    }
     for (const closure of result.roomClosures ?? []) {
       this.broadcast({ type: 'room-closed', roomId: closure.roomId, gameId: closure.gameId, reason: closure.reason }, closure.connectionIds);
     }
