@@ -15,6 +15,7 @@ import { roomIdSchema } from '../casinoSchemas/roomIdSchema';
 import { roomReadyPhaseSchema } from '../casinoSchemas/roomReadyPhaseSchema';
 import { roomRoleSchema } from '../casinoSchemas/roomRoleSchema';
 import { roomSeatIdSchema } from '../casinoSchemas/roomSeatIdSchema';
+import { roomSocialEventSchema } from './roomSocialEventSchema';
 import { roomStatusSchema } from '../casinoSchemas/roomStatusSchema';
 import { serverInstanceIdSchema } from '../casinoSchemas/serverInstanceIdSchema';
 import { sessionIdSchema } from '../casinoSchemas/sessionIdSchema';
@@ -108,6 +109,7 @@ export const serverMessageSchema = (() => {
       game: roomGameSnapshotSchema,
       beat: beatRoomStateSchema.optional(),
       slots: slotsRoomStateSchema.optional(),
+      socialEvents: z.array(roomSocialEventSchema),
     })
     .strict();
 
@@ -176,6 +178,7 @@ export const serverMessageSchema = (() => {
     baseServerMessageSchema.extend({ type: z.literal('room-closed'), roomId: roomIdSchema, gameId: roomGameIdSchema, reason: z.string() }),
     baseServerMessageSchema.extend({ type: z.literal('room-list'), gameId: roomGameIdSchema, rooms: z.array(roomSummaryShapeSchema) }),
     baseServerMessageSchema.extend({ type: z.literal('room-state'), room: roomSnapshotShapeSchema }),
+    baseServerMessageSchema.extend({ type: z.literal('room-social-event'), roomId: roomIdSchema, event: roomSocialEventSchema }),
     baseServerMessageSchema.extend({
       type: z.literal('settlement'),
       roomId: roomIdSchema,

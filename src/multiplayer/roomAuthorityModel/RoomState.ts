@@ -4,6 +4,7 @@ import type { RoomGameId } from '../protocol/RoomGameId';
 import type { RoomPlayer } from '../protocol/RoomPlayer';
 import type { RoomRole } from '../protocol/RoomRole';
 import type { RoomSeatId } from '../protocol/RoomSeatId';
+import type { RoomSocialEvent } from '../protocol/RoomSocialEvent';
 import type { ProfileId } from '../../schemas/casinoSchemas/ProfileId';
 import type { ConnectionId } from '../../schemas/casinoSchemas/ConnectionId';
 import type { RoomId } from '../../schemas/casinoSchemas/RoomId';
@@ -22,6 +23,7 @@ export interface RoomState {
   readonly spectators: Map<ProfileId, RoomPlayer>;
   readonly connectionToMember: Map<ConnectionId, { readonly profileId: ProfileId; readonly role: RoomRole }>;
   readonly seats: Map<RoomSeatId, ProfileId>;
+  socialEvents: RoomSocialEvent[];
   readonly model: GameModel;
   readonly createdAt: number;
   updatedAt: number;

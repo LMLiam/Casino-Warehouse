@@ -8,6 +8,7 @@ import type { ServerInstanceId } from '../../schemas/casinoSchemas/ServerInstanc
 import type { SessionId } from '../../schemas/casinoSchemas/SessionId';
 import type { RoomGameId } from './RoomGameId';
 import type { RoomSettlement } from './RoomSettlement';
+import type { RoomSocialEvent } from './RoomSocialEvent';
 import type { RoomSnapshot } from './RoomSnapshot';
 import type { RoomSummary } from './RoomSummary';
 
@@ -28,5 +29,6 @@ export type ServerMessage =
   | { readonly type: 'room-closed'; readonly roomId: RoomId; readonly gameId: RoomGameId; readonly reason: string }
   | { readonly type: 'room-list'; readonly gameId: RoomGameId; readonly rooms: readonly RoomSummary[] }
   | { readonly type: 'room-state'; readonly room: RoomSnapshot }
+  | { readonly type: 'room-social-event'; readonly roomId: RoomId; readonly event: RoomSocialEvent }
   | { readonly type: 'settlement'; readonly roomId: RoomId; readonly sessionId: SessionId; readonly settlements: readonly RoomSettlement[] }
   | { readonly type: 'error'; readonly code: string; readonly message: string };

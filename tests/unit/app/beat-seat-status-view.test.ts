@@ -83,6 +83,7 @@ const createRoom = (game: GameSnapshot): RoomSnapshot => ({
   players: [{ connectionId: testConnectionId('a'), profileId: aliceId, profileName: 'Alice', bankroll: 95, sessionStartBankroll: 100, role: 'player' }],
   spectators: [],
   seats: [{ seatId: 'left', profileId: aliceId }, { seatId: 'centre' }, { seatId: 'right' }],
+  socialEvents: [],
   game,
   beat: { rebetSeatIds: [], readyProfileIds: [], readyCount: 0, playerCount: 1 },
 });

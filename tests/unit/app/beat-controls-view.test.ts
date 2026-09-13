@@ -113,6 +113,7 @@ const createRoom = (
   ],
   spectators: [],
   seats: options.seats ?? [{ seatId: 'left', profileId: aliceId }, { seatId: 'right', profileId: bobId }, { seatId: 'centre' }],
+  socialEvents: [],
   game,
   beat: { rebetSeatIds: options.rebetSeatIds ?? ['left'], readyProfileIds: [], readyCount: 0, playerCount: options.players?.length ?? 2 },
 });

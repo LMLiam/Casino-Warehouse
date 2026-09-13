@@ -21,6 +21,7 @@ export const createServerManagedBeatRoom = (): RoomState => {
     spectators: new Map(),
     connectionToMember: new Map(),
     seats: new Map(),
+    socialEvents: [],
     model: createGameModel('beat-the-house', 0),
     createdAt: now,
     updatedAt: now,
